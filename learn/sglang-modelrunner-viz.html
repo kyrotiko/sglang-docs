@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SGLang：ModelRunner、AttentionBackend 与一次前向的驱动过程</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#fafafa;color:#222;line-height:1.6}
+header{padding:14px 24px;background:#1f2937;color:#fff}
+header h1{margin:0;font-size:19px}
+nav.steps{display:flex;flex-wrap:wrap;gap:6px;padding:10px 24px;background:#fff;border-bottom:1px solid #ddd}
+nav.steps button{border:1px solid #bbb;background:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:14px}
+nav.steps button[aria-current="step"]{background:#1f2937;color:#fff;border-color:#1f2937}
+main{padding:14px 24px;max-width:1320px}
+h2{margin:4px 0 8px;font-size:18px}
+h3{font-size:15px;margin:14px 0 6px}
+.desc{background:#fff;border-left:4px solid #1f2937;padding:8px 14px;margin-bottom:12px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.bar button{padding:5px 14px;font-size:14px;cursor:pointer;background:#fff;border:1px solid #888;border-radius:4px}
+.bar button[aria-pressed="true"]{background:#1f2937;color:#fff}
+button:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+code{background:#eef;padding:0 4px;border-radius:3px;font-size:13px}
+.loc{font-family:Consolas,monospace;font-size:12px;color:#1d4ed8}
+.note{font-size:13px;color:#555}
+.cols{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+.panel{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px 14px;flex:1;min-width:320px}
+/* 架构嵌套框 */
+.box{border:2px solid var(--c);border-radius:8px;padding:6px 10px 10px;margin:6px 0;background:#fff}
+.box>.hd{all:unset;cursor:pointer;display:flex;gap:8px;align-items:baseline;font-weight:600;color:var(--c);padding:2px 4px;border-radius:4px}
+.box>.hd:focus-visible{outline:3px solid #f59e0b}
+.box>.hd small{font-weight:400;color:#666;font-family:Consolas,monospace;font-size:11px}
+.box.sel{background:#fffbea;box-shadow:0 0 0 3px #f59e0b}
+.inner{display:flex;flex-wrap:wrap;gap:8px}
+.inner>.box{flex:1 1 220px;margin:4px 0}
+.ref{font-size:12px;color:#7c2d12;margin-top:2px}
+/* 启动 */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chip{padding:3px 10px;border-radius:12px;font-size:13px;border:1px dashed #aaa;color:#999;background:#fff}
+.chip.on{border-style:solid;color:#fff}
+.card{background:#fff;border:1px solid #ddd;border-left:6px solid #9ca3af;border-radius:6px;padding:8px 12px;margin:8px 0}
+.card.now{border-left-color:#f59e0b;box-shadow:0 0 0 2px #f59e0b33}
+.card.done{border-left-color:#15803d}
+.card .num{font-weight:700;margin-right:6px}
+/* 时序图 */
+.seqwrap{overflow-x:auto;background:#fff;border:1px solid #ddd;border-radius:8px;padding:8px}
+.seq{position:relative;min-width:1100px}
+.lanes{display:grid;grid-template-columns:repeat(8,1fr);gap:0;position:sticky;top:0;background:#fff;z-index:2;padding-bottom:4px}
+.lane{margin:0 4px;padding:4px;border-radius:6px;color:#fff;font-size:12px;text-align:center;line-height:1.3;font-weight:600}
+.lane small{display:block;font-weight:400;font-size:10px;opacity:.9}
+.life{position:absolute;top:44px;bottom:0;width:0;border-left:2px dashed #d4d4d4}
+.msg{position:relative;height:38px}
+.msg.loop{background:#fef9c3}
+.msg.rec{opacity:.45}
+.msg.rec .lab{font-style:italic}
+.msg.cur{background:#ffedd5}
+.msg .lab{position:absolute;top:1px;font-size:12px;white-space:nowrap;font-family:Consolas,monospace;padding:0 4px;background:rgba(255,255,255,.85);border-radius:3px}
+.msg .arr{position:absolute;top:24px;height:0;border-top:2px solid var(--c)}
+.msg .arr.ret{border-top-style:dashed}
+.msg .arr::after{content:"";position:absolute;top:-7px;border:6px solid transparent}
+.msg .arr.r::after{right:-2px;border-left:8px solid var(--c)}
+.msg .arr.l::after{left:-2px;border-right:8px solid var(--c)}
+.msg .self{position:absolute;top:17px;width:16px;height:16px;border:2px solid var(--c);border-left:none;border-radius:0 8px 8px 0}
+.msg .no{position:absolute;left:2px;top:10px;font-size:11px;color:#777;width:22px;text-align:right}
+.looptag{position:absolute;left:28px;top:12px;font-size:11px;color:#a16207;font-weight:600}
+.detail{background:#fff8e1;border:1px solid #e8c86a;border-radius:6px;padding:8px 12px;margin:8px 0;min-height:86px}
+.detail .t{font-weight:600}
+table.cmp{border-collapse:collapse;font-size:14px;margin:8px 0;width:100%;max-width:1100px}
+table.cmp td,table.cmp th{border:1px solid #ddd;padding:6px 10px;text-align:left;vertical-align:top}
+table.cmp th{background:#f3f4f6}
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:4px;margin:8px 0}
+.fbox{background:#fff;border:2px solid var(--c);border-radius:6px;padding:6px 8px;font-size:12px;width:180px}
+.fbox b{color:var(--c);font-size:13px}
+.farr{align-self:center;font-size:20px;color:#666}
+</style>
+</head>
+<body>
+<header><h1>SGLang：ModelRunner 是什么、和 AttentionBackend 什么关系、一次推理是怎么驱动起来的</h1></header>
+<nav class="steps" id="nav" aria-label="页面导航"></nav>
+<main>
+  <h2 id="title" tabindex="-1"></h2>
+  <div id="stage"></div>
+</main>
+<script>
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const COL = {sched:'#475569', worker:'#0e7490', mr:'#7e22ce', runner:'#b45309', attn:'#c2410c', model:'#2563eb', layer:'#1d4ed8', pool:'#15803d', sampler:'#be185d'};
+
+// ---------- Tab 1：谁拥有谁 ----------
+const ARCH = {id:'sched', name:'Scheduler', sub:'managers/scheduler.py', c:COL.sched,
+  info:`每个 GPU rank 一个进程。<b>负责"决定做什么"</b>：收请求、管 waiting queue / running batch、RadixCache 前缀匹配、分配 KV 槽位、组 batch、处理结果。它不碰模型权重，也不直接发起 GPU 计算。
+    <br>主循环 <code>event_loop_normal</code> 每轮调一次 <code>run_batch</code>，再把 batch 交给 worker。
+    <br><span class="loc">scheduler.py:1976 event_loop_normal / 4553 run_batch</span>`,
+  extra:'持有 req_to_token_pool、token_to_kv_pool_allocator、tree_cache 的<b>引用</b>（和 ModelRunner 是同一个对象）',
+  kids:[{id:'worker', name:'TpModelWorker', sub:'managers/tp_worker.py', c:COL.worker,
+    info:`Scheduler 和 ModelRunner 之间的一层薄适配。<b>把 ScheduleBatch 转成 ForwardBatch，调 ModelRunner 前向，再调采样，打包成 GenerationBatchResult</b>。
+      启动时由它按顺序调 ModelRunner 的各个初始化步骤（分配内存池、建 attention backend、抓 CUDA graph）。
+      <br><span class="loc">tp_worker.py:603 forward_batch_generation / 395–432 初始化三步</span>`,
+    kids:[{id:'mr', name:'ModelRunner', sub:'model_executor/model_runner.py', c:COL.mr,
+      info:`<b>一个 GPU 上"模型执行器"的总管</b>。它拥有执行一次前向需要的所有东西：模型权重、KV cache 显存池、attention backend、CUDA graph runner、采样器，并负责这些东西的创建和组装。
+        对外主要就两个入口：<code>forward(forward_batch)</code> 和 <code>sample(logits, forward_batch)</code>。
+        <br><span class="loc">model_runner.py:320 class / 1808 forward / 1958 _forward_raw / 2098 sample</span>`,
+      kids:[
+        {id:'model', name:'self.model（如 LlamaForCausalLM）', sub:'models/llama.py', c:COL.model,
+          info:`真正的 nn.Module：embedding、N 个 decoder layer、norm、lm_head + logits_processor。由 <code>load_model()</code> 加载权重。
+            每个 attention 层里有一个 <b>RadixAttention</b>（<span class="loc">llama.py:226</span>），它本身不算 attention，只保存层的配置（layer_id、head 数等），并在 forward 时把 q/k/v 交给 attention backend。
+            <br><span class="loc">llama.py:458 LlamaModel.forward / 279 self.attn(q,k,v,forward_batch) / radix_attention.py:172</span>`},
+        {id:'pool', name:'KV 内存池', sub:'mem_cache/memory_pool.py', c:COL.pool,
+          info:`<code>req_to_token_pool</code>（每个请求一行，记录槽位号）、<code>token_to_kv_pool</code>（按层的 k_buffer/v_buffer 显存）、<code>token_to_kv_pool_allocator</code>（管哪些槽位空闲）。
+            由 <code>alloc_memory_pool()</code> 根据加载完权重后剩余的显存大小分配。<b>Scheduler 拿它们分配槽位，AttentionBackend 拿它们读写 KV</b>，是同一份对象。
+            <br><span class="loc">model_runner.py:963 alloc_memory_pool / memory_pool.py:2648 按层分配 k_buffer</span>`},
+        {id:'attn', name:'self.attn_backend（AttentionBackend）', sub:'layers/attention/*_backend.py', c:COL.attn,
+          info:`ModelRunner 拥有的<b>一个组件</b>，专门负责 attention 这一步。由 <code>init_attention_backends()</code> 按 <code>--attention-backend</code> 创建，创建时缓存了 KV 池的引用（如 <span class="loc">triton_backend.py:218</span>）。
+            <br>两个职责：① <code>init_forward_metadata(fb)</code> 每个 batch 一次，把 req_pool_indices/seq_lens 翻译成 kernel 要的 kv_indptr/kv_indices；② <code>forward(q,k,v,layer,fb)</code> 每层一次，写 KV、调 kernel。
+            <br><span class="loc">model_runner.py:1092 init_attention_backends / base_attn_backend.py:38</span>`},
+        {id:'runner', name:'执行器：EagerRunner / DecodeCudaGraphRunner / PrefillCudaGraphRunner', sub:'model_executor/runner/', c:COL.runner,
+          info:`决定"怎么跑一次 model.forward"。<b>EagerRunner</b>：普通 Python 逐层执行；<b>DecodeCudaGraphRunner</b>：启动时把 decode 前向录成 CUDA graph，运行时直接 replay，省掉上千次 kernel launch 的 CPU 开销；<b>PrefillCudaGraphRunner</b>：prefill 的分段 graph。
+            由 <code>init_cuda_graphs()</code> 创建，必须在 attention backend 之后，因为录制时要真的跑 attention。
+            <br><span class="loc">model_runner.py:1165 init_cuda_graphs / eager_runner.py:210 execute / decode_cuda_graph_runner.py:1598 execute</span>`},
+        {id:'sampler', name:'self.sampler', sub:'layers/sampler.py', c:COL.sampler,
+          info:`按每个请求的 temperature / top_p / top_k 等参数从 logits 采样出 next_token_ids。在 <code>initialize()</code> 里由 <code>create_sampler()</code> 创建。
+            <br><span class="loc">model_runner.py:706 / 2098 sample</span>`},
+      ]}]}]};
+function archHtml(n) {
+  return `<div class="box" style="--c:${n.c}" id="box-${n.id}">
+    <button class="hd" data-id="${n.id}" aria-label="查看 ${esc(n.name)} 的说明">${esc(n.name)} <small>${esc(n.sub)}</small></button>
+    ${n.extra ? `<div class="ref">${n.extra}</div>` : ''}
+    ${n.kids ? `<div class="inner">${n.kids.map(archHtml).join('')}</div>` : ''}</div>`;
+}
+function findArch(n, id) { if (n.id === id) return n; for (const k of n.kids || []) { const r = findArch(k, id); if (r) return r; } return null; }
+const TABS = [];
+TABS.push({nav:'① 谁拥有谁', title:'① 架构：谁拥有谁（点击方框看说明）',
+render(){
+  return `<div class="desc">一句话：<b>Scheduler 决定"算什么"，ModelRunner 负责"怎么算"，AttentionBackend 是 ModelRunner 手下专管 attention 的一个组件</b>。
+    下面的框表示包含/拥有关系，外层对象创建并持有内层对象。每个 TP rank 都有一套完整的这样的结构。</div>
+    <div class="cols"><div style="flex:1.4;min-width:520px">${archHtml(ARCH)}</div>
+    <div class="panel" id="archInfo" aria-live="polite" style="position:sticky;top:10px"></div></div>`;
+},
+after(){
+  const show = id => {
+    const n = findArch(ARCH, id);
+    document.querySelectorAll('.box').forEach(b => b.classList.toggle('sel', b.id === 'box-' + id));
+    document.getElementById('archInfo').innerHTML = `<h3 style="margin-top:0;color:${n.c}">${esc(n.name)}</h3><div>${n.info}</div>`;
+  };
+  document.querySelectorAll('.box>.hd').forEach(b => b.onclick = () => show(b.dataset.id));
+  show('mr');
+}});
+
+// ---------- Tab 2：启动顺序 ----------
+const BOOT = [
+  {t:'Scheduler 创建 TpModelWorker', on:['worker'], loc:'scheduler.py:1022',
+   d:'Scheduler 进程启动后，在初始化时创建 TpModelWorker，把 gpu_id、tp_rank 等传进去。'},
+  {t:'TpModelWorker 创建 ModelRunner', on:['mr'], loc:'tp_worker.py:480',
+   d:'ModelRunner.__init__ 里初始化 torch.distributed（TP 通信组）等环境，最后调 initialize()。'},
+  {t:'initialize()：创建采样器、加载模型权重', on:['sampler', 'model'], loc:'model_runner.py:697 / 706 create_sampler / 707 load_model',
+   d:'load_model() 按模型的 architecture 找到对应的模型类（如 LlamaForCausalLM），实例化后按 TP 切分加载权重。模型里的每个 RadixAttention 此时只是配置，还没有 backend。'},
+  {t:'alloc_memory_pool()：按剩余显存分配 KV cache', on:['pool'], loc:'tp_worker.py:406 → model_runner.py:963',
+   d:'权重加载完后，看 GPU 还剩多少显存（受 --mem-fraction-static 控制），算出能放多少个 token 的 KV，分配 req_to_token_pool、token_to_kv_pool（按层的 k/v buffer）和 allocator。<b>这一步决定了系统最多能同时容纳多少 token。</b>'},
+  {t:'init_attention_backends()：创建 AttentionBackend', on:['attn'], loc:'tp_worker.py:422 → model_runner.py:1092',
+   d:'解析 --attention-backend / --prefill-attention-backend / --decode-attention-backend，从注册表创建实例，存到 self.attn_backend。backend 的 __init__ 会缓存 KV 池的引用，所以<b>必须在分配内存池之后</b>。'},
+  {t:'init_cuda_graphs()：创建执行器，录制 CUDA graph', on:['runner'], loc:'tp_worker.py:428 → model_runner.py:1165',
+   d:'创建 EagerRunner，然后对一组 batch size（如 1, 2, 4, 8 … 256）各真实跑一次 decode 前向并录制成 CUDA graph，保存在 DecodeCudaGraphRunner 里。录制时要真的调 attention backend，所以<b>必须在 backend 之后</b>。这一步通常要几十秒，是启动慢的主要原因之一。'},
+  {t:'Scheduler 拿到内存池引用，开始事件循环', on:['sched'], loc:'scheduler.py:604–610',
+   d:'Scheduler 拿到 req_to_token_pool、token_to_kv_pool_allocator，再创建 tree_cache（RadixCache）。从此 Scheduler 用这些对象分配和释放槽位，ModelRunner 用同一份对象读写 KV。然后进入 event_loop。'},
+];
+const CHIPS = [['worker', 'TpModelWorker'], ['mr', 'ModelRunner'], ['sampler', 'sampler'], ['model', 'model 权重'], ['pool', 'KV 内存池'], ['attn', 'AttentionBackend'], ['runner', 'Eager/CUDA graph runner'], ['sched', 'Scheduler 就绪']];
+let bootT = 0;
+TABS.push({nav:'② 启动顺序', title:'② 启动：这些组件按什么顺序建起来',
+render(){
+  return `<div class="desc">顺序很重要，后一步依赖前一步：权重先占显存，剩下的才给 KV cache；backend 要引用 KV 池；CUDA graph 录制要真的跑 backend。</div>
+    <div class="bar"><button id="bPrev">← 上一步</button><button id="bNext">下一步 →</button><button id="bAll">全部展开</button>
+    <span id="bCnt" aria-live="polite"></span></div>
+    <div class="chips" id="chips"></div><div id="cards"></div>`;
+},
+after(){
+  const draw = () => {
+    const on = new Set(BOOT.slice(0, bootT).flatMap(b => b.on));
+    document.getElementById('chips').innerHTML = CHIPS.map(([k, n]) =>
+      `<span class="chip ${on.has(k) ? 'on' : ''}" style="${on.has(k) ? 'background:' + COL[k] + ';border-color:' + COL[k] : ''}">${on.has(k) ? '✓ ' : ''}${n}</span>`).join('');
+    document.getElementById('cards').innerHTML = BOOT.slice(0, bootT).map((b, i) =>
+      `<div class="card ${i === bootT - 1 ? 'now' : 'done'}"><span class="num">${i + 1}.</span><b>${b.t}</b> <span class="loc">${b.loc}</span><div>${b.d}</div></div>`).join('')
+      || '<p class="note">点"下一步"开始。</p>';
+    document.getElementById('bCnt').textContent = `${bootT} / ${BOOT.length}`;
+  };
+  document.getElementById('bNext').onclick = () => { bootT = Math.min(BOOT.length, bootT + 1); draw(); };
+  document.getElementById('bPrev').onclick = () => { bootT = Math.max(0, bootT - 1); draw(); };
+  document.getElementById('bAll').onclick = () => { bootT = BOOT.length; draw(); };
+  draw();
+}});
+// ---------- Tab 3：一次前向的时序图 ----------
+const LANES = [
+  ['Scheduler', 'scheduler.py', COL.sched], ['TpModelWorker', 'tp_worker.py', COL.worker],
+  ['ModelRunner', 'model_runner.py', COL.mr], ['Eager / CudaGraph Runner', 'runner/*.py', COL.runner],
+  ['Model', 'llama.py LlamaModel', COL.model], ['DecoderLayer + RadixAttention', 'llama.py / radix_attention.py', COL.layer],
+  ['AttentionBackend', '*_backend.py', COL.attn], ['KV 内存池', 'memory_pool.py', COL.pool]];
+const M = (a, b, label, o = {}) => ({a, b, label, ...o});
+const HEAD = [
+  M(0, 0, 'get_next_batch_to_run() + 分配 KV 槽位', {t:'Scheduler 组 batch', loc:'scheduler.py:3829',
+    d:'决定这一轮跑 prefill 还是 decode、哪些请求参加；用 allocator 分配 out_cache_loc，填好 req_to_token。产出一个 ScheduleBatch（CPU 侧的 batch 描述）。'}),
+  M(0, 1, 'forward_batch_generation(batch)', {t:'交给 worker', loc:'scheduler.py:4553 run_batch → tp_worker.py:603',
+    d:'Scheduler 的 run_batch 调 model_worker.forward_batch_generation。到这里为止都是"调度"，从这里开始是"执行"。'}),
+  M(1, 1, 'ForwardBatch.init_new(batch, model_runner)', {t:'ScheduleBatch → ForwardBatch', loc:'tp_worker.py:634',
+    d:'把调度侧的 batch 转成执行侧的 ForwardBatch：input_ids、positions、seq_lens、req_pool_indices、out_cache_loc、forward_mode、sampling_info 等 GPU 张量。之后模型里每一层都拿着这个对象。'}),
+  M(1, 2, 'model_runner.forward(forward_batch)', {t:'进入 ModelRunner', loc:'model_runner.py:1808',
+    d:'forward() 包了一层 profiling、专家分布统计等，核心在 _forward_raw。'}),
+  M(2, 2, '发布 ForwardContext(attn_backend)；选执行路径', {t:'_forward_raw：发布上下文、选路径', loc:'model_runner.py:1958–2060 / forward_context.py:73',
+    d:'① 用 <code>forward_context(ForwardContext(attn_backend=self.attn_backend))</code> 把 backend 放进一个"当前前向"的全局上下文，模型深处的 RadixAttention 用 <code>get_attn_backend()</code> 取，不用一层层传参。<br>② 判断：decode 且 batch size 在录制范围内 → CUDA graph replay；能走 prefill graph → prefill graph；否则 → EagerRunner。'}),
+];
+// 模型主体（eager 下逐步执行；CUDA graph 下是被录制好的部分）
+const BODY = [
+  M(4, 4, 'embed_tokens(input_ids) → hidden', {t:'embedding', loc:'llama.py:468', d:'input_ids [n] 查表得到 hidden [n, d]。prefill 时 n = 所有请求的 token 总数，decode 时 n = batch size。'}),
+  M(4, 5, 'layers[i](positions, hidden, forward_batch)', {loop:true, t:'进入第 i 层', loc:'llama.py:479–480', d:'for i in range(start_layer, end_layer) 逐层调用 decoder layer。下面黄色部分每层都执行一遍。'}),
+  M(5, 5, 'qkv_proj + RoPE → q, k, v', {loop:true, t:'算 Q/K/V', loc:'llama.py:257 LlamaAttention.forward', d:'hidden [n, d] × W_qkv 一次 GEMM 得到 n 个 token 的 q/k/v，再对 q、k 做旋转位置编码。这里还和 attention backend 无关。'}),
+  M(5, 6, 'get_attn_backend().forward(q, k, v, self, fb)', {loop:true, t:'RadixAttention → AttentionBackend', loc:'llama.py:279 self.attn(...) → radix_attention.py:172',
+    d:'RadixAttention 把自己（带 layer_id 等配置）连同 q/k/v 交给 backend。backend 按 forward_mode 分发到 forward_decode 或 forward_extend（<span class="loc">base_attn_backend.py:307</span>）。'}),
+  M(6, 7, 'set_kv_buffer(layer, out_cache_loc, k, v)', {loop:true, t:'写入本层的新 K/V', loc:'memory_pool.py:2898',
+    d:'把这一批新 token 的 k、v 写到 k_buffer[layer_id][out_cache_loc]、v_buffer[layer_id][out_cache_loc]。'}),
+  M(6, 7, 'kernel 按 kv_indices 读历史 K/V', {loop:true, t:'attention kernel', loc:'triton_backend.py:2288 forward_decode / forward_extend',
+    d:'用 init_forward_metadata 准备好的 kv_indptr / kv_indices，直接到 k_buffer[layer_id] 里按槽位号读每个请求的全部历史 K/V，算 softmax(QKᵀ)V。'}),
+  M(6, 5, 'attn_output', {loop:true, ret:true, t:'attention 输出返回', d:'返回 [n, heads × head_dim]。'}),
+  M(5, 5, 'o_proj → MLP → 新 hidden', {loop:true, t:'层的剩余部分', loc:'llama.py:280 o_proj / LlamaDecoderLayer.forward',
+    d:'o_proj、残差、norm、MLP（gate/up/down）都是逐 token 的 GEMM。TP 下这里有 all-reduce。'}),
+  M(5, 4, 'hidden → 下一层', {loop:true, ret:true, t:'回到层循环', d:'i += 1，回到 "进入第 i 层"，直到所有层跑完。'}),
+  M(4, 4, 'norm + logits_processor（只取每个请求最后一个位置）', {t:'算 logits', loc:'llama.py:604–618 / logits_processor.py:691',
+    d:'最终 norm 后，logits_processor 用 cumsum(extend_seq_lens)-1 选出每个请求最后一个位置，过 lm_head 得到 [batch, vocab]。'}),
+];
+const EAGER = [
+  M(2, 3, 'eager_runner.execute(fb)', {t:'走 eager 路径', loc:'model_runner.py:2058 → eager_runner.py:210',
+    d:'按 forward_mode 分发到 _execute_decode / _execute_extend / _execute_idle。'}),
+  M(3, 6, 'attn_backend.init_forward_metadata(fb)', {t:'每个 batch 一次：准备 attention metadata', loc:'eager_runner.py:257 → triton_backend.py:870',
+    d:'backend 根据 req_pool_indices、seq_lens 生成 kv_indptr / kv_indices（以及 prefill 用的 qo_indptr）。<b>所有层共用这一份</b>，所以只在前向开始前做一次。'}),
+  M(6, 7, '读 req_to_token[req_pool_indices, :seq_lens]', {t:'查槽位表', d:'把每个请求的槽位号拼成一维 kv_indices，CSR 格式。'}),
+  M(3, 4, 'model.forward(input_ids, positions, fb)', {t:'调模型', loc:'eager_runner.py:268',
+    d:'到这里才真正进入 nn.Module。下面是普通 Python 逐层执行，每个算子一次 kernel launch。'}),
+  ...BODY,
+  M(4, 3, 'LogitsProcessorOutput', {ret:true, t:'模型返回 logits'}),
+  M(3, 2, 'logits', {ret:true, t:'runner 返回'}),
+];
+const GRAPH = [
+  M(2, 3, 'decode_cuda_graph_runner.execute(fb)', {t:'走 CUDA graph 路径', loc:'model_runner.py:2002 → decode_cuda_graph_runner.py:1598',
+    d:'decode 且 batch size 在录制范围内时走这里。'}),
+  M(3, 3, 'load_batch：拷进录制时的静态 buffer（pad 到录制的 bs）', {t:'填静态输入', loc:'decode_cuda_graph_runner.py:1377',
+    d:'CUDA graph 要求每次地址和形状都一样，所以把这次的 input_ids、positions、seq_lens 等拷进启动时分配的固定 buffer，batch size 补齐到最近的录制档位。'}),
+  M(3, 6, 'init_forward_metadata_out_graph(fb)', {t:'只更新 metadata buffer 的内容', loc:'decode_cuda_graph_runner.py:1575 / base_attn_backend.py:107',
+    d:'和 eager 一样要根据这次的 seq_lens 算 kv_indices，但写进固定地址的 buffer 里，graph 里的 kernel 会读到新内容。'}),
+  M(6, 7, '读 req_to_token → 写 kv_indices buffer', {t:'查槽位表'}),
+  M(3, 3, 'graph.replay()', {t:'一次性重放整个前向', loc:'decode_cuda_graph_runner.py:1628 backend.replay',
+    d:'启动时 <code>init_cuda_graphs</code> 真实跑过一次下面这些步骤并录制成 CUDA graph。现在一次 replay 就把录好的几千个 kernel 全部提交给 GPU，<b>完全不经过 Python</b>。decode 每步计算量很小，省掉的 CPU launch 开销非常可观。'}),
+  ...BODY.map(m => ({...m, rec:true})),
+  M(3, 2, 'logits（从静态输出 buffer 里切出真实 bs）', {ret:true, t:'返回 logits'}),
+];
+const TAIL = [
+  M(2, 1, 'ModelRunnerOutput(logits_output)', {ret:true, t:'ModelRunner.forward 返回', loc:'model_runner.py:2068'}),
+  M(1, 2, 'model_runner.sample(logits, fb)', {t:'采样', loc:'tp_worker.py:725 → model_runner.py:2098',
+    d:'self.sampler 按每个请求自己的 temperature / top_p / top_k 从 [batch, vocab] 的 logits 里采样，得到 next_token_ids [batch]。'}),
+  M(2, 1, 'next_token_ids', {ret:true, t:'采样结果'}),
+  M(1, 0, 'GenerationBatchResult', {ret:true, t:'返回给 Scheduler', loc:'tp_worker.py:676'}),
+  M(0, 0, 'process_batch_result：按下标写回 reqs[i]、判断结束、发给 detokenizer', {t:'处理结果', loc:'scheduler.py:5010 → batch_result_processor.py:942',
+    d:'回到调度侧。下一轮 event_loop 再组新的 batch，重复整个过程。'}),
+];
+let seqMode = 'eager', seqStep = 0;
+const seqRows = () => [...HEAD, ...(seqMode === 'eager' ? EAGER : GRAPH), ...TAIL];
+const stepIdx = rows => rows.map((m, i) => m.rec ? -1 : i).filter(i => i >= 0);
+const cx = i => (i + 0.5) / LANES.length * 100;
+function seqHtml() {
+  const rows = seqRows(), steps = stepIdx(rows);
+  const curRow = steps[seqStep];
+  let visEnd = curRow;
+  while (rows[visEnd + 1] && rows[visEnd + 1].rec) visEnd++;
+  let h = '<div class="seq"><div class="lanes">' +
+    LANES.map(([n, s, c]) => `<div class="lane" style="background:${c}">${esc(n)}<small>${esc(s)}</small></div>`).join('') + '</div>';
+  h += LANES.map((_, i) => `<div class="life" style="left:${cx(i)}%"></div>`).join('');
+  let firstLoop = true, n = 0;
+  rows.forEach((m, i) => {
+    if (!m.rec) n++;
+    const c = LANES[m.a][2];
+    const cls = ['msg', m.loop ? 'loop' : '', m.rec ? 'rec' : '', i === curRow ? 'cur' : ''].join(' ');
+    const hidden = i > visEnd ? 'style="visibility:hidden"' : '';
+    let inner = `<span class="no">${m.rec ? '' : n}</span>`;
+    if (m.loop && firstLoop) { inner += `<span class="looptag">↻ 每层重复</span>`; firstLoop = false; }
+    const label = (m.rec ? '（graph 内）' : '') + m.label;
+    if (m.a === m.b) {
+      inner += `<div class="self" style="--c:${c};left:${cx(m.a)}%"></div><span class="lab" style="left:calc(${cx(m.a)}% + 20px)">${esc(label)}</span>`;
+    } else {
+      const x1 = Math.min(cx(m.a), cx(m.b)), x2 = Math.max(cx(m.a), cx(m.b));
+      inner += `<div class="arr ${m.b > m.a ? 'r' : 'l'} ${m.ret ? 'ret' : ''}" style="--c:${c};left:${x1}%;width:${x2 - x1}%"></div>
+        <span class="lab" style="left:calc(${x1}% + 6px)">${esc(label)}</span>`;
+    }
+    h += `<div class="${cls}" ${hidden} data-k="${i}" ${i <= visEnd ? 'tabindex="0" role="button"' : 'aria-hidden="true"'} aria-label="${esc(label)}">${inner}</div>`;
+  });
+  return h + '</div>';
+}
+function seqDetail(i) {
+  const rows = seqRows(), m = rows[i];
+  const lane = (k) => `<span style="color:${LANES[k][2]};font-weight:600">${esc(LANES[k][0])}</span>`;
+  return `<div class="t">${esc(m.t || m.label)}</div>
+    <div class="note">${lane(m.a)}${m.a !== m.b ? ' → ' + lane(m.b) : '（内部）'} ${m.loc ? '&nbsp; <span class="loc">' + m.loc + '</span>' : ''}</div>
+    <div>${m.d || ''}${m.rec ? '<br><i>这一步在启动时已经录进 CUDA graph。replay 时由 GPU 按录好的顺序直接执行，Python 不会再逐行调用到这里。</i>' : ''}</div>`;
+}
+TABS.push({nav:'③ 一次前向怎么跑', title:'③ 驱动：一个 batch 从 Scheduler 到 GPU 再回来（时序图）',
+render(){
+  return `<div class="desc">横向是参与者（左边是调度侧，右边越来越接近 GPU 计算），纵向是时间。实线是调用，虚线是返回，<span style="background:#fef9c3;padding:0 4px">黄色</span>部分每一层都执行一遍。
+    点"下一步"逐条看，点任意一行看它的说明和代码位置。切换 eager / CUDA graph 对比 decode 的两条执行路径。</div>
+    <div class="bar" role="group" aria-label="执行路径">
+      <button data-sm="eager" aria-pressed="${seqMode === 'eager'}">Eager（prefill 默认、或未录 graph 时）</button>
+      <button data-sm="graph" aria-pressed="${seqMode === 'graph'}">CUDA graph replay（decode 常见路径）</button></div>
+    <div class="bar"><button id="sPrev">← 上一步</button><button id="sNext">下一步 →</button><button id="sAll">全部展开</button><button id="sReset">重置</button>
+      <span id="sCnt" aria-live="polite"></span></div>
+    <div class="detail" id="sDetail" aria-live="polite"></div>
+    <div class="seqwrap" id="seq"></div>`;
+},
+after(){
+  const draw = () => {
+    const rows = seqRows(), steps = stepIdx(rows);
+    seqStep = Math.max(0, Math.min(steps.length - 1, seqStep));
+    document.getElementById('seq').innerHTML = seqHtml();
+    document.getElementById('sCnt').textContent = `步骤 ${seqStep + 1} / ${steps.length}`;
+    document.getElementById('sDetail').innerHTML = seqDetail(steps[seqStep]);
+    document.querySelectorAll('#seq .msg[tabindex]').forEach(r => {
+      const show = () => document.getElementById('sDetail').innerHTML = seqDetail(+r.dataset.k);
+      r.onclick = show;
+      r.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(); } };
+    });
+  };
+  document.querySelectorAll('[data-sm]').forEach(b => b.onclick = () => {
+    seqMode = b.dataset.sm; seqStep = 0;
+    document.querySelectorAll('[data-sm]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    draw();
+  });
+  document.getElementById('sNext').onclick = () => { seqStep++; draw(); };
+  document.getElementById('sPrev').onclick = () => { seqStep--; draw(); };
+  document.getElementById('sAll').onclick = () => { seqStep = 1e9; draw(); };
+  document.getElementById('sReset').onclick = () => { seqStep = 0; draw(); };
+  draw();
+}});
+// ---------- Tab 4：关系对比 + 数据形态 ----------
+const FLOW = [
+  ['Req', COL.sched, 'Scheduler', '一个请求：origin_input_ids、output_ids、采样参数、完成状态'],
+  ['ScheduleBatch', COL.sched, 'Scheduler', 'reqs 列表 + 对齐的 req_pool_indices / seq_lens / out_cache_loc，调度视角'],
+  ['ForwardBatch', COL.worker, 'TpModelWorker → 模型每一层', '执行视角的 GPU 张量：input_ids、positions、forward_mode、sampling_info…'],
+  ['attention metadata', COL.attn, 'AttentionBackend', 'kv_indptr / kv_indices / qo_indptr，backend 私有格式，每 batch 一份'],
+  ['hidden states', COL.model, 'Model 各层', '[n, d]，逐层更新；每层顺带写 KV cache'],
+  ['LogitsProcessorOutput', COL.model, 'Model → ModelRunner', 'next_token_logits [batch, vocab]（只含最后位置）'],
+  ['next_token_ids', COL.sampler, 'sampler', '[batch]，第 i 个属于 reqs[i]'],
+  ['GenerationBatchResult', COL.worker, 'TpModelWorker → Scheduler', '打包 logits、next_token_ids 等，回到调度侧写进 Req.output_ids'],
+];
+TABS.push({nav:'④ 关系总结', title:'④ ModelRunner 和 AttentionBackend 的关系，以及数据在各层的形态',
+render(){
+  return `<div class="desc"><b>关系</b>：ModelRunner 是"整个模型在这张卡上怎么执行"的总管，AttentionBackend 是它拥有的一个可替换组件，只管 attention。
+    ModelRunner 创建 backend、在每个 batch 前让它准备 metadata、把它放进 ForwardContext；模型里的 RadixAttention 每层通过 ForwardContext 找到它并调用。</div>
+  <table class="cmp">
+    <tr><th></th><th style="color:${COL.mr}">ModelRunner</th><th style="color:${COL.attn}">AttentionBackend</th></tr>
+    <tr><th>是什么</th><td>一张 GPU 上模型执行的总管</td><td>attention 这一个算子的实现策略</td></tr>
+    <tr><th>拥有 / 引用</th><td>模型权重、KV 内存池、attn_backend、Eager/CUDA graph runner、sampler</td><td>KV 内存池的<b>引用</b>（从 ModelRunner 拿）、自己的 metadata buffer</td></tr>
+    <tr><th>谁创建</th><td>TpModelWorker</td><td>ModelRunner.init_attention_backends()</td></tr>
+    <tr><th>每个 batch</th><td><code>forward()</code> 一次、<code>sample()</code> 一次</td><td><code>init_forward_metadata()</code> 一次</td></tr>
+    <tr><th>每一层</th><td>不参与（交给 model.forward 逐层跑）</td><td><code>forward()</code> 一次：写 KV + 调 attention kernel</td></tr>
+    <tr><th>怎么被调用</th><td>TpModelWorker 直接持有并调用</td><td>runner 直接调 init；RadixAttention 通过 <code>get_attn_backend()</code> 从 ForwardContext 取</td></tr>
+    <tr><th>可替换</th><td>一般不换</td><td><code>--attention-backend</code> / <code>--prefill-attention-backend</code> / <code>--decode-attention-backend</code></td></tr>
+  </table>
+  <h3>为什么用 ForwardContext，而不是把 backend 当参数一路传下去</h3>
+  <p>模型代码要支持上百种模型，如果每个 forward 签名都加一个 attn_backend 参数，改动面太大。ModelRunner 在 <code>_forward_raw</code> 里发布一个"当前前向"的上下文
+  （<span class="loc">model_runner.py:1968–1976</span>），RadixAttention 在最深处用 <code>get_attn_backend()</code> 取（<span class="loc">forward_context.py:73</span>）。
+  投机解码的 draft 模型、PD 复用等场景需要换一个 backend 时，只要临时替换这个上下文即可。</p>
+  <h3>一轮迭代中数据的形态变化</h3>
+  <div class="flow">${FLOW.map(([n, c, who, d], i) =>
+    `${i ? '<span class="farr" aria-hidden="true">→</span>' : ''}<div class="fbox" style="--c:${c}"><b>${n}</b><div class="note">${who}</div><div>${d}</div></div>`).join('')}</div>
+  <h3>补充</h3>
+  <p>• <b>TP</b>：每个 TP rank 都有一整套 Scheduler → TpModelWorker → ModelRunner，拿到同样的 batch、跑同样的时序，只是权重是切分的。层内的 o_proj / MLP 之后有 all-reduce 把各卡结果合起来。</p>
+  <p>• <b>overlap 调度</b>（默认开启）：GPU 在跑第 k 个 batch 的时候，CPU 已经在为第 k+1 个 batch 做调度和 ForwardBatch 准备，所以图③里 Scheduler 那几步和 GPU 计算在时间上是重叠的。</p>
+  <p class="note">图里的代码位置基于当前 main 分支，行号以后可能变化。</p>`;
+}});
+
+// ---------- 导航 ----------
+let cur = 0;
+const nav = document.getElementById('nav');
+nav.innerHTML = TABS.map((s, i) => `<button data-i="${i}">${esc(s.nav)}</button>`).join('');
+nav.querySelectorAll('button').forEach(b => b.onclick = () => go(+b.dataset.i));
+function go(i) {
+  cur = i;
+  const s = TABS[cur];
+  document.getElementById('title').textContent = s.title;
+  document.getElementById('stage').innerHTML = s.render();
+  if (s.after) s.after();
+  nav.querySelectorAll('button').forEach((b, j) =>
+    j === cur ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current'));
+}
+go(0);
+</script>
+</body>
+</html>

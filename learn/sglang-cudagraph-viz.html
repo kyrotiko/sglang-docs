@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SGLang CUDA graph：FullCudaGraphBackend 与 BreakableCudaGraphBackend</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#fafafa;color:#222;line-height:1.6}
+header{padding:14px 24px;background:#1f2937;color:#fff}
+header h1{margin:0;font-size:19px}
+nav.steps{display:flex;flex-wrap:wrap;gap:6px;padding:10px 24px;background:#fff;border-bottom:1px solid #ddd}
+nav.steps button{border:1px solid #bbb;background:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:14px}
+nav.steps button[aria-current="step"]{background:#1f2937;color:#fff;border-color:#1f2937}
+main{padding:14px 24px;max-width:1320px}
+h2{margin:4px 0 8px;font-size:18px}
+h3{font-size:15px;margin:14px 0 6px}
+.desc{background:#fff;border-left:4px solid #1f2937;padding:8px 14px;margin-bottom:12px}
+.warn{background:#fff7ed;border-left:4px solid #c2410c;padding:8px 14px;margin:10px 0}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.bar button{padding:5px 14px;font-size:14px;cursor:pointer;background:#fff;border:1px solid #888;border-radius:4px}
+.bar button[aria-pressed="true"]{background:#1f2937;color:#fff}
+button:focus-visible,[tabindex]:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+code{background:#eef;padding:0 4px;border-radius:3px;font-size:13px}
+.loc{font-family:Consolas,monospace;font-size:12px;color:#1d4ed8}
+.note{font-size:13px;color:#555}
+.info{background:#fff8e1;border:1px solid #e8c86a;border-radius:6px;padding:8px 12px;margin:8px 0;min-height:60px}
+/* 时间线 */
+.tlwrap{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px;overflow-x:auto}
+.tlrow{display:flex;align-items:center;margin:3px 0}
+.tlname{width:150px;flex:none;font-size:12px;text-align:right;padding-right:8px;font-family:Consolas,monospace}
+.tllane{position:relative;height:26px;background:#f5f5f5;border-radius:3px;flex:none}
+.blk{position:absolute;top:2px;height:22px;border-radius:2px;border:1px solid rgba(0,0,0,.25);font-size:9px;color:#fff;overflow:hidden;text-align:center;line-height:20px}
+.tlsum{font-size:13px;margin:2px 0 10px 158px}
+.legend span{display:inline-flex;align-items:center;gap:4px;margin-right:14px;font-size:13px}
+.legend i{width:14px;height:14px;display:inline-block;border-radius:2px;border:1px solid rgba(0,0,0,.2)}
+/* 架构图 */
+.arch{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px 18px;align-items:start;max-width:1100px}
+.abox{all:unset;box-sizing:border-box;display:block;cursor:pointer;background:#fff;border:2px solid var(--c);border-radius:8px;padding:8px 10px;font-size:13px}
+.abox b{color:var(--c);font-size:14px;display:block}
+.abox small{font-family:Consolas,monospace;font-size:11px;color:#666}
+.abox.sel{background:#fffbea;box-shadow:0 0 0 3px #f59e0b}
+.abox.dash{border-style:dashed}
+.span3{grid-column:1/4}
+.span2{grid-column:2/4}
+.down{text-align:center;font-size:18px;color:#888;line-height:1}
+.tag{display:inline-block;font-size:11px;padding:0 6px;border-radius:8px;background:#eee;color:#333;margin-top:3px}
+/* 录制 / 回放条带 */
+.strip{display:flex;flex-wrap:wrap;gap:3px;align-items:stretch;background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px}
+.op{min-width:62px;padding:4px 4px;border-radius:4px;border:2px dashed #bbb;background:#fff;color:#777;font-size:11px;text-align:center;font-family:Consolas,monospace;line-height:1.25;transition:background .2s}
+.op small{display:block;font-size:9px}
+.op.rec{color:#fff;border-style:solid;border-color:rgba(0,0,0,.25)}
+.op.eager{background:#c2410c;color:#fff;border-style:solid;border-color:#7c2d12}
+.op.eagerout{background:#6b7280;color:#fff;border-style:solid;border-color:#374151}
+.op.now{outline:3px solid #f59e0b;outline-offset:1px}
+.op.attn{min-width:70px}
+.lsep{width:2px;background:#ddd;margin:0 2px}
+table.cmp{border-collapse:collapse;font-size:14px;margin:8px 0;width:100%;max-width:1150px}
+table.cmp td,table.cmp th{border:1px solid #ddd;padding:6px 10px;text-align:left;vertical-align:top}
+table.cmp th{background:#f3f4f6}
+</style>
+</head>
+<body>
+<header><h1>SGLang CUDA graph：FullCudaGraphBackend 与 BreakableCudaGraphBackend 是什么、怎么驱动</h1></header>
+<nav class="steps" id="nav" aria-label="页面导航"></nav>
+<main>
+  <h2 id="title" tabindex="-1"></h2>
+  <div id="stage"></div>
+</main>
+<script>
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TABS = [];
+
+// ---------- Tab 1：CUDA graph 到底省了什么（时间线示意） ----------
+const KCOL = {gemm:'#2563eb', attn:'#c2410c', misc:'#6b7280', cpuE:'#cbd5e1', cpuG:'#7e22ce'};
+const LAYER_OPS = [['norm', 'misc'], ['qkv', 'gemm'], ['rope', 'misc'], ['kv写', 'misc'], ['attn', 'attn'], ['o_proj', 'gemm'], ['norm2', 'misc'], ['mlp', 'gemm']];
+const SIZES = {
+  decode: {name:'decode（kernel 很短）', d:{embed:3, norm:2, qkv:4, rope:2, 'kv写':2, attn:6, o_proj:3, norm2:2, mlp:8, lm_head:6}},
+  short:  {name:'短 prefill（几百 token）', d:{embed:4, norm:3, qkv:10, rope:3, 'kv写':3, attn:12, o_proj:6, norm2:3, mlp:18, lm_head:8}},
+  long:   {name:'长 prefill（几千 token）', d:{embed:10, norm:8, qkv:60, rope:10, 'kv写':8, attn:80, o_proj:40, norm2:8, mlp:120, lm_head:20}},
+};
+const NLAYER = 2, LAUNCH = 8, GLAUNCH = 4;   // µs：eager 每个 kernel 的 CPU 开销 / 一次 graph replay 的 CPU 开销
+let tlSize = 'decode';
+function buildOps(D) {
+  const ops = [{n:'embed', k:'misc', d:D.embed}];
+  for (let l = 0; l < NLAYER; l++) LAYER_OPS.forEach(([n, k]) => ops.push({n, k, d:D[n], l}));
+  ops.push({n:'lm_head', k:'gemm', d:D.lm_head});
+  return ops;
+}
+function sim(mode, D) {
+  const ops = buildOps(D), C = [], G = [];
+  let cpu = 0, gpu = 0;
+  const eager = op => {
+    C.push({s:cpu, e:cpu + LAUNCH, k:'cpuE', t:op.n}); cpu += LAUNCH;
+    const s = Math.max(cpu, gpu); G.push({s, e:s + op.d, k:op.k, t:op.n}); gpu = s + op.d;
+  };
+  const graph = seg => {
+    if (!seg.length) return;
+    C.push({s:cpu, e:cpu + GLAUNCH, k:'cpuG', t:'replay'}); cpu += GLAUNCH;
+    let s = Math.max(cpu, gpu);
+    seg.forEach(op => { G.push({s, e:s + op.d, k:op.k, t:op.n}); s += op.d; });
+    gpu = s;
+  };
+  if (mode === 'eager') ops.forEach(eager);
+  else if (mode === 'full') graph(ops);
+  else {
+    // prefill 的 BCG 用法：embed / lm_head 在图外 eager，图内按 attention 切段
+    eager(ops[0]);
+    let seg = [];
+    ops.slice(1, -1).forEach(op => { if (op.k === 'attn') { graph(seg); seg = []; eager(op); } else seg.push(op); });
+    graph(seg);
+    eager(ops[ops.length - 1]);
+  }
+  const busy = G.reduce((a, b) => a + (b.e - b.s), 0);
+  return {C, G, total:Math.max(cpu, gpu), busy};
+}
+function laneHtml(name, blocks, scale, width, label) {
+  return `<div class="tlrow"><div class="tlname">${name}</div><div class="tllane" style="width:${width}px" role="img" aria-label="${esc(label)}">` +
+    blocks.map(b => {
+      const w = Math.max(1, (b.e - b.s) * scale);
+      const dark = b.k === 'cpuE';
+      return `<div class="blk" title="${esc(b.t)} ${(b.e - b.s)}µs" style="left:${b.s * scale}px;width:${w}px;background:${KCOL[b.k]};${dark ? 'color:#111' : ''}">${w > 26 ? esc(b.t) : ''}</div>`;
+    }).join('') + '</div></div>';
+}
+function tlHtml() {
+  const D = SIZES[tlSize].d, R = {eager:sim('eager', D), full:sim('full', D), brk:sim('brk', D)};
+  const width = 1000, scale = width / Math.max(R.eager.total, R.full.total, R.brk.total);
+  const block = (key, title) => {
+    const r = R[key], pct = (r.busy / r.total * 100).toFixed(0);
+    return laneHtml(title + ' CPU', r.C, scale, width, `${title} CPU 时间线`) +
+      laneHtml(title + ' GPU', r.G, scale, width, `${title} GPU 时间线，总耗时约 ${r.total.toFixed(0)} 微秒，GPU 忙碌 ${pct}%`) +
+      `<div class="tlsum">总耗时 ≈ <b>${r.total.toFixed(0)} µs</b>，GPU 忙碌 ${pct}%，CPU 发起了 ${r.C.length} 次提交</div>`;
+  };
+  return block('eager', 'Eager') + block('full', 'Full graph') + block('brk', 'Breakable');
+}
+TABS.push({nav:'① CUDA graph 省了什么', title:'① 先把基础补上：CUDA graph 到底省掉了什么',
+render(){
+  return `<div class="desc">GPU kernel 都是 CPU 一个一个"提交"的。eager 模式下，每个算子都要走一遍 Python → PyTorch dispatcher → CUDA launch，CPU 上要花几到十几微秒。
+    一层 Llama 有十来个 kernel，32 层一次前向就是几百次提交。<b>kernel 很短的时候（decode），GPU 算完一个就在等 CPU 提交下一个</b>，时间都花在了"等"上。<br>
+    CUDA graph 的做法是：启动时把一整串 kernel（连同参数和显存地址）<b>录制</b>下来；运行时 CPU 只调用一次 <code>graph.replay()</code>，GPU 就把录好的 kernel 背靠背跑完。<br>
+    下面用一个 2 层的玩具模型示意三种驱动方式。切换 kernel 大小，看 GPU 什么时候在空等。</div>
+    <div class="bar" role="group" aria-label="kernel 大小">${Object.entries(SIZES).map(([k, s]) =>
+      `<button data-sz="${k}" aria-pressed="${k === tlSize}">${s.name}</button>`).join('')}</div>
+    <div class="legend"><span><i style="background:${KCOL.cpuE}"></i>CPU 提交一个 kernel</span><span><i style="background:${KCOL.cpuG}"></i>CPU 发起一次 graph replay</span>
+      <span><i style="background:${KCOL.gemm}"></i>GEMM</span><span><i style="background:${KCOL.attn}"></i>attention</span><span><i style="background:${KCOL.misc}"></i>其他小 kernel</span></div>
+    <div class="tlwrap" id="tl"></div>
+    <p class="note">数字是示意值：eager 每个 kernel 的 CPU 开销按 ${LAUNCH} µs、每次 replay 按 ${GLAUNCH} µs 算，忽略了 load_batch、metadata 准备等每个 batch 一次的开销。真实模型有几十层，差距会成倍放大。
+    Breakable 这一行按 prefill 的用法画：embed 和 lm_head 在图外 eager，attention 在图的两段之间 eager。</p>
+    <h3>录制这件事带来的硬约束</h3>
+    <p>• <b>地址固定</b>：录下来的是"从地址 X 读、往地址 Y 写"。所以每次 replay 前要把这次的输入拷进录制时用的那块静态 buffer。<br>
+    • <b>形状固定</b>：kernel 的 grid 大小录死了。所以要对一组 batch size（或 token 数）分别录一张图，运行时向上补齐到最近的档位。<br>
+    • <b>图里不能有 CPU 逻辑</b>：图里没有 Python，if/for 只在录制那一次执行。依赖这次数据的 CPU 决策（比如按每个请求的长度规划 attention）必须放到图外，或者提前写进静态 buffer。</p>
+    <p>第三条正是两种 backend 的分歧点：attention 恰好是那块"最依赖这次 batch 长什么样"的计算。</p>`;
+},
+after(){
+  const draw = () => document.getElementById('tl').innerHTML = tlHtml();
+  document.querySelectorAll('[data-sz]').forEach(b => b.onclick = () => {
+    tlSize = b.dataset.sz;
+    document.querySelectorAll('[data-sz]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    draw();
+  });
+  draw();
+}});
+// ---------- Tab 2：架构图 ----------
+const AC = {mr:'#7e22ce', run:'#b45309', base:'#475569', full:'#2563eb', brk:'#c2410c', eager:'#6b7280', graph:'#0e7490', pool:'#15803d', attn:'#be185d'};
+const ARCH = {
+  mr:{c:AC.mr, t:'ModelRunner._forward_raw', s:'model_runner.py:1958', d:`每次前向在这里选路径：
+    <br>• decode 且 <code>decode_cuda_graph_runner.can_run_graph(fb)</code> → <code>decode_cuda_graph_runner.execute</code>（<span class="loc">2001</span>）
+    <br>• extend 且 prefill runner 能跑 → <code>prefill_cuda_graph_runner.execute</code>（<span class="loc">2031–2054</span>）
+    <br>• 否则 → <code>eager_runner.execute</code>（<span class="loc">2058</span>）
+    <br>三个 runner 都在启动时由 <code>init_cuda_graphs</code> 创建（<span class="loc">1165–1197</span>）。`},
+  dec:{c:AC.run, t:'DecodeCudaGraphRunner', s:'runner/decode_cuda_graph_runner.py:219', d:`<b>管 decode 阶段"录什么、怎么喂数据"</b>，不管"怎么录"。
+    <br>• 持有静态 buffer（input_ids、positions、seq_lens、out_cache_loc…）和要录的 batch size 列表。
+    <br>• <code>capture()</code>：bs 从大到小，对每个 bs 调 <code>capture_one_shape</code>，里面构造 <code>run_once</code>（= 整个 model.forward，含 logits）交给 <code>self.backend.capture_one</code>（<span class="loc">1109–1360</span>）。
+    <br>• <code>execute()</code>：<code>load_batch</code> 把这次输入拷进静态 buffer、补齐到录制的 bs、在图外刷新 attention metadata（<span class="loc">1575</span>）→ <code>self.backend.replay</code> → 按真实 bs 切片输出（<span class="loc">1598–1660</span>）。`},
+  pre:{c:AC.run, t:'PrefillCudaGraphRunner', s:'runner/prefill_cuda_graph_runner.py:289', d:`<b>管 prefill 阶段</b>，按 token 数分档（bucket）录制。
+    <br>• 只录 transformer 的<b>层主体</b>：embedding 在图外算好拷进静态 slot，LM head + logits_processor 在图外 eager 跑（<span class="loc">2166–2237</span>）。replay 时把 <code>layer_model.forward</code> 临时换成 <code>replay_layer_forward</code>。
+    <br>• <code>can_run_graph</code> 检查 token 数、最长序列、LoRA、多模态、mixed batch 等，不满足就走 eager（<span class="loc">1414</span>）。`},
+  eag:{c:AC.eager, t:'EagerRunner', s:'runner/eager_runner.py:81', d:'不录图，逐个 kernel 提交。所有走不了图的情况都回落到这里。'},
+  base:{c:AC.base, t:'BaseCudaGraphBackend（接口）', s:'runner_backend/base_cuda_graph_backend.py:28', d:`runner 手里的 <code>self.backend</code>，负责<b>"怎么录、怎么放"</b>。接口只有 6 个方法：
+    <code>capture_session(stream)</code> / <code>capture_one(shape_key, forward_fn, …)</code> / <code>can_run</code> / <code>replay_session()</code> / <code>replay(shape_key, fb)</code> / <code>cleanup</code>。
+    <br>由 <code>resolve_decode_backend</code> / <code>resolve_prefill_backend</code> 按配置创建（<span class="loc">runner_backend/utils.py:48 / 107</span>）。`},
+  full:{c:AC.full, t:'FullCudaGraphBackend', s:'runner_backend/full_cuda_graph_backend.py:99', d:`<b>一个 shape 录一张完整的图</b>，attention 也在图里。
+    <br>• <code>capture_one</code>：先 eager 跑 2 次 warmup（加载 kernel、autotune、懒初始化），再在 <code>torch.cuda.graph(graph, pool, stream)</code> 里跑一次 forward_fn 录下来，存 <code>_graphs[key]</code> 和 <code>_outputs[key]</code>（<span class="loc">137–216</span>）。
+    <br>• <code>replay</code>：<code>_graphs[key].replay()</code>，返回录制时那块输出 tensor（<span class="loc">225–233</span>）。
+    <br>• 图里的 attention kernel 读的是固定地址的 metadata buffer，runner 每次 replay 前往里写新值。`},
+  brk:{c:AC.brk, t:'BreakableCudaGraphBackend', s:'runner_backend/breakable_cuda_graph_backend.py:60', d:`<b>一个 shape 录成"多段图 + 段间 eager 函数"</b>，attention 在段与段之间 eager 跑。
+    <br>• <code>capture_one</code>：2 次 warmup，然后在 <code>BreakableCUDAGraphCapture</code> 里跑 forward_fn；碰到 <code>@eager_on_graph</code> 标记的函数就在那里断开（<span class="loc">113–159</span>）。
+    <br>• <code>replay_session</code> 打开 <code>enable_breakable_cuda_graph()</code> 标志，RadixAttention 据此走 eager 分支（<span class="loc">256–259</span>）。
+    <br>• 不支持 memory saver（<span class="loc">88–94</span>）；混入 DedupedCudaGraphMixin，结构相同的段可以复用同一份可执行图（<span class="loc">cuda_graph_dedup_mixin.py</span>，基于 cudaGraphExecUpdate）。`},
+  g1:{c:AC.graph, t:'torch.cuda.CUDAGraph × 每个 shape 一张', s:'_graphs: Dict[ShapeKey, CUDAGraph]', d:'Full 的产物：每个 batch size（decode）或 token 档（prefill）一张完整的图。'},
+  g2:{c:AC.graph, t:'BreakableCUDAGraph × 每个 shape 一个', s:'breakable_cuda_graph.py:329', d:`Breakable 的产物：<code>_segments</code>（若干 CUDAGraph）和 <code>_break_fns</code>（段间要 eager 执行的函数）。
+    <br><code>replay()</code> 就是 <code>for i, seg: seg.replay(); break_fns[i]()</code>（<span class="loc">338–347</span>）。`},
+  pool:{c:AC.pool, t:'全局 graph memory pool', s:'runner_utils/pool.py get_or_create_global_graph_memory_pool', d:'所有图共用一个显存池存放中间结果。录制时 bs 从大到小（<span class="loc">decode_cuda_graph_runner.py:1150–1152、1184–1186</span>），小图可以复用大图已经申请的显存，总占用接近"最大那张图"而不是"所有图之和"。'},
+  attn:{c:AC.attn, t:'AttentionBackend（另一个 "backend"！）', s:'layers/attention/*_backend.py', d:`和上面的 CUDA graph backend 是两回事，两者配合：
+    <br>• <b>Full（decode）</b>：replay 前 runner 调 <code>init_forward_metadata_out_graph</code> 把这次的 kv_indices 等写进静态 buffer；attention kernel 本身录在图里。
+    <br>• <b>Breakable（prefill）</b>：replay 前在图外调 <code>init_forward_metadata</code>（<span class="loc">prefill_cuda_graph_runner.py:1291–1292</span>）；每层的 attention 由 <code>RadixAttention._eager_attention</code>（<span class="loc">radix_attention.py:176</span>）在段间 eager 调 <code>get_attn_backend().forward</code>，用的是这次真实的 batch。`},
+};
+const abox = (id, cls = '') => `<button class="abox ${cls}" data-a="${id}" style="--c:${ARCH[id].c}"><b>${esc(ARCH[id].t)}</b><small>${esc(ARCH[id].s)}</small>${
+  id === 'full' ? '<br><span class="tag">decode 默认</span>' : id === 'brk' ? '<br><span class="tag">prefill 默认（CUDA）</span>' : ''}</button>`;
+TABS.push({nav:'② 架构图', title:'② 架构：Runner 管"录什么、怎么喂"，Backend 管"怎么录、怎么放"（点击方框看说明）',
+render(){
+  return `<div class="cols" style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+    <div class="arch" style="flex:1.5;min-width:640px">
+      <div class="span3">${abox('mr')}</div>
+      <div class="down span3">↓ 按 forward_mode 和能否走图，三选一</div>
+      ${abox('dec')}${abox('pre')}${abox('eag')}
+      <div class="down span2" style="grid-column:1/3">↓ self.backend（两个 runner 都可以配成任一种）</div><div></div>
+      <div style="grid-column:1/3">${abox('base')}</div><div class="note" style="align-self:center">EagerRunner 没有 graph backend</div>
+      ${abox('full')}${abox('brk')}<div></div>
+      <div class="down">↓ 产物</div><div class="down">↓ 产物</div><div></div>
+      ${abox('g1')}${abox('g2')}<div></div>
+      <div style="grid-column:1/3">${abox('pool')}</div><div></div>
+      <div class="span3">${abox('attn', 'dash')}</div>
+    </div>
+    <div class="info" id="archInfo" aria-live="polite" style="flex:1;min-width:320px;position:sticky;top:10px"></div></div>
+    <div class="warn">注意名字：这里的 <b>CUDA graph backend</b>（Full / Breakable）决定"怎么录制和回放前向"；之前讲的 <b>AttentionBackend</b>（flashinfer / fa3 / triton…）决定"attention 用哪个 kernel 算"。两个"backend"互相独立，可以任意组合。<br>
+    另：以上是 CUDA 设备。NPU（昇腾）上 runner 换成 NPUGraphRunner、backend 换成 NPUCudaGraphBackend（只有 full 一种），见第 ⑤ 页。</div>`;
+},
+after(){
+  const show = id => {
+    document.querySelectorAll('.abox').forEach(b => b.classList.toggle('sel', b.dataset.a === id));
+    const a = ARCH[id];
+    document.getElementById('archInfo').innerHTML = `<h3 style="margin-top:0;color:${a.c}">${esc(a.t)}</h3><div class="loc">${esc(a.s)}</div><div style="margin-top:6px">${a.d}</div>`;
+  };
+  document.querySelectorAll('.abox').forEach(b => b.onclick = () => show(b.dataset.a));
+  show('base');
+}});
+// ---------- Tab 3：录制 / 回放分步演示 ----------
+const SL = 3;   // 演示用 3 层
+const SOPS = [{n:'embed'}];
+for (let l = 0; l < SL; l++) ['norm', 'qkv', 'rope', 'attn', 'o_proj', 'mlp'].forEach(n => SOPS.push({n, l}));
+SOPS.push({n:'lm_head'});
+const SEGC = ['#2563eb', '#15803d', '#7e22ce', '#0e7490'];
+function segOf(mode) {
+  let s = 0;
+  return SOPS.map(op => {
+    if (mode === 'full') return {kind:'g', seg:0};
+    if (op.n === 'embed' || op.n === 'lm_head') return {kind:'out'};
+    if (op.n === 'attn') { const r = {kind:'e', seg:s}; s++; return r; }
+    return {kind:'g', seg:s};
+  });
+}
+function buildSteps(mode, phase) {
+  const K = segOf(mode), st = SOPS.map(() => ({s:'pend'})), out = [];
+  const snap = (t, d, now = [], loc = '') => out.push({t, d, loc, now, st:st.map(x => ({...x}))});
+  const idx = (pred) => SOPS.map((op, i) => i).filter(i => pred(SOPS[i], K[i]));
+  if (mode === 'full' && phase === 'cap') {
+    snap('warmup × 2', '先 eager 跑两遍完整前向：加载 kernel、autotune、触发懒初始化。这两遍不录。', [], 'full_cuda_graph_backend.py:159–173');
+    snap('进入 torch.cuda.graph(graph, pool, stream)', '开始录制。从这里起 kernel 不再真正执行，而是被记进 graph。', [], 'full_cuda_graph_backend.py:198–203');
+    for (let i = 0; i < SOPS.length; i++) {
+      st[i] = {s:'rec', seg:0};
+      if (i === 0 || i === SOPS.length - 1 || SOPS[i].n === 'attn')
+        snap(`录制 ${SOPS[i].n}${SOPS[i].l !== undefined ? '（第 ' + SOPS[i].l + ' 层）' : ''}`,
+          SOPS[i].n === 'attn' ? 'attention 也被录进图里：kernel 的参数指向固定地址的 metadata buffer（kv_indptr / kv_indices…），以后 replay 前往里写新值。' : '这个 kernel 记进了同一张图。', [i]);
+    }
+    snap('存图', '<code>_graphs[shape_key] = graph</code>，<code>_outputs[shape_key] = out</code>：输出 tensor 也留着，它的地址在 pool 里固定。DecodeCudaGraphRunner 对每个 bs（从大到小）重复上面全过程。', [], 'full_cuda_graph_backend.py:215–216');
+  } else if (mode === 'full') {
+    snap('load_batch', '把这次的 input_ids / positions / seq_lens / out_cache_loc 等拷进录制时那几块静态 buffer，bs 补齐到最近的录制档位。', [], 'decode_cuda_graph_runner.py:1377');
+    snap('图外刷新 attention metadata', '<code>attn_backend.init_forward_metadata_out_graph(fb_view)</code>：按这次的 seq_lens 算 kv_indices，写进固定地址的 buffer。', [], 'decode_cuda_graph_runner.py:1575');
+    SOPS.forEach((_, i) => st[i] = {s:'play', seg:0});
+    snap('graph.replay()', 'CPU 只调一次，GPU 把录好的整串 kernel 背靠背跑完，Python 一行模型代码都不执行。', idx(() => true), 'full_cuda_graph_backend.py:231–233');
+    snap('切片输出', '从固定的输出 buffer 里按真实 bs 切出 logits，返回给 ModelRunner。', [], 'decode_cuda_graph_runner.py:1638–1660');
+  } else if (phase === 'cap') {
+    st[0] = st[SOPS.length - 1] = {s:'out'};
+    snap('只录层主体', 'prefill 的 BCG 只录 transformer 的层：embedding 和 LM head / logits_processor 留在图外（灰色）。', [0, SOPS.length - 1], 'prefill_cuda_graph_runner.py:2166–2167');
+    snap('warmup × 2', '同样先 eager 跑两遍。', [], 'breakable_cuda_graph_backend.py:121–127');
+    snap('进入 BreakableCUDAGraphCapture', '打开第 0 段：<code>_begin_new_segment()</code> → <code>CUDAGraph.capture_begin(pool)</code>；同时把自己放进 ContextVar，让 <code>@eager_on_graph</code> 能感知到"正在分段录制"。', [], 'breakable_cuda_graph.py:392–403');
+    let seg = 0;
+    for (let l = 0; l < SL; l++) {
+      const pre = idx((op, k) => op.l === l && k.kind === 'g' && k.seg === seg);
+      const a = idx(op => op.l === l && op.n === 'attn')[0];
+      const before = pre.filter(i => i < a);
+      before.forEach(i => st[i] = {s:'rec', seg});
+      if (before.length) snap(`第 ${seg} 段继续录：第 ${l} 层 ${before.map(i => SOPS[i].n).join(' / ')}`, '这些 kernel 记进当前段。', before);
+      st[a] = {s:'eager'};
+      snap(`碰到第 ${l} 层 attention → 断开`, `<code>_eager_attention</code> 带 <code>@eager_on_graph</code>：① <code>_end_current_segment()</code> 结束第 ${seg} 段；② 真跑一次 attention，确定输出地址；③ 把一个 <code>replay_fn</code> 追加进 <code>_break_fns</code>；④ <code>_begin_new_segment()</code> 开第 ${seg + 1} 段。`, [a], 'breakable_cuda_graph.py:278–322 / radix_attention.py:176');
+      seg++;
+      const nxt = idx((op, k) => op.l === l && k.kind === 'g' && k.seg === seg && op.n !== 'norm' && op.n !== 'qkv' && op.n !== 'rope');
+      nxt.forEach(i => st[i] = {s:'rec', seg});
+      snap(`第 ${seg} 段开始录：第 ${l} 层 o_proj / mlp`, '断点之后的 kernel 进入新的一段，直到下一层的 attention 再断开。', nxt);
+    }
+    snap('退出 capture，存图', `<code>__exit__</code> 结束最后一段。得到一个 BreakableCUDAGraph：${SL + 1} 段图 + ${SL} 个 break 函数（N 层就是 N+1 段、N 个断点）。开了 dedup 时，结构一样的段可以共用一份可执行图。`, [], 'breakable_cuda_graph.py:405–416 / breakable_cuda_graph_backend.py:155–159');
+  } else {
+    st[0] = {s:'out'};
+    snap('图外准备', '① <code>attn_backend.init_forward_metadata(forward_batch)</code>：按这次真实的 batch（几个请求、各自多长）准备 metadata，不需要补齐请求数；② embedding 在图外算好，拷进静态 input slot。', [0], 'prefill_cuda_graph_runner.py:1291–1292 / 2187–2191');
+    for (let s = 0; s <= SL; s++) {
+      const g = idx((op, k) => k.kind === 'g' && k.seg === s);
+      g.forEach(i => st[i] = {s:'play', seg:s});
+      snap(`replay 第 ${s} 段`, `<code>BreakableCUDAGraph.replay()</code> 里的 <code>seg.replay()</code>：这一段的 kernel 一次性提交。`, g, 'breakable_cuda_graph.py:342–343');
+      if (s < SL) {
+        const a = idx(op => op.n === 'attn' && op.l === s)[0];
+        st[a] = {s:'eager'};
+        snap(`break_fns[${s}]()：第 ${s} 层 attention eager 执行`, '<code>replay_fn</code> 调 <code>_eager_attention</code>，它用 <code>get_forward_batch()</code> 拿到<b>这次真实的</b> batch，调 <code>get_attn_backend().forward(q[:n], k, v, …)</code>，再把结果拷进下一段要读的那块"桥接 buffer"。', [a], 'breakable_cuda_graph.py:314–316 / 344–345 / radix_attention.py:189–221');
+      }
+    }
+    st[SOPS.length - 1] = {s:'out'};
+    snap('图外 tail：LM head + logits_processor', '按真实请求的 metadata 取每个请求最后一个位置，算 logits。输出行数随请求数变化，所以也放在图外。', [SOPS.length - 1], 'prefill_cuda_graph_runner.py:2232–2237');
+  }
+  return out;
+}
+let cgMode = 'full', cgPhase = 'cap', cgStep = 0;
+function stripHtml(step) {
+  let h = '<div class="strip" role="img" aria-label="各算子当前状态">';
+  SOPS.forEach((op, i) => {
+    if (i > 0 && (op.l !== SOPS[i - 1].l)) h += '<span class="lsep" aria-hidden="true"></span>';
+    const x = step.st[i], now = step.now.includes(i) ? ' now' : '';
+    let cls = 'op', st = '', sub = op.l !== undefined ? `L${op.l}` : '';
+    if (x.s === 'rec' || x.s === 'play') { cls += ' rec'; st = `style="background:${SEGC[x.seg % SEGC.length]}"`; sub += x.s === 'rec' ? ` · 录入段${x.seg}` : ` · 段${x.seg} ✓`; }
+    else if (x.s === 'eager') { cls += ' eager'; sub += ' · eager'; }
+    else if (x.s === 'out') { cls += ' eagerout'; sub += '图外 eager'; }
+    if (op.n === 'attn') cls += ' attn';
+    h += `<div class="${cls}${now}" ${st}>${esc(op.n)}<small>${esc(sub)}</small></div>`;
+  });
+  return h + '</div>';
+}
+TABS.push({nav:'③ 录制与回放', title:'③ 驱动过程：两种 backend 分别怎么录、怎么放（逐步演示）',
+render(){
+  return `<div class="desc">下面是一个 3 层模型的一次前向，每格是一个 kernel。选一种 backend 和阶段，点"下一步"。<br>
+    <b>Full</b> 按 decode 的用法演示（整个前向一张图）；<b>Breakable</b> 按 prefill 的用法演示（只录层主体，attention 处断开）。</div>
+    <div class="bar" role="group" aria-label="backend">
+      <button data-cm="full" aria-pressed="${cgMode === 'full'}">FullCudaGraphBackend（decode 默认）</button>
+      <button data-cm="brk" aria-pressed="${cgMode === 'brk'}">BreakableCudaGraphBackend（prefill 默认）</button></div>
+    <div class="bar" role="group" aria-label="阶段">
+      <button data-cp="cap" aria-pressed="${cgPhase === 'cap'}">启动时：录制（capture）</button>
+      <button data-cp="rep" aria-pressed="${cgPhase === 'rep'}">每次前向：回放（replay）</button></div>
+    <div class="bar"><button id="cPrev">← 上一步</button><button id="cNext">下一步 →</button><span id="cCnt" aria-live="polite"></span></div>
+    <div id="cStrip"></div>
+    <div class="info" id="cInfo" aria-live="polite"></div>
+    <div class="legend"><span><i style="background:${SEGC[0]}"></i><i style="background:${SEGC[1]}"></i><i style="background:${SEGC[2]}"></i>不同颜色 = 不同的图（段）</span>
+      <span><i style="background:#c2410c"></i>段间 eager（attention）</span><span><i style="background:#6b7280"></i>图外 eager</span><span><i style="background:#fff;border:2px dashed #bbb"></i>还没执行到</span></div>`;
+},
+after(){
+  const draw = () => {
+    const steps = buildSteps(cgMode, cgPhase);
+    cgStep = Math.max(0, Math.min(steps.length - 1, cgStep));
+    const s = steps[cgStep];
+    document.getElementById('cStrip').innerHTML = stripHtml(s);
+    document.getElementById('cCnt').textContent = `步骤 ${cgStep + 1} / ${steps.length}`;
+    document.getElementById('cInfo').innerHTML = `<b>${esc(s.t)}</b>${s.loc ? ' &nbsp;<span class="loc">' + esc(s.loc) + '</span>' : ''}<div>${s.d}</div>`;
+  };
+  const bind = (attr, set) => document.querySelectorAll(`[${attr}]`).forEach(b => b.onclick = () => {
+    set(b.getAttribute(attr)); cgStep = 0;
+    document.querySelectorAll(`[${attr}]`).forEach(x => x.setAttribute('aria-pressed', x === b));
+    draw();
+  });
+  bind('data-cm', v => cgMode = v);
+  bind('data-cp', v => cgPhase = v);
+  document.getElementById('cNext').onclick = () => { cgStep++; draw(); };
+  document.getElementById('cPrev').onclick = () => { cgStep--; draw(); };
+  draw();
+}});
+// ---------- Tab 4：对比总结 ----------
+TABS.push({nav:'④ 对比与配置', title:'④ 两者对比、为什么 decode 用 Full / prefill 用 Breakable、怎么配置',
+render(){
+  return `<table class="cmp">
+    <tr><th></th><th style="color:${AC.full}">FullCudaGraphBackend</th><th style="color:${AC.brk}">BreakableCudaGraphBackend</th></tr>
+    <tr><th>每个 shape 录出来的是</th><td>1 张 <code>torch.cuda.CUDAGraph</code></td><td>1 个 <code>BreakableCUDAGraph</code>：N+1 段图 + N 个 break 函数（N = attention 层数）</td></tr>
+    <tr><th>attention</th><td>录在图里</td><td>在段与段之间 eager 执行（<code>@eager_on_graph</code>）</td></tr>
+    <tr><th>attention metadata</th><td>replay 前写进固定地址的 buffer，图里的 kernel 读它。所以"有几个请求"也被录死了：prefill 要固定请求槽位数，空的槽位用长度为 0 的占位补齐</td><td>replay 前在图外按这次真实的 batch 正常计算，attention 本身也是 eager，不需要补齐请求数</td></tr>
+    <tr><th>prefill 时的形状键</th><td>token 档 + 固定请求槽位数（<code>full_prefill_max_req</code>），请求数超过就走 eager。需要手动开启</td><td>只看 token 档，请求数任意。CUDA 上默认</td></tr>
+    <tr><th>每次前向的 CPU 提交次数</th><td>1 次 replay</td><td>N+1 次段 replay + N 次 eager attention（仍然比 eager 的几百次少得多）</td></tr>
+    <tr><th>memory saver</th><td>支持</td><td>不支持，构造时直接报错（<span class="loc">breakable_cuda_graph_backend.py:88–94</span>）</td></tr>
+    <tr><th>调试</th><td>—</td><td><code>--debug-cuda-graph</code> 只能配 Breakable（<span class="loc">decode_cuda_graph_runner.py:1243–1247</span>），可以把整个前向包成 eager 来排查</td></tr>
+  </table>
+  <h3>为什么 decode 默认 Full、prefill 默认 Breakable</h3>
+  <p>CUDA graph 要求"形状和地址录死"。<b>一个 batch 里，只有 attention 关心 token 是怎么分给各个请求的</b>（几个请求、各自多长、前缀命中多少）。
+  qkv_proj、RoPE、MLP、norm 这些逐 token 的算子只关心总 token 数（之前讲过的"按行独立"）。</p>
+  <p>• <b>decode</b>：每个请求正好 1 个 token，batch size 一确定，attention 的 grid 形状也就确定了，只有每个请求的 KV 长度会变，而这只是 metadata buffer 里的数值。所以整个前向录成一张图没有问题，CPU 开销最小。<br>
+  • <b>prefill</b>：同样 2048 个 token，可能是 1 个请求 × 2048，也可能是 16 个请求 × 128，attention 的切分方式完全不同。Full 只能把请求槽位数也录死再补齐；Breakable 干脆把 attention 拿出图外 eager 跑，其余只按 token 数分档录制。</p>
+  <p>这也是之前那张"一层 attention 拆解"里 5–8 步（交给 backend → 写 KV → attention kernel）和其余步骤的区别：Breakable 断开的就是这一段。</p>
+  <h3>默认值和配置</h3>
+  <p>• 默认：decode = <code>full</code>（<span class="loc">cuda_graph_config.py:149–151</span>）；prefill 在 CUDA 上 = <code>breakable</code>，其他平台 = <code>disabled</code>（<span class="loc">cuda_graph_config.py:119–123</span>）。<br>
+  • 命令行：<code>--cuda-graph-backend-decode</code> / <code>--cuda-graph-backend-prefill</code>，取值 <code>full | breakable | disabled</code>；或者 <code>--cuda-graph-config '{"decode":{"backend":"full","max_bs":256},"prefill":{"backend":"breakable"}}'</code>（JSON 优先级最高）。<br>
+  • 相关：<code>--cuda-graph-max-bs-decode</code>、<code>--cuda-graph-max-bs-prefill</code>、<code>--cuda-graph-max-seq-len-prefill</code>（更长的 batch 走 eager）、<code>--disable-decode-cuda-graph</code>、<code>--disable-prefill-cuda-graph</code>（<span class="loc">arg_groups/fields/exec_.py:572–640</span>）。</p>
+  <h3>代码入口</h3>
+  <table class="cmp">
+    <tr><th>是什么</th><th>位置</th></tr>
+    <tr><td>backend 接口</td><td class="loc">model_executor/runner_backend/base_cuda_graph_backend.py:28</td></tr>
+    <tr><td>Full：capture_one / replay</td><td class="loc">model_executor/runner_backend/full_cuda_graph_backend.py:137 / 225</td></tr>
+    <tr><td>Breakable：capture_one / replay</td><td class="loc">model_executor/runner_backend/breakable_cuda_graph_backend.py:113 / 261</td></tr>
+    <tr><td>断点装饰器、分段容器、分段录制</td><td class="loc">runner_backend_utils/breakable_cuda_graph/breakable_cuda_graph.py:253 / 329 / 358</td></tr>
+    <tr><td>attention 的断点</td><td class="loc">layers/radix_attention.py:131–158（判断）/ 176（@eager_on_graph）</td></tr>
+    <tr><td>按配置选 backend</td><td class="loc">model_executor/runner_backend/utils.py:48 / 107</td></tr>
+    <tr><td>decode runner 录制循环 / 回放</td><td class="loc">model_executor/runner/decode_cuda_graph_runner.py:1109–1360 / 1598</td></tr>
+    <tr><td>prefill runner 回放（只放层主体，tail eager）</td><td class="loc">model_executor/runner/prefill_cuda_graph_runner.py:2325 / 2157</td></tr>
+  </table>`;
+}});
+
+// ---------- Tab 5：NPU 版本 ----------
+const NPU = {c:'#b45309', g:'#0e7490'};
+TABS.push({nav:'⑤ NPU 版本', title:'⑤ NPUGraphRunner / NPUCudaGraphBackend：同一套框架在昇腾上的移植',
+render(){
+  return `<div class="desc">NPUGraphRunner 不是第三种并列的 runner，而是 <b>DecodeCudaGraphRunner 在华为昇腾 NPU 上的薄子类</b>（<span class="loc">hardware_backend/npu/graph_runner/npu_graph_runner.py:97</span>）。
+    之前讲的 Runner 管"录什么怎么喂"、Backend 管"怎么录怎么放"的分层原样成立，两边各换了一个实现。</div>
+  <div class="arch" style="grid-template-columns:1fr 1fr">
+    <div><h3 style="margin-top:0;color:${AC.full}">CUDA（前面讲的）</h3>
+    <div class="abox" style="--c:${AC.run};cursor:default"><b>DecodeCudaGraphRunner</b><small>runner/decode_cuda_graph_runner.py:219</small></div>
+    <div class="down">↓ self.backend</div>
+    <div class="abox" style="--c:${AC.full};cursor:default"><b>FullCudaGraphBackend（或 Breakable）</b><small>runner_backend/full_cuda_graph_backend.py:99</small></div>
+    <div class="down">↓</div>
+    <div class="abox" style="--c:${NPU.g};cursor:default"><b>torch.cuda.CUDAGraph</b><small>录制 API：torch.cuda.graph(...)</small></div></div>
+    <div><h3 style="margin-top:0;color:${NPU.c}">NPU（昇腾）</h3>
+    <div class="abox" style="--c:${NPU.c};cursor:default"><b>NPUGraphRunner(DecodeCudaGraphRunner)</b><small>hardware_backend/npu/graph_runner/npu_graph_runner.py:97</small><br><span class="tag">npu 设备时查表选中</span></div>
+    <div class="down">↓ self.backend（只有这一种）</div>
+    <div class="abox" style="--c:${NPU.c};cursor:default"><b>NPUCudaGraphBackend</b><small>hardware_backend/npu/graph_runner/npu_cudagraph_backend.py:42</small><br><span class="tag">NPU 无条件返回它，没有 breakable 选项</span></div>
+    <div class="down">↓</div>
+    <div class="abox" style="--c:${NPU.g};cursor:default"><b>torch.npu.NPUGraph</b><small>torch.npu.graph(..., auto_dispatch_capture=True)</small></div></div>
+  </div>
+  <p class="note">选中的位置：<span class="loc">model_executor/model_runner_components/cuda_graph_setup.py:775</span>（runner 按 device 查表）、<span class="loc">runner_backend/utils.py:62–69</span>（backend）。</p>
+  <h3>完全继承父类的部分</h3>
+  <p>静态 buffer 分配、capture_bs 档位、<code>load_batch</code> 拷贝 + 补齐（含 PaddingPolicy 那套哨兵值）、replay 后按真实 bs 切片输出——一行没改。NPU 的 attention backend 是 <code>ascend</code>，metadata 同样是 replay 前在图外刷进固定 buffer。</p>
+  <h3>核心区别：seq_lens 怎么进到录好的图里</h3>
+  <table class="cmp">
+    <tr><th></th><th style="color:${AC.full}">CUDA</th><th style="color:${NPU.c}">NPU</th></tr>
+    <tr><td>attention kernel 从哪读 KV 长度</td><td>从<b>设备上固定地址的 buffer</b>读（kv_indptr 等的数值）</td><td>启动时由 <b>host 传入的输入属性</b>：MLA 叫 <code>actual_seq_lengths_kv</code>，MHA 叫 <code>context_lens</code>，投机验证叫 <code>actual_seq_kvlen</code>（<span class="loc">npu_graph_runner.py:139 _init_arch_map</span>）</td></tr>
+    <tr><td>replay 前要做什么</td><td>CPU 把新值写进那块 buffer（<code>init_forward_metadata_out_graph</code>），<b>图本身不用动</b></td><td>不写 buffer，调 CANN 的 <code>NPUGraph.update(cpu_update_input=[{attr: seq_lens}])</code> <b>重新绑定图的 host 输入</b>，再 replay（<span class="loc">npu_cudagraph_backend.py:156</span>）</td></tr>
+    <tr><td>调用入口</td><td><code>backend.replay(shape_key, fb)</code></td><td>NPUGraphRunner.execute 重写后走 <code>backend.replay_with_input_update(...)</code>（<span class="loc">npu_graph_runner.py:418</span>）；补齐槽位的 seq_lens 填 0</td></tr>
+  </table>
+  <p>工程细节：<code>update</code> 提交给一个专用 worker 线程与 replay 并发发起，随后 <code>update_future.result()</code> 等完成；因为 seq_lens 是 host 侧数组、设备可能还在读上一轮，有 <code>_rebind_fence</code> 事件保证下一轮重写前先等上一轮读完（<span class="loc">npu_cudagraph_backend.py:68–76 / 182–193</span>）。
+  特例：DeepSeek DSA / V4 走 sync-free 路径，直接 <code>backend.replay</code> 不做 update（<span class="loc">npu_graph_runner.py:372–425</span>）。</p>
+  <h3>其余小差异</h3>
+  <table class="cmp">
+    <tr><th>项</th><th>DecodeCudaGraphRunner</th><th>NPUGraphRunner</th></tr>
+    <tr><td>torch.compile</td><td>默认 patch</td><td>换成 <code>patch_model_npu</code>，走 torch_npu 的 <code>npugraph_ex</code> 后端——昇腾的 "compile + 整图" 是配套设计（<span class="loc">npu_graph_runner.py:78–94</span>）</td></tr>
+    <tr><td>out_cache_loc dtype</td><td>int64</td><td>int32（省带宽，<code>_cache_loc_dtype</code>）</td></tr>
+    <tr><td>capture profiler</td><td>内存里出 trace</td><td>写磁盘（<code>_init_profile_context_and_memory_record</code> 重写）</td></tr>
+    <tr><td>可选 backend</td><td>full / breakable / disabled</td><td>只有 full-style 一种</td></tr>
+    <tr><td>专属分支</td><td>—</td><td>ASCEND_USE_FIA、FIA v2 BSND 等 NPU kernel 开关；另有 eagle_draft 等 NPU 子类给投机解码 draft 用（同套路：继承 CUDA 侧对应 runner，只换录制 API 和 seq_lens 更新）</td></tr>
+  </table>`;
+}});
+
+// ---------- 导航 ----------
+let cur = 0;
+const nav = document.getElementById('nav');
+nav.innerHTML = TABS.map((s, i) => `<button data-i="${i}">${esc(s.nav)}</button>`).join('');
+nav.querySelectorAll('button').forEach(b => b.onclick = () => go(+b.dataset.i));
+function go(i) {
+  cur = i;
+  const s = TABS[cur];
+  document.getElementById('title').textContent = s.title;
+  document.getElementById('stage').innerHTML = s.render();
+  if (s.after) s.after();
+  nav.querySelectorAll('button').forEach((b, j) =>
+    j === cur ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current'));
+}
+go(0);
+</script>
+</body>
+</html>

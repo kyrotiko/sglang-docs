@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prefill 为什么能并行：KV 是怎么一次算出来的</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#fafafa;color:#222;line-height:1.6}
+header{padding:14px 24px;background:#1f2937;color:#fff}
+header h1{margin:0;font-size:19px}
+nav.steps{display:flex;flex-wrap:wrap;gap:6px;padding:10px 24px;background:#fff;border-bottom:1px solid #ddd}
+nav.steps button{border:1px solid #bbb;background:#fff;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:13px}
+nav.steps button[aria-current="step"]{background:#1f2937;color:#fff;border-color:#1f2937}
+main{padding:14px 24px;max-width:1280px}
+h2{margin:4px 0 8px;font-size:18px}
+h3{font-size:15px;margin:16px 0 6px}
+.desc{background:#fff;border-left:4px solid #1f2937;padding:8px 14px;margin-bottom:12px}
+.ctrl{display:flex;gap:8px;margin:18px 0}
+.ctrl button,.bar button{padding:5px 14px;font-size:14px;cursor:pointer;background:#fff;border:1px solid #888;border-radius:4px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.bar button[aria-pressed="true"]{background:#1f2937;color:#fff}
+button:focus-visible,.node:focus-visible,input:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+.info{min-height:30px;font-size:14px;background:#fff8e1;border:1px solid #e8c86a;padding:4px 10px;border-radius:4px;margin:6px 0}
+.note{font-size:13px;color:#555}
+code{background:#eef;padding:0 4px;border-radius:3px;font-size:13px}
+/* 依赖图 */
+.dag{display:grid;gap:8px;align-items:center;width:max-content}
+.rl{font-size:12px;color:#555;text-align:right;padding-right:6px;font-family:Consolas,monospace}
+.node{width:96px;height:46px;border:2px solid #bbb;border-radius:6px;background:#f3f4f6;color:#777;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;line-height:1.2;transition:background .25s,border-color .25s;cursor:default}
+.node small{font-size:10px}
+.node.done{color:#fff;border-color:rgba(0,0,0,.3)}
+.node.now{outline:3px solid #f59e0b;outline-offset:1px}
+.node.dep{outline:3px dashed #111;outline-offset:1px}
+.node.unknown{background:repeating-linear-gradient(45deg,#e5e7eb,#e5e7eb 4px,#fff 4px,#fff 8px)}
+.node.skip{background:#fff;border-style:dashed;color:#aaa}
+.counter{font-size:22px;font-weight:700;font-family:Consolas,monospace}
+/* 矩阵 */
+.mat{display:inline-grid;gap:2px;vertical-align:middle}
+.mc{width:22px;height:22px;border-radius:3px;border:1px solid rgba(0,0,0,.2)}
+.mc.cache{background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.45),rgba(255,255,255,.45) 3px,transparent 3px,transparent 6px)}
+.mc.mask{background:#fff}
+.mc.w{background:#9ca3af}
+.mblk{display:inline-flex;flex-direction:column;align-items:center;gap:3px;margin:0 4px;vertical-align:middle}
+.mlbl{font-size:12px;font-family:Consolas,monospace;color:#333;text-align:center}
+.op{font-size:20px;vertical-align:middle;padding:0 2px}
+.eq{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:8px 0;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px}
+/* 屋顶线 */
+.barrow{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}
+.barrow .name{width:150px}
+.track{flex:1;max-width:700px;height:22px;background:#f1f1f1;border-radius:4px;position:relative}
+.fill{height:100%;border-radius:4px;transition:width .2s}
+table.kv{border-collapse:collapse;font-size:14px;margin:8px 0}
+table.kv td,table.kv th{border:1px solid #ddd;padding:4px 10px;text-align:left}
+table.kv th{background:#f3f4f6}
+.tl{display:flex;height:34px;border:1px solid #ccc;border-radius:4px;overflow:hidden;max-width:1000px;margin:4px 0}
+.tl div{height:100%}
+</style>
+</head>
+<body>
+<header><h1>Prefill 为什么能并行：整个 prompt 的 KV 是怎么一次算出来的</h1></header>
+<nav class="steps" id="nav" aria-label="步骤导航"></nav>
+<main>
+  <h2 id="title" tabindex="-1"></h2>
+  <div id="stage"></div>
+  <div class="ctrl">
+    <button id="prev">← 上一步</button>
+    <button id="next">下一步 →</button>
+  </div>
+</main>
+<script>
+// ---------- 公共数据 ----------
+const PCOL = ['#2563eb', '#c2410c', '#15803d', '#7e22ce'];   // prompt 位置 0..3
+const GCOL = ['#0e7490', '#b91c1c', '#4d7c0f', '#a21caf'];   // 生成的 token
+const PROMPT = ['今天', '天气', '怎么', '样'];
+const GEN = ['晴', '天', '，', '适合'];
+const NL = 3;                                                 // 演示用 3 层
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---------- 依赖图的三种调度方式 ----------
+// 每个 step 是一组可以"同时"计算的格子 {l, p}，l=1..NL 是层，l=NL+1 是 lm_head
+function schedule(mode) {
+  const S = [];
+  if (mode === 'prefill') {
+    for (let l = 1; l <= NL; l++) S.push([0, 1, 2, 3].map(p => ({l, p})));
+    S.push([{l:NL + 1, p:3}]);
+  } else if (mode === 'serial') {
+    for (let p = 0; p < 4; p++) for (let l = 1; l <= NL; l++) S.push([{l, p}]);
+    S.push([{l:NL + 1, p:3}]);
+  } else {
+    for (let p = 0; p < 4; p++) for (let l = 1; l <= NL + 1; l++) S.push([{l, p}]);
+  }
+  return S;
+}
+const MODES = {
+  prefill: {name:'prefill（prompt 已知，并行）', cols:PROMPT, colors:PCOL},
+  serial:  {name:'prompt 逐个喂（反例，不并行）', cols:PROMPT, colors:PCOL},
+  decode:  {name:'decode（生成，只能串行）', cols:GEN, colors:GCOL},
+};
+let dagMode = 'prefill', dagT = 0, dagTimer = null;
+
+function isDone(l, p) {
+  const S = schedule(dagMode);
+  for (let t = 0; t < dagT; t++) if (S[t].some(c => c.l === l && c.p === p)) return true;
+  return false;
+}
+function isNow(l, p) {
+  const S = schedule(dagMode);
+  return dagT > 0 && S[dagT - 1].some(c => c.l === l && c.p === p);
+}
+function inputKnown(p) {
+  if (dagMode !== 'decode' || p === 0) return true;
+  return isDone(NL + 1, p - 1);           // decode：第 p 个输入 = 第 p-1 列 lm_head 采样出来的 token
+}
+function headText(p) {
+  if (dagMode === 'decode') return p < 3 ? GEN[p + 1] : '出门';
+  return p === 3 ? '晴' : '';
+}
+function renderDag() {
+  const M = MODES[dagMode], S = schedule(dagMode);
+  let h = `<div class="dag" style="grid-template-columns:110px repeat(4,96px)">`;
+  for (let l = NL + 1; l >= 0; l--) {
+    h += `<div class="rl">${l === NL + 1 ? 'lm_head + 采样' : l === 0 ? '输入 token' : '第 ' + l + ' 层'}</div>`;
+    for (let p = 0; p < 4; p++) {
+      const col = M.colors[p];
+      let cls = 'node', st = '', body = '';
+      if (l === 0) {
+        const known = inputKnown(p);
+        cls += known ? ' done' : ' unknown';
+        st = known ? `style="background:${col}"` : '';
+        body = known ? `${esc(M.cols[p])}<small>位置 ${dagMode === 'decode' ? 4 + p : p}</small>` : '？<small>还不知道</small>';
+      } else if (l === NL + 1) {
+        const needed = dagMode === 'decode' || p === 3;
+        if (!needed) { cls += ' skip'; body = '不需要<small>答案已在 prompt 里</small>'; }
+        else if (isDone(l, p)) { cls += ' done'; st = `style="background:${col}"`; body = `→ ${esc(headText(p))}<small>logits 采样</small>`; }
+        else body = '…';
+      } else {
+        if (isDone(l, p)) { cls += ' done'; st = `style="background:${col}"`; body = `Q K V<small>存 KV（层${l}）</small>`; }
+        else body = `层${l}·位${p}`;
+      }
+      if (isNow(l, p)) cls += ' now';
+      const lab = l === 0 ? `输入位置 ${p}` : l === NL + 1 ? `位置 ${p} 的 lm_head` : `第 ${l} 层 位置 ${p}`;
+      h += `<div class="${cls}" ${st} tabindex="0" data-l="${l}" data-p="${p}" aria-label="${lab}">${body}</div>`;
+    }
+  }
+  h += '</div>';
+  document.getElementById('dag').innerHTML = h;
+  document.getElementById('cnt').textContent = `${dagT} / ${S.length}`;
+  document.getElementById('dagInfo').innerHTML = dagExplain(S);
+  document.querySelectorAll('#dag .node').forEach(n => {
+    const show = () => showDeps(+n.dataset.l, +n.dataset.p);
+    n.onmouseenter = show; n.onfocus = show;
+    n.onmouseleave = () => document.querySelectorAll('#dag .dep').forEach(x => x.classList.remove('dep'));
+  });
+}
+// 依赖：第 l 层位置 p 需要 第 l-1 层的位置 0..p（attention 要读前面所有位置的 K/V）
+function showDeps(l, p) {
+  document.querySelectorAll('#dag .dep').forEach(x => x.classList.remove('dep'));
+  if (l === 0) {
+    if (dagMode === 'decode' && p > 0) document.querySelector(`#dag .node[data-l="${NL + 1}"][data-p="${p - 1}"]`).classList.add('dep');
+    return;
+  }
+  const deps = l === NL + 1 ? [p] : [...Array(p + 1).keys()];
+  deps.forEach(q => document.querySelector(`#dag .node[data-l="${l - 1}"][data-p="${q}"]`).classList.add('dep'));
+}
+function dagExplain(S) {
+  if (dagT === 0) return '点"走一步"或"自动播放"。鼠标移到/Tab 到某个格子上，会用黑色虚线框出它依赖的格子。';
+  const cur = S[dagT - 1], c0 = cur[0];
+  if (dagMode === 'prefill') {
+    if (c0.l <= NL) return `第 ${dagT} 步：<b>第 ${c0.l} 层的 4 个位置一起算</b>。它们只依赖第 ${c0.l - 1} 层的输出，而第 ${c0.l - 1} 层的 4 个位置上一步已经全部算完。一次 GEMM 算出 4 个位置的 Q/K/V，K/V 写进 cache，然后做一次带 causal mask 的 attention。`;
+    return `第 ${dagT} 步：只对最后一个位置做 lm_head，采样出第一个生成的 token “晴”。总共 ${S.length} 步，<b>步数 = 层数 + 1，与 prompt 长度无关</b>。`;
+  }
+  if (dagMode === 'serial') return `第 ${dagT} 步：一次只算 1 个格子。这样算出的 K/V 和 prefill 完全一样，但要 ${S.length} 步，<b>步数 = 长度 × 层数</b>。prompt 已经全部知道了，这样等是白等。`;
+  if (c0.l === NL + 1) return `第 ${dagT} 步：位置 ${4 + c0.p} 采样出 “${esc(headText(c0.p))}”。<b>它就是下一列的输入</b>，所以下一列直到这一步才能开始。`;
+  return `第 ${dagT} 步：生成第 ${c0.p + 1} 个 token，正在第 ${c0.l} 层。这一列每一层的 attention 还要读 prompt 的 KV cache（图中没画）。输入 token 只有 1 个，所以 GEMM 只有 1 行。`;
+}
+// ---------- 矩阵小工具 ----------
+// rows: 每行一个颜色（null=权重灰色）；cls: 每行附加 class
+function mat(rows, ncol, opt = {}) {
+  const cell = opt.cell || 22;
+  let h = `<div class="mat" style="grid-template-columns:repeat(${ncol},${cell}px)">`;
+  rows.forEach((r, i) => {
+    for (let j = 0; j < ncol; j++) {
+      const m = opt.mask && opt.mask(i, j);
+      const cls = m ? 'mask' : (r.color ? (r.cache ? 'cache' : '') : 'w');
+      const st = !m && r.color ? `style="background:${opt.cellColor ? opt.cellColor(i, j) : r.color};width:${cell}px;height:${cell}px"` : `style="width:${cell}px;height:${cell}px"`;
+      h += `<span class="mc ${cls}" ${st}></span>`;
+    }
+  });
+  return h + '</div>';
+}
+const blk = (label, inner) => `<div class="mblk">${inner}<div class="mlbl">${label}</div></div>`;
+const op = s => `<span class="op">${s}</span>`;
+const W = n => Array.from({length:n}, () => ({color:null}));
+const STEPS = [];
+
+// 0. 依赖图
+STEPS.push({nav:'1 依赖关系', title:'第 1 步：先看依赖关系：谁必须等谁',
+render(){
+  let h = `<div class="desc">图中每个格子是"某一层在某个位置上的计算"（算 Q/K/V、写 KV cache、做 attention、过 MLP）。
+  一个格子能不能开始，只看它依赖的格子是否已经算完：<br>
+  • <b>第 l 层位置 p</b> 依赖 <b>第 l-1 层的位置 0..p</b>：attention 要读前面所有位置的 K/V，而这些 K/V 由第 l-1 层的输出投影得到。<br>
+  • 它<b>不依赖同一层的其他位置</b>。同一层里位置 0 和位置 3 之间没有先后顺序要求。<br>
+  所以依赖只沿竖直方向（层到层）传递，同一行（同一层）的格子可以一起算。切换下面三种模式，比较一共需要多少步。</div>`;
+  h += `<div class="bar" role="group" aria-label="模式">` +
+    Object.entries(MODES).map(([k, m]) => `<button data-m="${k}" aria-pressed="${k === dagMode}">${m.name}</button>`).join('') + '</div>';
+  h += `<div class="bar"><button id="stepBtn">走一步</button><button id="playBtn">自动播放</button><button id="resetBtn">重置</button>
+    <span>已用步数（串行轮数）：</span><span class="counter" id="cnt" aria-live="polite"></span></div>`;
+  h += `<div class="info" id="dagInfo" aria-live="polite"></div><div id="dag"></div>`;
+  h += `<p class="note">decode 模式下，第 2 列的输入是第 1 列顶部采样出来的 token，在那之前它是"？"，第 2 列只能干等。prefill 的输入一开始就全部已知，这是两者的根本区别。</p>`;
+  return h;
+},
+after(){
+  const stop = () => { clearInterval(dagTimer); dagTimer = null; const b = document.getElementById('playBtn'); if (b) b.textContent = '自动播放'; };
+  document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
+    stop(); dagMode = b.dataset.m; dagT = 0;
+    document.querySelectorAll('[data-m]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    renderDag();
+  });
+  const step = () => { if (dagT < schedule(dagMode).length) { dagT++; renderDag(); } else stop(); };
+  document.getElementById('stepBtn').onclick = () => { stop(); step(); };
+  document.getElementById('resetBtn').onclick = () => { stop(); dagT = 0; renderDag(); };
+  document.getElementById('playBtn').onclick = () => {
+    if (dagTimer) return stop();
+    if (dagT >= schedule(dagMode).length) dagT = 0;
+    document.getElementById('playBtn').textContent = '暂停';
+    dagTimer = setInterval(step, 700);
+  };
+  renderDag();
+},
+leave(){ clearInterval(dagTimer); dagTimer = null; }});
+// 1. 一层内部的矩阵
+let layerMode = 'prefill';
+function layerHtml() {
+  const P = PCOL.map(c => ({color:c}));
+  if (layerMode === 'prefill') {
+    const pr = (i, j) => PCOL[i];
+    return `<div class="eq">${blk('X [4, d]<br>4 个位置的输入', mat(P, 6))}${op('×')}${blk('W<sub>q</sub> / W<sub>k</sub> / W<sub>v</sub><br>[d, d]', mat(W(6), 6))}${op('=')}
+        ${blk('Q [4, d]', mat(P, 6))}${blk('K [4, d]', mat(P, 6))}${blk('V [4, d]', mat(P, 6))}
+        ${op('→')}${blk('K、V 4 行全部<br>写入 KV cache', mat(P, 6))}</div>
+      <div class="eq">${blk('Q [4, d]', mat(P, 6))}${op('×')}${blk('Kᵀ [d, 4]<br>每列一个位置', mat(W(6).map(() => ({color:'x'})), 4, {cellColor:(i, j) => PCOL[j]}))}${op('=')}
+        ${blk('scores [4, 4]<br>白色 = causal mask', mat(P, 4, {mask:(i, j) => j > i, cellColor:pr, cell:28}))}
+        ${op('→ softmax ×')}${blk('V [4, d]', mat(P, 6))}${op('=')}${blk('输出 [4, d]', mat(P, 6))}</div>
+      <p>一次矩阵乘法 <code>X[4,d] × W[d,d]</code> 就同时得到 4 个位置的 Q/K/V，<b>这就是"整个 prompt 并行算 KV"</b>。
+      attention 也是一次 <code>[4,d] × [d,4]</code>，用 causal mask 把右上角盖掉，保证每一行只用到自己和之前的位置。
+      之后的 MLP 也是 <code>[4,d] × [d, 4d]</code> 一次算完。真实场景中 prompt 有上千个 token，就是一个 <code>[n, d]</code> 的大矩阵乘法，GPU 能用满 Tensor Core。</p>`;
+  }
+  const cache = PCOL.map(c => ({color:c, cache:true}));
+  const nw = {color:GCOL[0]};
+  return `<div class="eq">${blk('x [1, d]<br>只有 1 个新 token', mat([nw], 6))}${op('×')}${blk('W<sub>q</sub> / W<sub>k</sub> / W<sub>v</sub><br>[d, d]（同样大）', mat(W(6), 6))}${op('=')}
+      ${blk('q [1, d]', mat([nw], 6))}${blk('k [1, d]', mat([nw], 6))}${blk('v [1, d]', mat([nw], 6))}
+      ${op('→')}${blk('追加到 KV cache<br>斜纹 = prefill 时存的', mat(cache.concat([nw]), 6))}</div>
+    <div class="eq">${blk('q [1, d]', mat([nw], 6))}${op('×')}${blk('K<sub>cache</sub>ᵀ [d, 5]<br>前 4 列来自 cache', mat(W(6).map(() => ({color:'x'})), 5, {cellColor:(i, j) => j < 4 ? PCOL[j] : GCOL[0]}))}${op('=')}
+      ${blk('scores [1, 5]<br>不用 mask，历史全可见', mat([nw], 5, {cellColor:(i, j) => j < 4 ? PCOL[j] : GCOL[0], cell:28}))}
+      ${op('→ softmax ×')}${blk('V<sub>cache</sub> [5, d]', mat(cache.concat([nw]), 6))}${op('=')}${blk('输出 [1, d]', mat([nw], 6))}</div>
+    <p>decode 每步只有 1 行输入：<code>x[1,d] × W[d,d]</code> 是矩阵乘向量（GEMV），<b>权重一样大、一样要从显存完整读一遍，却只算 1 行</b>。
+    attention 读的是之前存好的 KV cache（斜纹部分），不用再算一遍，这正是 prefill 存 KV 的意义。
+    下一步才能开始的原因是：下一个 token 要等这一步的 lm_head 采样出来。</p>`;
+}
+STEPS.push({nav:'2 一层里的矩阵', title:'第 2 步：放大一层：prefill 是一个大矩阵乘法，decode 是"一行"',
+render(){
+  return `<div class="desc">上一步图里"一行格子一起算"，落到 GPU 上就是：把 n 个位置的输入叠成矩阵，乘以这一层的权重。
+    颜色表示位置，灰色是权重。切换 prefill / decode 对比形状。</div>
+    <div class="bar" role="group" aria-label="模式">
+      <button data-lm="prefill" aria-pressed="${layerMode === 'prefill'}">prefill：4 个 prompt token</button>
+      <button data-lm="decode" aria-pressed="${layerMode === 'decode'}">decode：1 个新 token</button></div>
+    <div id="layer"></div>`;
+},
+after(){
+  const draw = () => document.getElementById('layer').innerHTML = layerHtml();
+  document.querySelectorAll('[data-lm]').forEach(b => b.onclick = () => {
+    layerMode = b.dataset.lm;
+    document.querySelectorAll('[data-lm]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    draw();
+  });
+  draw();
+}});
+// 2. compute-bound vs memory-bound
+// 粗略模型：8B 参数、bf16（权重 16 GB），H100 SXM 约 990 TFLOPS(bf16 dense)、3.35 TB/s
+const PARAM = 8e9, BYTES = 2 * PARAM, FLOPS_PER_TOK = 2 * PARAM, PEAK = 990e12, BW = 3.35e12;
+function roof(n) {
+  const tMem = BYTES / BW * 1e3, tComp = FLOPS_PER_TOK * n / PEAK * 1e3;
+  return {tMem, tComp, t:Math.max(tMem, tComp), util:tComp / Math.max(tMem, tComp)};
+}
+STEPS.push({nav:'3 为什么快', title:'第 3 步：为什么 prefill"计算量大但 GPU 利用率高"，decode 正好相反',
+render(){
+  return `<div class="desc">每次前向，GPU 都要把<b>整份权重从显存（HBM）读进计算单元</b>。权重的读取量是固定的，和这次算几个 token 无关；计算量则和 token 数 n 成正比。<br>
+  • n 小（decode，n=1）：读 16 GB 权重要约 4.8 ms，算 1 个 token 只要约 0.016 ms。<b>大部分时间在等数据</b>，叫 memory-bound。<br>
+  • n 大（prefill，n=上千）：权重读一次被 n 个 token 共用，时间由计算决定，叫 compute-bound，Tensor Core 是满的。<br>
+  拖动滑块改变"一次前向处理的 token 数 n"。</div>
+  <label for="nSlider"><b>一次前向的 token 数 n = <span id="nVal"></span></b></label><br>
+  <input type="range" id="nSlider" min="0" max="12" step="1" value="0" style="width:420px">
+  <div id="roofOut"></div>
+  <p class="note">假设：8B 模型、bf16，H100 SXM 峰值约 990 TFLOPS、带宽约 3.35 TB/s。只算线性层，忽略 attention 和 KV cache 的读取，也假设计算和读取完全重叠。数字只用来看趋势，量级是对的。
+  这个模型里，"每读 1 字节权重做多少次计算"恰好约等于 n。GPU 的拐点约为 990/3.35 ≈ 295，所以 n 超过约 300 才会变成 compute-bound。</p>`;
+},
+after(){
+  const s = document.getElementById('nSlider');
+  const draw = () => {
+    const n = 2 ** +s.value, r = roof(n), mx = Math.max(r.tMem, r.tComp);
+    document.getElementById('nVal').textContent = n + (n === 1 ? '（decode, batch=1）' : n >= 512 ? '（典型 prefill）' : '');
+    const bar = (name, v, col) => `<div class="barrow"><span class="name">${name}</span><div class="track"><div class="fill" style="width:${Math.max(0.4, v / mx * 100)}%;background:${col}"></div></div><span>${v.toFixed(3)} ms</span></div>`;
+    document.getElementById('roofOut').innerHTML =
+      bar('读权重耗时', r.tMem, '#c2410c') + bar('计算耗时', r.tComp, '#2563eb') +
+      `<table class="kv"><tr><th>这次前向耗时 ≈ max(两者)</th><td>${r.t.toFixed(2)} ms</td></tr>
+       <tr><th>平均每个 token</th><td>${(r.t / n).toFixed(4)} ms</td></tr>
+       <tr><th>Tensor Core 利用率（粗估）</th><td>${(r.util * 100).toFixed(1)}%</td></tr>
+       <tr><th>瓶颈</th><td>${r.tMem > r.tComp ? '<b style="color:#c2410c">memory-bound：等权重从显存搬过来</b>' : '<b style="color:#2563eb">compute-bound：算力用满</b>'}</td></tr></table>`;
+  };
+  s.oninput = draw; draw();
+}});
+// 3. 时间线总结
+STEPS.push({nav:'4 时间线总结', title:'第 4 步：放到时间线上：1000 token 的 prompt + 生成 200 token',
+render(){
+  const pre = roof(1000).t, dec = roof(1).t, N = 200, total = pre + dec * N;
+  let ticks = '';
+  for (let i = 0; i < N; i++) ticks += `<div style="width:${dec / total * 100}%;background:${i % 2 ? '#0e7490' : '#22a3bd'}"></div>`;
+  return `<div class="desc">用上一步的粗略模型（8B、H100、batch=1）：</div>
+  <div class="tl" role="img" aria-label="prefill 约 ${pre.toFixed(0)} 毫秒，decode 200 步约 ${(dec * N).toFixed(0)} 毫秒">
+    <div style="width:${pre / total * 100}%;background:#2563eb" title="prefill"></div>${ticks}</div>
+  <div class="note"><span style="color:#2563eb">■</span> prefill：1 次前向，处理 1000 个 token，约 ${pre.toFixed(1)} ms &nbsp;&nbsp;
+    <span style="color:#0e7490">■</span> decode：200 次前向，每次 1 个 token，每次约 ${dec.toFixed(1)} ms，共约 ${(dec * N).toFixed(0)} ms</div>
+  <table class="kv">
+    <tr><th></th><th>prefill</th><th>decode</th></tr>
+    <tr><th>输入</th><td>整个 prompt，一开始就全部已知</td><td>每步 1 个 token，要等上一步采样出来</td></tr>
+    <tr><th>串行步数</th><td>1 次前向（内部 = 层数个依赖阶段）</td><td>生成多少个 token 就要多少次前向</td></tr>
+    <tr><th>矩阵形状</th><td><code>[n, d] × [d, d]</code>，GEMM</td><td><code>[1, d] × [d, d]</code>，GEMV</td></tr>
+    <tr><th>KV cache</th><td>一次性算出 n 个位置的 K/V 并写入</td><td>读全部历史 K/V，追加 1 行</td></tr>
+    <tr><th>瓶颈</th><td>算力（compute-bound）</td><td>显存带宽（memory-bound）</td></tr>
+    <tr><th>对应指标</th><td>TTFT（首 token 延迟）</td><td>TPOT / ITL（每个 token 的间隔）</td></tr>
+  </table>
+  <h3>和 sglang 的调度联系起来</h3>
+  <p>• <b>为什么要 continuous batching</b>：decode 时 n=1 太浪费，把 B 个请求的 decode 拼成一个 batch，矩阵就变成 <code>[B, d] × [d, d]</code>。
+  权重同样只读一次，B 就相当于第 3 步里的 n，吞吐几乎随 B 线性增长，直到撞上算力或 KV cache 显存上限。
+  这就是上一个可视化里 "多个请求拼在一起算" 的根本动机。</p>
+  <p>• <b>chunked prefill</b>（<code>--chunked-prefill-size</code>）：prompt 很长时（比如 32k），一次 prefill 会占住 GPU 很久，其他请求的 decode 就会卡住。
+  把它切成几段，每段几千个 token，已经足够 compute-bound，每段之间还能插入 decode。
+  后一段 attention 时读前一段存好的 KV cache，和 decode 读 cache 是同一套机制。</p>
+  <p>• <b>mixed chunk</b>（<code>--enable-mixed-chunk</code>）：把 prefill 块和正在运行的 decode 请求放进同一个 batch，用 prefill 的大矩阵"顺带"完成 decode。</p>
+  <p class="note">补充：attention 部分的计算量随长度近似 n² 增长（第 2 步的 scores 是 [n, n]），所以超长 prompt 时 attention 会成为 prefill 的主要开销。
+  FlashAttention 这类 kernel 按块计算，不会真的在显存里构造 [n, n] 矩阵，被 causal mask 盖掉的块也会直接跳过。</p>`;
+}});
+
+// ---------- 导航 ----------
+let cur = 0;
+const nav = document.getElementById('nav');
+nav.innerHTML = STEPS.map((s, i) => `<button data-i="${i}">${esc(s.nav)}</button>`).join('');
+nav.querySelectorAll('button').forEach(b => b.onclick = () => go(+b.dataset.i));
+function go(i) {
+  if (STEPS[cur].leave) STEPS[cur].leave();
+  cur = Math.max(0, Math.min(STEPS.length - 1, i));
+  const s = STEPS[cur];
+  document.getElementById('title').textContent = s.title;
+  document.getElementById('stage').innerHTML = s.render();
+  if (s.after) s.after();
+  nav.querySelectorAll('button').forEach((b, j) =>
+    j === cur ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current'));
+  document.getElementById('prev').disabled = cur === 0;
+  document.getElementById('next').disabled = cur === STEPS.length - 1;
+}
+document.getElementById('prev').onclick = () => go(cur - 1);
+document.getElementById('next').onclick = () => go(cur + 1);
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight') go(cur + 1);
+  if (e.key === 'ArrowLeft') go(cur - 1);
+});
+go(0);
+</script>
+</body>
+</html>

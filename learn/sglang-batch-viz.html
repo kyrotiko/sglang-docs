@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SGLang 批处理可视化：多个请求为什么能一起算</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#fafafa;color:#222;line-height:1.6}
+header{padding:14px 24px;background:#1f2937;color:#fff}
+header h1{margin:0;font-size:19px}
+nav.steps{display:flex;flex-wrap:wrap;gap:6px;padding:10px 24px;background:#fff;border-bottom:1px solid #ddd}
+nav.steps button{border:1px solid #bbb;background:#fff;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:13px}
+nav.steps button[aria-current="step"]{background:#1f2937;color:#fff;border-color:#1f2937}
+main{padding:14px 24px;max-width:1280px}
+h2{margin:4px 0 8px;font-size:18px}
+.desc{background:#fff;border-left:4px solid #1f2937;padding:8px 14px;margin-bottom:12px}
+.ctrl{display:flex;gap:8px;margin:18px 0}
+.ctrl button{padding:6px 16px;font-size:14px;cursor:pointer}
+button:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+.t{margin:8px 0}
+.lbl{font-family:Consolas,monospace;font-size:13px;color:#555;margin-bottom:3px}
+.lbl b{color:#222}
+.row{display:flex;flex-wrap:wrap;gap:2px;align-items:center}
+.cell{min-width:40px;height:30px;padding:0 4px;display:inline-flex;align-items:center;justify-content:center;font-family:Consolas,monospace;font-size:12px;border:1px solid rgba(0,0,0,.25);border-radius:3px;color:#fff;white-space:nowrap}
+.cell.m{min-width:34px;height:24px}
+.cell.wide{min-width:64px}
+.cell.sm{min-width:24px;width:24px;height:24px;padding:0;font-size:10px}
+.cell.gray{background:#e5e7eb;color:#444}
+.cell.pad{background:repeating-linear-gradient(45deg,#d4d4d4,#d4d4d4 3px,#f3f3f3 3px,#f3f3f3 6px);color:#666}
+.cell.fut{background:#fff}
+.cell.dim{opacity:.22}
+.cell.hl{outline:3px solid #f59e0b;outline-offset:1px}
+.cell.kv{min-width:48px;height:40px;flex-direction:column;line-height:1.1;font-size:12px}
+.cell.kv small{font-size:9px;opacity:.85}
+.idx{font-size:10px;color:#666;text-align:center;min-width:40px;width:40px;display:inline-block}
+.grid{display:grid;gap:2px}
+.cols{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+.note{font-size:13px;color:#555}
+.info{min-height:28px;font-family:Consolas,monospace;font-size:13px;background:#fff8e1;border:1px solid #e8c86a;padding:3px 8px;border-radius:4px;margin:6px 0}
+.legend span{display:inline-flex;align-items:center;gap:4px;margin-right:14px;font-size:13px}
+.legend i{width:14px;height:14px;display:inline-block;border-radius:2px}
+code{background:#eef;padding:0 4px;border-radius:3px;font-size:13px}
+.op{font-size:22px;padding:0 6px;align-self:center}
+.pick,.rb{cursor:pointer;background:#fff;border-radius:4px;padding:3px 10px}
+.pick[aria-pressed="true"]{background:#fff3c4}
+</style>
+</head>
+<body>
+<header><h1>SGLang 批处理可视化：多个请求的 token 为什么能拼在一起算、又不会乱</h1></header>
+<nav class="steps" id="nav" aria-label="步骤导航"></nav>
+<main>
+  <h2 id="title" tabindex="-1"></h2>
+  <div id="stage" aria-live="polite"></div>
+  <div class="ctrl">
+    <button id="prev">← 上一步</button>
+    <button id="next">下一步 →</button>
+    <span class="note" style="align-self:center">也可以用键盘 ← → 切换</span>
+  </div>
+</main>
+<script>
+// ---------- 示例数据（数字是虚构的，只为演示结构） ----------
+const R = {
+  A: {color:'#2563eb', words:['今天','天气','怎么','样','？'], ids:[101,102,103,104,105],
+      slots:[3,7,0,12,5], pool:0},
+  B: {color:'#c2410c', words:['你','好','呀'], ids:[201,202,203],
+      slots:[1,9,14], pool:1},
+  C: {color:'#15803d', words:['写','一','首','诗'], ids:[301,302,303,304],
+      slots:[2,6,10,15], pool:2},
+  D: {color:'#7e22ce', words:['讲','个','笑话'], ids:[401,402,403],
+      slots:[9,1,14], pool:1},   // D 复用 B 释放的 pool 行和槽位
+};
+const ORDER = ['A','B','C'];
+const NEXT1 = {A:{id:501,w:'晴'}, B:{id:502,w:'！'}, C:{id:503,w:'春'}};  // prefill 采样结果
+const DEC_SLOT = {A:11, B:8, C:13};                                         // decode 新分配的槽位
+const NEXT2 = {A:{id:601,w:'天'}, B:{id:2,w:'EOS'}, C:{id:603,w:'风'}};     // decode 采样结果
+const POOL_N = 18;
+
+// 扁平化：所有 prefill token，按请求顺序首尾相接
+const FLAT = [];
+ORDER.forEach(k => R[k].ids.forEach((id,p) =>
+  FLAT.push({k, id, w:R[k].words[p], pos:p, slot:R[k].slots[p]})));
+const LENS = ORDER.map(k => R[k].ids.length);         // [5,3,4]
+const CU = [0]; LENS.forEach(l => CU.push(CU.at(-1) + l)); // [0,5,8,12]
+const LAST = CU.slice(1).map(x => x - 1);             // [4,7,11]
+
+// ---------- 渲染小工具 ----------
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function C(text, k, cls='', attrs='') {
+  const st = k ? `style="background:${R[k].color}"` : '';
+  return `<span class="cell ${k ? '' : 'gray'} ${cls}" ${st} ${attrs}>${esc(text)}</span>`;
+}
+function T(name, shape, cells) {
+  return `<div class="t"><div class="lbl"><b>${name}</b>${shape ? ' &nbsp;shape ' + shape : ''}</div><div class="row">${cells}</div></div>`;
+}
+function legend(keys) {
+  return `<div class="legend">${keys.map(k => `<span><i style="background:${R[k].color}"></i>请求 ${k}</span>`).join('')}</div>`;
+}
+function idxRow(n) {
+  return `<div class="row">${Array.from({length:n}, (_, i) => `<span class="idx">${i}</span>`).join('')}</div>`;
+}
+// KV pool 状态：slot -> {k, w}
+function poolPrefill() {
+  const m = {};
+  FLAT.forEach(t => m[t.slot] = {k:t.k, w:t.w});
+  return m;
+}
+function poolDecode() {
+  const m = poolPrefill();
+  ORDER.forEach(k => m[DEC_SLOT[k]] = {k, w:NEXT1[k].w});
+  return m;
+}
+function poolGrid(m, hl = []) {
+  let h = '<div class="lbl"><b>token_to_kv_pool</b>（显存里的 KV 槽位，下标=槽位号）</div><div class="row">';
+  for (let s = 0; s < POOL_N; s++) {
+    const o = m[s];
+    const cls = 'kv ' + (hl.includes(s) ? 'hl' : (hl.length ? 'dim' : ''));
+    h += o ? C('', o.k, cls).replace('></span>', `>${esc(o.w)}<small>#${s}</small></span>`)
+           : `<span class="cell gray ${cls}">空<small>#${s}</small></span>`;
+  }
+  return h + '</div>';
+}
+// req_to_token：每行 = 一个请求按顺序存放的槽位号
+function r2tTable(rows, hlRow = null) {
+  let h = '<div class="lbl"><b>req_to_token_pool.req_to_token</b>（行=请求在 pool 里的行号，列=token 位置）</div>';
+  h += '<div class="grid" style="grid-template-columns:70px repeat(7,40px)">';
+  h += '<span class="idx" style="width:70px">行 \\ 位置</span>';
+  for (let i = 0; i < 7; i++) h += `<span class="idx">${i}</span>`;
+  for (let r = 0; r < 4; r++) {
+    const row = rows[r];
+    h += `<span class="idx" style="width:70px;align-self:center">第 ${r} 行${row ? '（' + row.k + '）' : ''}</span>`;
+    for (let i = 0; i < 7; i++) {
+      const v = row && row.slots[i];
+      const dim = hlRow !== null && hlRow !== r ? 'dim' : '';
+      h += v !== undefined && row ? C(v, row.k, 'm ' + dim) : `<span class="cell gray m ${dim}"></span>`;
+    }
+  }
+  return h + '</div>';
+}
+function rowsPrefill() {
+  return {0:{k:'A', slots:R.A.slots}, 1:{k:'B', slots:R.B.slots}, 2:{k:'C', slots:R.C.slots}};
+}
+function rowsDecode() {
+  const r = rowsPrefill();
+  ORDER.forEach((k, i) => r[i] = {k, slots:[...R[k].slots, DEC_SLOT[k]]});
+  return r;
+}
+// 请求选择按钮（用来高亮某个请求）
+function picker(id, keys) {
+  return `<div class="row" role="group" aria-label="选择请求" id="${id}" style="gap:8px;margin:6px 0">` +
+    keys.map(k => `<button class="pick" data-k="${k}" aria-pressed="false" style="border:2px solid ${R[k].color};color:${R[k].color}">只看请求 ${k}</button>`).join('') +
+    `<button class="pick" data-k="" aria-pressed="true" style="border:2px solid #555">全部</button></div>`;
+}
+function bindPicker(id, fn) {
+  const g = document.getElementById(id);
+  g.querySelectorAll('button').forEach(b => b.onclick = () => {
+    g.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    fn(b.dataset.k || null);
+  });
+  fn(null);
+}
+// ---------- 各步骤 ----------
+const STEPS = [];
+
+// 0. 三个请求
+STEPS.push({nav:'0 三个请求', title:'第 0 步：三个请求到达 Scheduler',
+render(){
+  let h = `<div class="desc">TokenizerManager 已经把文本转成 token ids，Scheduler 为每个请求创建一个 <code>Req</code> 对象并放进 waiting queue。
+  <code>get_new_batch_prefill</code> 选中 A、B、C 三个请求，组成一个 <code>ScheduleBatch</code>，<code>batch.reqs = [A, B, C]</code>。<br>
+  <b>核心规则：</b>batch 里每个"按请求排列"的数组，第 i 个元素都属于 <code>batch.reqs[i]</code>。后面每一步都靠这条规则。</div>`;
+  ORDER.forEach((k, i) => {
+    h += T(`reqs[${i}] = 请求 ${k} &nbsp; origin_input_ids`, `[${R[k].ids.length}]`,
+      R[k].ids.map((id, p) => C(`${R[k].words[p]} ${id}`, k, 'wide')).join(''));
+  });
+  return h;
+}});
+
+// 1. 拼平
+STEPS.push({nav:'1 拼成一条', title:'第 1 步（prefill）：把所有 token 首尾相接拼成一条，不做 padding',
+render(){
+  let h = `<div class="desc"><code>prepare_for_extend</code> 把三个请求的 token 首尾相接，得到一个长度 5+3+4=12 的一维张量。
+  它不知道 token 属于谁，归属信息另外存在 <code>extend_lens</code> / <code>seq_lens</code> 里，
+  attention 会把它们转成前缀和 <code>cu_seqlens = [0,5,8,12]</code>，用来标出每个请求的起止位置。</div>`;
+  h += legend(ORDER);
+  h += T('input_ids', '[12]', FLAT.map(t => C(t.id, t.k)).join(''));
+  h += idxRow(12);
+  h += T('positions（每个请求从 0 重新编号，RoPE 用它）', '[12]', FLAT.map(t => C(t.pos, t.k)).join(''));
+  h += `<div class="cols">
+    ${T('extend_lens', '[3]', ORDER.map(k => C(R[k].ids.length, k)).join(''))}
+    ${T('seq_lens', '[3]', ORDER.map(k => C(R[k].ids.length, k)).join(''))}
+    ${T('cu_seqlens（分界线）', '[4]', CU.map(x => C(x, null)).join(''))}
+  </div>`;
+  h += `<h3 style="font-size:15px;margin-top:18px">对比：如果用 padding 补齐（sglang 不这么做）</h3>`;
+  h += '<div class="grid" style="grid-template-columns:repeat(5,40px);width:max-content">';
+  ORDER.forEach(k => { for (let p = 0; p < 5; p++) h += p < R[k].ids.length ? C(R[k].ids[p], k) : '<span class="cell pad">PAD</span>'; });
+  h += '</div><p class="note">补齐成 [3,5] 会浪费 3 个位置的计算。请求长度差得越多，浪费越大。拼平的方式一个 PAD 都没有。</p>';
+  return h;
+}});
+
+// 2. 线性层
+STEPS.push({nav:'2 线性层', title:'第 2 步：线性层 / MLP 是逐行（逐 token）计算的，拼在一起不影响结果',
+render(){
+  const X = FLAT.map((t, i) => [0,1,2,3].map(j => ((i * 7 + j * 3) % 9) - 4));
+  const W = [[1,0,2,-1],[0,1,-1,2],[1,1,0,0],[-1,0,1,1]];
+  const Y = X.map(r => [0,1,2,3].map(j => r.reduce((s, v, q) => s + v * W[q][j], 0)));
+  const mat = (M, id, cls) => `<div class="grid" id="${id}" style="grid-template-columns:repeat(4,34px)">` +
+    M.map((r, i) => r.map(v => C(v, cls ? cls(i) : null, `m r${i}`)).join('')).join('') + '</div>';
+  let h = `<div class="desc">每个 token 的 hidden state 是一行，12 个 token 叠成矩阵 <code>X[12, hidden]</code>。
+  QKV 投影、MLP、LayerNorm 都是 <code>Y = X · W</code> 这种按行独立的运算：<b>Y 的第 i 行只依赖 X 的第 i 行</b>，和其他行属于哪个请求无关。
+  所以三个请求可以共享一次大矩阵乘法（GEMM），比分别做三次小矩阵乘法更能把 GPU 跑满。点击下面的行号看看。</div>`;
+  h += `<div class="row" style="gap:4px;margin-bottom:8px" role="group" aria-label="选择一行">` +
+    FLAT.map((t, i) => `<button class="rb" data-i="${i}" style="border:2px solid ${R[t.k].color}">第${i}行(${t.k})</button>`).join('') + '</div>';
+  h += `<div class="info" id="linInfo">点击一个行号</div>`;
+  h += `<div class="cols">
+    <div><div class="lbl"><b>X</b> [12, 4]（hidden 简化成 4 维）</div>${mat(X, 'mx', i => FLAT[i].k)}</div>
+    <div class="op">×</div>
+    <div><div class="lbl"><b>W</b> [4, 4]（所有请求共用同一份权重）</div>${mat(W, 'mw', null)}</div>
+    <div class="op">=</div>
+    <div><div class="lbl"><b>Y</b> [12, 4]</div>${mat(Y, 'my', i => FLAT[i].k)}</div>
+  </div>`;
+  return h;
+},
+after(){
+  document.querySelectorAll('.rb').forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    ['mx', 'my'].forEach(id => document.querySelectorAll(`#${id} .cell`).forEach(c => {
+      const on = c.classList.contains('r' + i);
+      c.classList.toggle('hl', on); c.classList.toggle('dim', !on);
+    }));
+    document.getElementById('linInfo').textContent =
+      `Y[${i}] = X[${i}] · W，只用到 X 的第 ${i} 行（请求 ${FLAT[i].k} 的“${FLAT[i].w}”），其余 11 行完全没参与。`;
+  });
+}});
+// 3. attention
+STEPS.push({nav:'3 attention', title:'第 3 步：attention 是唯一让 token 互相"看见"的地方，按 cu_seqlens 分块',
+render(){
+  let h = `<div class="desc">attention 计算的是 Q·Kᵀ，token 之间会交换信息，所以必须隔离不同的请求。
+  下图是 12×12 的 "query 能看哪些 key"：<b>彩色</b> = 同一请求且不是未来位置，可以看；<b>白色</b> = 同一请求的未来 token，被 causal mask 挡掉；
+  <b>灰色斜纹</b> = 别的请求，永远不可见。<br>
+  结果是沿对角线排列的三个三角块。实际的 varlen attention kernel（FlashInfer / FlashAttention）<b>根本不会构造这个 12×12 矩阵</b>，
+  它按 <code>cu_seqlens</code> 把 Q/K/V 切成 [0,5) [5,8) [8,12) 三段，每段只算自己那个三角块，灰色部分从来不计算。
+  把鼠标移到格子上可以看说明。</div>`;
+  h += `<div class="info" id="attInfo">鼠标移到格子上</div>`;
+  h += '<div style="display:flex;gap:6px"><div>';
+  h += '<div class="lbl">&nbsp;</div>';
+  FLAT.forEach((t, i) => h += `<div style="height:26px;font-size:11px;font-family:Consolas,monospace;text-align:right;line-height:24px">q${i} ${t.k}:${esc(t.w)}</div>`);
+  h += '</div><div><div class="lbl">key →（列 j）</div>';
+  h += '<div class="grid" id="att" aria-hidden="true" style="grid-template-columns:repeat(12,24px)">';
+  FLAT.forEach((q, i) => FLAT.forEach((k, j) => {
+    let cls = 'sm', st = '';
+    if (q.k !== k.k) cls += ' pad';
+    else if (j > i) cls += ' fut';
+    else st = `style="background:${R[q.k].color}"`;
+    h += `<span class="cell ${cls}" ${st} data-i="${i}" data-j="${j}"></span>`;
+  }));
+  h += '</div></div></div>';
+  h += `<p class="note">文字版：请求 A 的 query（第 0–4 行）只看第 0–4 列；请求 B（第 5–7 行）只看第 5–7 列；请求 C（第 8–11 行）只看第 8–11 列，并且每个 query 只看不晚于自己位置的 key。</p>`;
+  return h;
+},
+after(){
+  const info = document.getElementById('attInfo');
+  document.querySelectorAll('#att .cell').forEach(c => c.onmouseenter = () => {
+    const q = FLAT[+c.dataset.i], k = FLAT[+c.dataset.j];
+    let msg = `q${c.dataset.i}（${q.k}:“${q.w}”） 看 k${c.dataset.j}（${k.k}:“${k.w}”）：`;
+    if (q.k !== k.k) msg += `不行，属于不同请求，kernel 根本不计算这一格`;
+    else if (+c.dataset.j > +c.dataset.i) msg += `不行，这是同一请求的未来 token（causal mask）`;
+    else msg += `可以，同一请求、位置不晚于自己`;
+    info.textContent = msg;
+  });
+}});
+// 4. KV cache 写入
+STEPS.push({nav:'4 写 KV cache', title:'第 4 步：每个 token 的 K/V 存进 KV pool，再用 req_to_token 记下归属',
+render(){
+  let h = `<div class="desc"><code>alloc_for_extend</code> 给每个新 token 分配一个空闲槽位，结果放在 <code>out_cache_loc[12]</code>（和 input_ids 一一对应），
+  算出来的 K/V 就写进这些槽位。<b>槽位不需要连续</b>，哪里空就放哪里，所以不会产生碎片问题。<br>
+  同时每个请求在 <code>req_to_token</code> 里占一行，行号存在 <code>req_pool_indices[i]</code>。这一行按顺序记录"我的第 0、1、2… 个 token 存在哪个槽位"。
+  以后想找某个请求的全部历史 KV，就查这一行。</div>`;
+  h += picker('pk4', ORDER);
+  h += T('out_cache_loc（第 i 个 token 写到哪个槽位）', '[12]', FLAT.map((t, i) => C(t.slot, t.k, `fl f${t.k}`)).join(''));
+  h += idxRow(12);
+  h += T('req_pool_indices', '[3]', ORDER.map(k => C(R[k].pool, k)).join(''));
+  h += `<div id="pool4"></div><div id="r2t4" style="margin-top:10px"></div>`;
+  return h;
+},
+after(){
+  bindPicker('pk4', k => {
+    document.getElementById('pool4').innerHTML = poolGrid(poolPrefill(), k ? R[k].slots : []);
+    document.getElementById('r2t4').innerHTML = r2tTable(rowsPrefill(), k ? R[k].pool : null);
+    document.querySelectorAll('.fl').forEach(c => c.classList.toggle('dim', !!k && !c.classList.contains('f' + k)));
+  });
+}});
+
+// 5. logits
+STEPS.push({nav:'5 取 logits 采样', title:'第 5 步：每个请求只取最后一个 token 的输出，得到 [3, vocab] 的 logits',
+render(){
+  let h = `<div class="desc">模型最后一层输出的 hidden 是 [12, hidden]。但预测"下一个 token"只需要<b>每个请求最后一个位置</b>的输出。
+  最后一个位置用 <code>cu_seqlens[1:] - 1 = [4, 7, 11]</code> 算出来，取出这 3 行再过 lm_head，得到 <code>logits[3, vocab]</code>。
+  <b>第 i 行就是 reqs[i] 的</b>。采样参数（temperature、top_p…）也按同样的顺序排成 [3] 的张量，每行用的是自己请求的参数。</div>`;
+  h += T('最后一层 hidden（高亮的是被选中的行）', '[12, hidden]',
+    FLAT.map((t, i) => C(t.w, t.k, LAST.includes(i) ? 'hl' : 'dim')).join(''));
+  h += idxRow(12);
+  h += `<div class="cols">
+    ${T('选出的下标', '[3]', LAST.map((x, i) => C(x, ORDER[i])).join(''))}
+    ${T('temperature', '[3]', ['0.7', '1.0', '0.0'].map((x, i) => C(x, ORDER[i])).join(''))}
+    ${T('next_token_ids（采样结果）', '[3]', ORDER.map(k => C(`${NEXT1[k].w} ${NEXT1[k].id}`, k, 'wide')).join(''))}
+  </div>`;
+  h += `<div class="lbl" style="margin-top:10px"><b>logits</b> [3, vocab]（示意：每行是一个请求在整个词表上的分数）</div>`;
+  ORDER.forEach((k, i) => {
+    h += `<div class="row" style="margin:2px 0"><span class="lbl" style="width:90px">第${i}行 = ${k}</span>`;
+    for (let v = 0; v < 16; v++) h += `<span class="cell sm" style="background:${R[k].color};opacity:${(0.15 + ((v * 37 + i * 11) % 80) / 100).toFixed(2)}"></span>`;
+    h += '<span class="note">&nbsp;…</span></div>';
+  });
+  return h;
+}});
+
+// 6. 写回
+STEPS.push({nav:'6 结果写回', title:'第 6 步：按下标 i 把结果写回 reqs[i]',
+render(){
+  let h = `<div class="desc"><code>process_batch_result_prefill</code> 用的就是一个简单的循环：
+  <code>for i, req in enumerate(batch.reqs): req.output_ids.append(next_token_ids[i])</code>。
+  因为 next_token_ids 的顺序和 reqs 一致，结果自然不会写错对象。接着检查每个请求是否结束（EOS / stop / max_tokens），
+  没结束的请求被 <code>merge_batch</code> 并进 running_batch，下一轮开始 decode。</div>`;
+  ORDER.forEach((k, i) => {
+    h += `<div class="row" style="margin:6px 0;gap:6px"><span class="lbl" style="width:170px">next_token_ids[${i}] → reqs[${i}]=${k}</span>`;
+    h += R[k].words.map(w => C(w, k)).join('') + '<span class="op">+</span>' + C(NEXT1[k].w, k, 'hl') + '</div>';
+  });
+  return h;
+}});
+// 7. decode
+STEPS.push({nav:'7 decode', title:'第 7 步（decode）：每个请求只输入 1 个 token，attention 按地址去 KV pool 读各自的历史',
+render(){
+  let h = `<div class="desc"><code>prepare_for_decode</code> 之后，每个请求这一轮只输入 1 个新 token（上一步采样出来的那个），
+  所以 <code>input_ids</code> 是 [3]，线性层的输入是 [3, hidden]，同样按行独立计算。<br>
+  attention 的问题在于三个请求的历史长度不同（6 / 4 / 5）。backend 不会把 KV 拷贝出来拼接或 padding，
+  而是根据 <code>req_pool_indices[i]</code> 找到 <code>req_to_token</code> 的那一行，取前 <code>seq_lens[i]</code> 个槽位号，
+  直接按地址去 KV pool 读（paged attention）。<b>每个 query 只会读到自己请求的 KV</b>。点击按钮看某个请求实际读了哪些槽位。</div>`;
+  h += picker('pk7', ORDER);
+  h += `<div class="cols">
+    ${T('input_ids', '[3]', ORDER.map(k => C(`${NEXT1[k].w} ${NEXT1[k].id}`, k, 'wide fl f' + k)).join(''))}
+    ${T('positions', '[3]', ORDER.map(k => C(R[k].ids.length, k, 'fl f' + k)).join(''))}
+    ${T('out_cache_loc（新 token 的 KV 写到哪）', '[3]', ORDER.map(k => C(DEC_SLOT[k], k, 'fl f' + k)).join(''))}
+    ${T('req_pool_indices', '[3]', ORDER.map(k => C(R[k].pool, k, 'fl f' + k)).join(''))}
+    ${T('seq_lens（+1 之后）', '[3]', ORDER.map(k => C(R[k].ids.length + 1, k, 'fl f' + k)).join(''))}
+  </div>`;
+  h += `<div class="info" id="decInfo"></div>`;
+  h += `<div id="pool7"></div><div id="r2t7" style="margin-top:10px"></div>`;
+  return h;
+},
+after(){
+  bindPicker('pk7', k => {
+    const rows = rowsDecode();
+    const slots = k ? rows[R[k].pool].slots : [];
+    document.getElementById('pool7').innerHTML = poolGrid(poolDecode(), slots);
+    document.getElementById('r2t7').innerHTML = r2tTable(rows, k ? R[k].pool : null);
+    document.querySelectorAll('.fl').forEach(c => c.classList.toggle('dim', !!k && !c.classList.contains('f' + k)));
+    document.getElementById('decInfo').textContent = k
+      ? `请求 ${k}：req_pool_indices=${R[k].pool} → req_to_token[${R[k].pool}][:${slots.length}] = [${slots.join(', ')}] → 只读这 ${slots.length} 个槽位的 K/V，和 query “${NEXT1[k].w}” 算 attention`
+      : '选一个请求，看它的 query 读了哪些 KV 槽位';
+  });
+}});
+
+// 8. continuous batching
+STEPS.push({nav:'8 进进出出', title:'第 8 步：continuous batching：请求结束就移出，新请求随时加入，下标始终对齐',
+render(){
+  const box = (title, reqs, pools, lens) => `<div style="background:#fff;border:1px solid #ccc;border-radius:6px;padding:8px 12px">
+    <div style="font-weight:600;margin-bottom:4px">${title}</div>
+    ${T('reqs', '', reqs.map(k => C(k, k)).join(''))}
+    ${T('req_pool_indices', '', reqs.map((k, i) => C(pools[i], k)).join(''))}
+    ${T('seq_lens', '', reqs.map((k, i) => C(lens[i], k)).join(''))}</div>`;
+  let h = `<div class="desc">这一轮 decode 采样出 <code>[天, EOS, 风]</code>，B 生成了 EOS，结束了。<br>
+  ① <code>filter_batch</code>：算出要保留的下标 <code>keep = [0, 2]</code>，然后<b>用同一个 keep 同时裁剪所有字段</b>（reqs、req_pool_indices、seq_lens、采样参数……）。
+  B 的 req_to_token 行和 KV 槽位被释放。<br>
+  ② 新请求 D 到了：单独跑一个 prefill batch（流程同第 1–6 步）。它被分到刚释放的第 1 行和槽位 #9 #1 #14。<br>
+  ③ <code>merge_batch</code>：把 D 的 batch 拼到 running_batch 后面，所有字段按同样的顺序拼接。<br>
+  因为所有字段总是一起裁剪、一起拼接，任何时刻"第 i 个"都指向同一个请求。req_pool_indices 也不需要连续。</div>`;
+  h += T('本轮 decode 采样结果 next_token_ids', '[3]', ORDER.map(k => C(NEXT2[k].w, k, 'wide' + (k === 'B' ? ' hl' : ''))).join(''));
+  h += `<div class="cols" style="margin-top:10px;align-items:center">
+    ${box('之前', ['A', 'B', 'C'], [0, 1, 2], [6, 4, 5])}
+    <div class="op">→ filter →</div>
+    ${box('B 移出后', ['A', 'C'], [0, 2], [6, 5])}
+    <div class="op">→ merge D →</div>
+    ${box('D 加入后', ['A', 'C', 'D'], [0, 2, 1], [6, 5, 3])}
+  </div>`;
+  const m = poolDecode();
+  R.B.slots.concat(DEC_SLOT.B).forEach(s => delete m[s]);
+  R.D.slots.forEach((s, p) => m[s] = {k:'D', w:R.D.words[p]});
+  h += '<div style="margin-top:14px"></div>' + poolGrid(m);
+  h += `<p class="note">KV pool：B 的槽位已经被 D 复用（#9 #1 #14），#8 还空着。A、C 本轮新 token "天""风" 的 KV 要在下一轮 decode 才写入，图里先不画。</p>`;
+  h += legend(['A', 'B', 'C', 'D']);
+  return h;
+}});
+
+// ---------- 导航 ----------
+let cur = 0;
+const nav = document.getElementById('nav');
+nav.innerHTML = STEPS.map((s, i) => `<button data-i="${i}">${esc(s.nav)}</button>`).join('');
+nav.querySelectorAll('button').forEach(b => b.onclick = () => go(+b.dataset.i));
+function go(i) {
+  cur = Math.max(0, Math.min(STEPS.length - 1, i));
+  const s = STEPS[cur];
+  document.getElementById('title').textContent = s.title;
+  document.getElementById('stage').innerHTML = s.render();
+  if (s.after) s.after();
+  nav.querySelectorAll('button').forEach((b, j) =>
+    j === cur ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current'));
+  document.getElementById('prev').disabled = cur === 0;
+  document.getElementById('next').disabled = cur === STEPS.length - 1;
+}
+document.getElementById('prev').onclick = () => go(cur - 1);
+document.getElementById('next').onclick = () => go(cur + 1);
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight') go(cur + 1);
+  if (e.key === 'ArrowLeft') go(cur - 1);
+});
+go(0);
+</script>
+</body>
+</html>
+
