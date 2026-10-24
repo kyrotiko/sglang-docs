@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>seq_lens 与 NPU graph.update：为什么 draft 要更新一个列表</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#fafafa;color:#222;line-height:1.6}
+header{padding:14px 24px;background:#1f2937;color:#fff}
+header h1{margin:0;font-size:19px}
+nav.steps{display:flex;flex-wrap:wrap;gap:6px;padding:10px 24px;background:#fff;border-bottom:1px solid #ddd}
+nav.steps button{border:1px solid #bbb;background:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:14px}
+nav.steps button[aria-current="step"]{background:#1f2937;color:#fff;border-color:#1f2937}
+main{padding:14px 24px;max-width:1280px}
+h2{margin:4px 0 8px;font-size:18px}
+h3{font-size:15px;margin:14px 0 6px}
+.desc{background:#fff;border-left:4px solid #1f2937;padding:8px 14px;margin-bottom:12px}
+.warn{background:#fff7ed;border-left:4px solid #c2410c;padding:8px 14px;margin:10px 0}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.bar button{padding:5px 14px;font-size:14px;cursor:pointer;background:#fff;border:1px solid #888;border-radius:4px}
+.bar button[aria-pressed="true"]{background:#1f2937;color:#fff}
+button:focus-visible,[tabindex]:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+code{background:#eef;padding:0 4px;border-radius:3px;font-size:13px}
+.loc{font-family:Consolas,monospace;font-size:12px;color:#1d4ed8}
+.note{font-size:13px;color:#555}
+.info{background:#fff8e1;border:1px solid #e8c86a;border-radius:6px;padding:8px 12px;margin:8px 0;min-height:56px}
+table.cmp{border-collapse:collapse;font-size:14px;margin:8px 0;width:100%}
+table.cmp td,table.cmp th{border:1px solid #ddd;padding:6px 10px;text-align:left;vertical-align:top}
+table.cmp th{background:#f3f4f6}
+/* 通用芯片/格子 */
+.chip{display:inline-block;padding:1px 8px;border-radius:9px;font-family:Consolas,monospace;font-size:12px;border:1px solid #bbb;background:#fff;margin:1px}
+/* KV 条形 */
+.kvrow{display:flex;align-items:center;gap:8px;margin:6px 0}
+.kvname{width:120px;font-size:13px;text-align:right;font-family:Consolas,monospace}
+.kvtrack{display:flex;gap:2px;flex:none}
+.cell{width:26px;height:26px;border-radius:3px;border:1px solid #999;background:#e2e8f0;font-size:11px;display:flex;align-items:center;justify-content:center;color:#475569}
+.cell.kv{background:#93c5fd;border-color:#3b82f6;color:#1e3a8a}
+.cell.new{background:#fbbf24;border-color:#d97706;color:#7c2d12;animation:pop .4s}
+.cell.ghost{background:#fff;border:1px dashed #bbb;color:#999}
+@keyframes pop{0%{transform:scale(.5)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
+/* attn 视窗 */
+.window{position:relative;height:34px;border:2px solid #c2410c;border-radius:5px;transition:left .45s, width .45s;background:rgba(194,65,12,.12)}
+.wtag{position:absolute;top:-22px;left:0;font-size:11px;color:#c2410c;font-family:Consolas,monospace;white-space:nowrap}
+/* 图任务条 */
+.reclist{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px}
+.rec{display:flex;align-items:center;gap:10px;border:2px solid #ddd;border-radius:8px;padding:6px 10px;margin:8px 0;background:#fff;transition:all .3s}
+.rec.match{border-color:#15803d;background:#f0fdf4}
+.rec.burn{border-color:#c2410c;background:#fff7ed}
+.rec .ridx{font-family:Consolas,monospace;font-weight:700;color:#666;width:88px;flex:none}
+.rec .rkw{font-family:Consolas,monospace;font-size:12px;flex:1}
+.rec .rkw b{color:#c2410c}
+.zipline{display:flex;gap:14px;flex-wrap:wrap;align-items:stretch;margin:10px 0}
+.zipcol{flex:1;min-width:300px}
+.zipbox{border:1px dashed #888;border-radius:8px;padding:8px;min-height:60px}
+.ziprow{display:flex;align-items:center;gap:10px;border:1px solid #ddd;border-radius:6px;padding:4px 10px;margin:6px 0;background:#fff;font-family:Consolas,monospace;font-size:12px;transition:all .35s}
+.ziprow.lit{border-color:#15803d;background:#f0fdf4;transform:translateX(4px)}
+.ziparrow{color:#888;font-size:16px;text-align:center;margin:4px 0}
+.errbox{border:2px solid #c2410c;background:#fee2e2;border-radius:8px;padding:10px 14px;font-family:Consolas,monospace;font-size:12px;margin:10px 0;display:none}
+.errbox.show{display:block}
+.arrowflow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:10px 0}
+.afbox{border:2px solid #475569;border-radius:8px;padding:6px 12px;background:#fff;font-size:13px;text-align:center}
+.afbox small{display:block;font-size:10px;color:#666;font-family:Consolas,monospace}
+.afarrow{color:#475569;font-size:18px}
+</style>
+</head>
+<body>
+<header><h1>seq_lens 是什么、为什么 NPU 要 graph.update、为什么 draft 传的是一个列表——机制可视化</h1></header>
+<nav class="steps" id="nav" aria-label="页面导航"></nav>
+<main>
+  <h2 id="title" tabindex="-1"></h2>
+  <div id="stage"></div>
+</main>
+<script>
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TABS = [];
+
+// ============================================================
+// Tab 1：seq_lens 是什么 + CUDA 与 NPU 的根本差异
+// ============================================================
+// 演示背景：请求 A（KV 已有 5 个）、请求 B（3 个）。EAGLE num_steps=3。
+// replay 时刻：图内 num_steps-1 次 draft 前向（最后一轮循环只选 token 不前向），KV 逐步增长。
+const T1STEPS = [
+ {t:'seq_lens = 每个请求的 KV cache 现在有多长', kv:{A:5,B:3}, hi:[], win:null,
+  d:'attention 要算"每个 query 该看哪些 KV"，就得知道每个请求已经攒了多少 KV——这就是 <code>seq_lens</code>（也叫 KV 长度、<code>actual_seq_lengths_kv</code>）。它<strong>不是</strong>什么高级配置：就是一行数字 <code>[5, 3]</code>。attention kernel 拿着它去 KV cache 里划出每个请求能看的范围。'},
+ {t:'KV cache 是不断增长的', kv:{A:5,B:3}, hi:['A5'], win:null,
+  d:'每生成一个 token，这个 token 的 K/V 会被写进 cache（图里的橙色格子），<b>seq_lens 同时 +1</b>。所以 seq_lens 是模型里少数几个<strong>每次前向都在变</strong>的量。'},
+ {t:'EAGLE draft 一次 replay 里，KV 长度变 3 次', kv:{A:8,B:6}, hi:['A6','A7','A8','B4','B5','B6'], win:null,
+  d:'draft 图录的是 <code>draft_forward</code> 内部的 <b>for 循环</b>（num_steps=3 时图内 2 次前向，最后一轮只选 token）：每次前向前，本轮选出的 draft token 已写入 KV，attention 读的长度各不相同——第 1 次前向是 <code>[6,4]</code>、第 2 次是 <code>[7,5]</code>。图内各次前向要读多个不同的值，这是和 decode 的根本差别。'},
+ {t:'CUDA：长度住在"设备上的信箱"里，改信箱内容就行', kv:{A:8,B:6}, hi:[], win:null, cuda:true,
+  d:'CUDA 图录制时记的是"从<strong>设备上某地址</strong>读长度"。replay 前把新值写进那块 buffer（静态地址不变），图里的 kernel 自己去读——<b>图本身一个字节都不用改</b>。这就是 <code>init_forward_metadata_out_graph</code> 干的事：写 buffer，不碰图。'},
+ {t:'NPU：长度是录制时"烧进图里"的 host 值——写 buffer 没用', kv:{A:8,B:6}, hi:[], win:null, npu:true,
+  d:'NPU 的 attention 算子当时是拿 <b>host 侧传进来的 Python list</b> 当参数的，录制时这个 list 的<strong>内容</strong>被固化成图内任务的参数。你在 replay 前改任何 buffer，图里那个任务读的还是录制时的旧值。<b>必须用 CANN 的 <code>graph.update</code> 把新值重新绑进图里</b>，再 replay。'},
+ {t:'这就是两套代码分叉的全部原因', kv:{A:8,B:6}, hi:[], win:null, both:true,
+  d:'CUDA 侧：<code>_replay_graph</code> 只调 <code>backend.replay()</code>，改 buffer 的事早在 execute 里做完了。NPU 侧：必须先 <code>graph.update</code> 重绑、再 replay——旧代码里这段写在 NPU 子类的 <code>_replay_graph</code> override 里（现已下沉到 <code>NPUCudaGraphBackend.replay()</code>）。'},
+];
+function kvHtml(st){
+  const mk = (name, total, hiSet) => {
+    let cells = '';
+    for (let i = 0; i < 8; i++) {
+      let cls = 'cell';
+      if (i < total) cls += ' kv';
+      else if (i < 5 && name === 'A') cls += ' ghost';
+      else if (i < 3 && name === 'B') cls += ' ghost';
+      if (hiSet.includes(name + (i + 1))) cls += ' new';
+      cells += `<div class="${cls}" title="KV #${i + 1}">${i < total ? (hiSet.includes(name + (i + 1)) ? '✚' : '·') : ''}</div>`;
+    }
+    return `<div class="kvrow"><div class="kvname">${name}（${total}）</div><div class="kvtrack" role="img" aria-label="请求${name}的 KV cache 有 ${total} 项">${cells}</div></div>`;
+  };
+  return mk('A', st.kv.A, st.hi) + mk('B', st.kv.B, st.hi);
+}
+TABS.push({nav:'① seq_lens 是什么', title:'① seq_lens：attention 的"看多远"，以及 CUDA/NPU 对它的两种持有方式',
+render(){
+  return `<div class="desc">背景用同一个例子跑完全页：batch 里 2 个请求（A 的 KV 已有 5 个、B 有 3 个），EAGLE <code>num_steps=3</code>。点"下一步"看 seq_lens 怎么长、两张图（CUDA/NPU）分别怎么处理它。</div>
+  <div class="bar"><button id="t1Prev">← 上一步</button><button id="t1Next">下一步 →</button><span id="t1Cnt" aria-live="polite"></span></div>
+  <h3>当前 seq_lens：<span id="t1Lens" style="font-family:Consolas,monospace"></span></h3>
+  <div id="t1Kv"></div>
+  <div class="info" id="t1Info" aria-live="polite"></div>
+  <div id="t1Side"></div>`;
+},
+after(){
+  let s = 0;
+  const draw = () => {
+    s = Math.max(0, Math.min(T1STEPS.length - 1, s));
+    const st = T1STEPS[s];
+    document.getElementById('t1Kv').innerHTML = kvHtml(st);
+    document.getElementById('t1Lens').textContent = `[${st.kv.A}, ${st.kv.B}]`;
+    document.getElementById('t1Cnt').textContent = `步骤 ${s + 1} / ${T1STEPS.length}`;
+    document.getElementById('t1Info').innerHTML = `<b>${esc(st.t)}</b><div>${st.d}</div>`;
+    const side = document.getElementById('t1Side');
+    if (st.cuda) side.innerHTML = `<div class="arrowflow">
+      <div class="afbox">新值 [6,4]<small>host</small></div><div class="afarrow">→</div>
+      <div class="afbox">写进静态 buffer<small>固定设备地址</small></div><div class="afarrow">→</div>
+      <div class="afbox" style="border-color:#2563eb">graph.replay()<small>kernel 自己去那个地址读</small></div></div>
+      <p class="note">图不用改：它只认地址，不认内容。</p>`;
+    else if (st.npu) side.innerHTML = `<div class="arrowflow">
+      <div class="afbox">新值 [6,4]<small>host</small></div><div class="afarrow">→</div>
+      <div class="afbox" style="border-color:#c2410c">graph.update()<small>重绑图内任务的参数</small></div><div class="afarrow">→</div>
+      <div class="afbox" style="border-color:#2563eb">graph.replay()<small>任务读的是新绑的值</small></div></div>
+      <p class="note">写设备 buffer 无效：图内任务当时拿的是 host 值的快照。</p>`;
+    else if (st.both) side.innerHTML = `<table class="cmp"><tr><th></th><th>CUDA</th><th>NPU</th></tr>
+      <tr><td>长度以什么形式进图</td><td>设备 buffer 的<strong>地址</strong></td><td>host 值的<strong>内容快照</strong></td></tr>
+      <tr><td>replay 前要做的</td><td>把新值写进那块 buffer</td><td><code>graph.update</code> 重绑 + replay</td></tr>
+      <tr><td>draft 的额外问题</td><td>buffer 每步都能改</td><td>见 ②③：一张图内 3 个不同时刻 → 一个列表</td></tr></table>`;
+    else side.innerHTML = '';
+  };
+  document.getElementById('t1Next').onclick = () => { s++; draw(); };
+  document.getElementById('t1Prev').onclick = () => { s--; draw(); };
+  draw();
+}});
+
+// ============================================================
+// Tab 2：decode 1 份 vs draft N-1 份
+// ============================================================
+const T2 = {phase:'decode', step:0};
+function stepListHtml(kind, lens){
+  // kind: 'decode' → 1 份；'draft' → num_steps-1 份
+  const n = kind === 'decode' ? 1 : 2;
+  let h = '';
+  for (let k = 0; k < n; k++) {
+    const l = lens[k];
+    h += `<div class="ziprow"><span class="chip">第 ${k + 1} 份</span> { "actual_seq_lengths_kv": [${l[0]}, ${l[1]}] }</div>`;
+  }
+  return h;
+}
+TABS.push({nav:'② 为什么是列表', title:'② decode 传 1 份、draft 传 N-1 份：一张图里有几个"时刻"就要几份',
+render(){
+  return `<div class="desc">关键问题：<b>这次 replay 的这张图里，attention 会用几次 seq_lens、每次该用几？</b>——传几份，就由它决定。</div>
+  <div class="bar" role="group" aria-label="阶段">
+    <button data-t2="decode" aria-pressed="true">decode 图（普通解码）</button>
+    <button data-t2="draft" aria-pressed="false">EAGLE draft 图（循环 3 步）</button></div>
+  <div id="t2Body"></div>`;
+},
+after(){
+  const draw = () => {
+    const b = document.getElementById('t2Body');
+    if (T2.phase === 'decode') {
+      b.innerHTML = `<h3>decode 图：图内只有 1 次 attention 用到 seq_lens</h3>
+      <p>decode 的图录的是<b>一次</b>前向。attention 从头到尾读同一份 KV 长度（每个请求的当前 seq_len）。所以 update 只需要 1 份：</p>
+      <div class="zipline"><div class="zipcol"><div class="zipbox">${stepListHtml('decode', [[5,3]])}</div></div></div>
+      <p class="note">torch_npu 还有个贴心捷径：只给 1 份时自动复制给所有记账条目（<span class="loc">torch_npu/npu/graphs.py:534-540</span>）——反正都一样。</p>`;
+    } else {
+      b.innerHTML = `<h3>draft 图：图内 ${'num_steps−1'} 次前向，KV 长度一次一变</h3>
+      <p>先纠正一个直觉：<code>draft_forward</code> 的 for 循环跑 num_steps 轮，但<b>最后一轮只选 token、不跑前向</b>（<code>eagle_worker_v2.py:766</code> 的 <code>if i == num_steps-1: break</code>）——num_steps=3 时图内只有 <b>2 次前向</b>。每次前向前，本轮选出的 draft token 已写入 KV，所以 attention 读的长度要 <b>+本轮已写入数</b>：</p>
+      <table class="cmp"><tr><th>图内前向</th><th>seq_lens</th><th>这份值谁用</th></tr>
+      <tr><td>第 1 次（i=0）</td><td>[6, 4] = 5+1</td><td><b>列表第 1 份</b>（每个节点只见"前缀+自己路径"=5+1；兄弟互不可见）</td></tr>
+      <tr><td>第 2 次（i=1）</td><td>[7, 5] = 5+2</td><td><b>列表第 2 份</b></td></tr></table>
+      <div class="zipline"><div class="zipcol"><div class="zipbox">${stepListHtml('draft', [[6,4],[7,5]])}</div></div></div>
+      <p class="note">num_steps=3 → 图内 2 次前向 → 列表长 <b>num_steps − 1 = 2</b>，前向数和份数一一对应。对应代码 <code>for step in range(num_steps − 1): lens = seq_lens_cpu[:raw_bs] + step + 1</code>；<b>+k+1 = 每个查询节点自身路径的深度</b>（与 topk 无关：兄弟节点虽都写进 KV，但树形 mask 互不可见）；<b>每一步还有专属的 attention backend</b>（<code>AscendAttnMultiStepDraftBackend</code> 为每个 step 实例化一个带 <code>speculative_step_id</code> 的 backend，<code>ascend_backend.py:3541</code>）。第 1 层候选来自循环前的 draft-extend 阶段，图内前向只负责"产出下一层"。</p>`;
+    }
+  };
+  document.querySelectorAll('[data-t2]').forEach(btn => btn.onclick = () => {
+    T2.phase = btn.dataset.t2;
+    document.querySelectorAll('[data-t2]').forEach(x => x.setAttribute('aria-pressed', x === btn));
+    draw();
+  });
+  draw();
+}});
+
+// ============================================================
+// Tab 3：graph.update 的记账/对账（zip 配对）交互演示
+// ============================================================
+let t3i = 0;
+const T3STEPS = [
+ {t:'capture：录制时顺手"记账"', lit:-1,
+  d:'录制 draft 图时，for 循环<strong>真的跑</strong>。每次一个 attention 算子消费 host 侧 seq_lens，torch_npu 就往 <code>graph_dispatch_records</code> 追加一条记录：<b>图内那个任务的 handle + 当时传入的 kwargs</b>（<span class="loc">graphs.py:487</span>）。3 次使用 = 3 条账，<b>追加顺序 = 图内执行顺序</b>——这就是"编号"的来源：不是显式编号，是列表下标天然当编号。'},
+ {t:'replay 前：你交出对账单（cpu_update_input）', lit:-1,
+  d:'SGLang 按公式生成 <code>num_steps−1</code> 份新值（第 k 份 = seq_len + k + 1，空槽补 0）。长度必须等于记账条数，否则直接报错——看右侧。'},
+ {t:'update：zip 按位置一一配对', lit:0,
+  d:'<code>update_capture_record</code> 里就一个 Python <code>zip</code>（<span class="loc">graphs.py:556</span>）：你的第 k 份 ↔ 记账的第 k 条。配对后把新值<b>写进那条记录的 kwargs</b>，并重放该算子的参数绑定（在独立的 update_stream 上）。此时"哪份给谁"已经定死——运行时不存在任何选择。'},
+ {t:'配对 2', lit:1, d:'第二份 [7,5] 绑给第二条例……每条账各拿各的新值。'},
+ {t:'配对 3', lit:2, d:'第三份同理。单份调用（decode）走复制捷径：1 份 copy 成 N 份再 zip，效果等价。'},
+ {t:'replay：每个任务读自己被改过的参数', lit:-1,
+  d:'<code>graph.replay()</code> 时图内任务按录制顺序执行，第 2 次前向的 attention 读到的就是刚绑上去的 [6,4]。整个机制里<b>没有"运行时判断用哪份"</b>这个环节——配对在 update 阶段一次完成。'},
+ {t:'长度不匹配的下场（真实报错）', lit:-1, err:true,
+  d:'如果你给的份数 ≠ 记账条数，<code>graphs.py:545-550</code> 直接 RuntimeError——这就是 SGLang 必须精确生成 <code>num_steps−1</code> 份的硬约束来源。点右侧按钮试试。'},
+];
+const REC_KW = ['[5,3]（录制时的值）', '[5,3]（录制时的值）', '[5,3]（录制时的值）'];
+const UPD = ['[6,4]', '[7,5]', '[8,6]'];
+function t3RecHtml(lit, allBound){
+  let h = '';
+  for (let k = 0; k < 3; k++) {
+    const matched = lit === k;
+    const showNew = allBound || lit >= k;
+    const kw = showNew ? `<b>[${UPD[k].match(/\d+/g).slice(0,2).join(',')}]</b>` : REC_KW[k];
+    h += `<div class="rec ${matched ? 'match' : ''}"><div class="ridx">记账 #${k}</div>
+      <div class="rkw">图内第 ${k + 1} 次前向的 attention&nbsp;·&nbsp;actual_seq_lengths_kv = ${kw}</div></div>`;
+  }
+  return h;
+}
+function t3ZipHtml(lit){
+  let h = '';
+  for (let k = 0; k < 3; k++) {
+    const litCls = lit >= k && lit !== -1 ? ' lit' : '';
+    h += `<div class="ziprow${litCls}"><span class="chip">你的第 ${k + 1} 份</span> ${UPD[k]}</div>
+          <div class="ziparrow" style="${lit === k ? 'color:#15803d' : ''}">${lit === k ? '⇓ 配对 → 绑给记账 #' + k : '↓'}</div>`;
+  }
+  return h;
+}
+TABS.push({nav:'③ update 怎么对账', title:'③ graph.update 机制：capture 记账、update 对账（zip 配对）——下层不用"知道"任何事',
+render(){
+  return `<div class="desc">回答你的原始问题："<b>下层怎么知道什么时候用第几个元素？</b>"——它不需要知道。录制时每次使用都立了一条账（列表下标即编号），你 update 时按位置对账，配对结果直接写进图内任务的参数。replay 时各读各的。逐步演示：</div>
+  <div class="bar"><button id="t3Prev">← 上一步</button><button id="t3Next">下一步 →</button><span id="t3Cnt" aria-live="polite"></span></div>
+  <div class="zipline">
+    <div class="zipcol" style="flex:1.4"><h3 style="margin:4px 0">torch_npu 的账本（capture 时立的）</h3><div class="reclist" id="t3Rec"></div></div>
+    <div class="zipcol"><h3 style="margin:4px 0">你的对账单（cpu_update_input）</h3><div class="zipbox" id="t3Zip"></div>
+    <button id="t3ErrBtn" style="margin-top:8px;display:none">试试只交 2 份 →</button>
+    <div class="errbox" id="t3Err"></div></div>
+  </div>
+  <div class="info" id="t3Info" aria-live="polite"></div>
+  <p class="note">演示用 3 条账纯为看清配对节奏；SGLang 实际例子 num_steps=3 时是 2 次前向 = 2 条账 = 2 份，机制完全相同。</p>`;
+},
+after(){
+  const draw = () => {
+    t3i = Math.max(0, Math.min(T3STEPS.length - 1, t3i));
+    const st = T3STEPS[t3i];
+    document.getElementById('t3Rec').innerHTML = t3RecHtml(st.lit, t3i >= 5);   // replay 步起全量展示已绑定
+    document.getElementById('t3Zip').innerHTML = t3ZipHtml(st.lit);
+    document.getElementById('t3Cnt').textContent = `步骤 ${t3i + 1} / ${T3STEPS.length}`;
+    document.getElementById('t3Info').innerHTML = `<b>${esc(st.t)}</b><div>${st.d}</div>`;
+    document.getElementById('t3ErrBtn').style.display = st.err ? 'inline-block' : 'none';
+    document.getElementById('t3Err').className = 'errbox';
+    if (st.err) {
+      document.getElementById('t3ErrBtn').onclick = () => {
+        const e = document.getElementById('t3Err');
+        e.className = 'errbox show';
+        e.innerHTML = 'RuntimeError: Currently, there are 3 operators that need<br>to be updated by capture, and there are only 2 elements<br>in the incoming cpu_update_input list';
+      };
+    }
+  };
+  document.getElementById('t3Next').onclick = () => { t3i++; draw(); };
+  document.getElementById('t3Prev').onclick = () => { t3i--; draw(); };
+  draw();
+}});
+
+// ---------- 导航 ----------
+let cur = 0;
+const nav = document.getElementById('nav');
+nav.innerHTML = TABS.map((s, i) => `<button data-i="${i}">${esc(s.nav)}</button>`).join('');
+nav.querySelectorAll('button').forEach(b => b.onclick = () => go(+b.dataset.i));
+function go(i) {
+  cur = i;
+  const s = TABS[cur];
+  document.getElementById('title').textContent = s.title;
+  document.getElementById('stage').innerHTML = s.render();
+  if (s.after) s.after();
+  nav.querySelectorAll('button').forEach((b, j) =>
+    j === cur ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current'));
+}
+go(0);
+</script>
+</body>
+</html>

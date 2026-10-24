@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SGLang NPU 上的 EAGLE draft 图：EAGLEDraftNpuGraphRunner 是干嘛的</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#fafafa;color:#222;line-height:1.6}
+header{padding:14px 24px;background:#1f2937;color:#fff}
+header h1{margin:0;font-size:19px}
+nav.steps{display:flex;flex-wrap:wrap;gap:6px;padding:10px 24px;background:#fff;border-bottom:1px solid #ddd}
+nav.steps button{border:1px solid #bbb;background:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:14px}
+nav.steps button[aria-current="step"]{background:#1f2937;color:#fff;border-color:#1f2937}
+main{padding:14px 24px;max-width:1320px}
+h2{margin:4px 0 8px;font-size:18px}
+h3{font-size:15px;margin:14px 0 6px}
+.desc{background:#fff;border-left:4px solid #1f2937;padding:8px 14px;margin-bottom:12px}
+.warn{background:#fff7ed;border-left:4px solid #c2410c;padding:8px 14px;margin:10px 0}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.bar button{padding:5px 14px;font-size:14px;cursor:pointer;background:#fff;border:1px solid #888;border-radius:4px}
+.bar button[aria-pressed="true"]{background:#1f2937;color:#fff}
+button:focus-visible,[tabindex]:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+code{background:#eef;padding:0 4px;border-radius:3px;font-size:13px}
+.loc{font-family:Consolas,monospace;font-size:12px;color:#1d4ed8}
+.note{font-size:13px;color:#555}
+.info{background:#fff8e1;border:1px solid #e8c86a;border-radius:6px;padding:8px 12px;margin:8px 0;min-height:60px}
+/* 架构图 */
+.arch{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px 18px;align-items:start;max-width:1100px}
+.abox{all:unset;box-sizing:border-box;display:block;cursor:pointer;background:#fff;border:2px solid var(--c);border-radius:8px;padding:8px 10px;font-size:13px}
+.abox b{color:var(--c);font-size:14px;display:block}
+.abox small{font-family:Consolas,monospace;font-size:11px;color:#666}
+.abox.sel{background:#fffbea;box-shadow:0 0 0 3px #f59e0b}
+.abox.dash{border-style:dashed}
+.span3{grid-column:1/4}
+.span2{grid-column:2/4}
+.down{text-align:center;font-size:18px;color:#888;line-height:1}
+.tag{display:inline-block;font-size:11px;padding:0 6px;border-radius:8px;background:#eee;color:#333;margin-top:3px}
+/* 草稿树 */
+.tree{background:#fff;border:1px solid #ddd;border-radius:8px;padding:8px;overflow-x:auto}
+circle.tnode{fill:#fff;stroke:#999;stroke-width:1.5}
+.tree text{font-size:11px;fill:#333;text-anchor:middle}
+.tedge{stroke:#bbb;stroke-width:1.5;fill:none}
+.n-on circle.tnode{stroke:#c2410c;stroke-width:2.5;fill:#fff7ed}
+.n-on text{fill:#7c2d12;font-weight:700}
+.n-hide{opacity:.12}
+.n-acc circle.tnode{fill:#dcfce7;stroke:#15803d;stroke-width:2.5}
+.n-acc text{fill:#14532d;font-weight:700}
+.n-rej{opacity:.35}
+/* buffer 表 */
+.btbl{border-collapse:collapse;font-size:13px;margin:6px 0;background:#fff}
+.btbl td,.btbl th{border:1px solid #ddd;padding:4px 10px;text-align:center;font-family:Consolas,monospace}
+.btbl th{background:#f3f4f6;font-family:inherit}
+.btbl .hl{background:#fff7ed}
+.btbl .pad{color:#999}
+/* DP 投票 */
+.ranks{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.rank{border:2px solid #999;border-radius:8px;padding:6px 10px;font-size:13px;background:#fff;min-width:120px;text-align:center}
+.rank b{display:block;font-size:12px}
+.rank.g{border-color:#15803d}.rank.e{border-color:#c2410c}
+.minres{border:2px solid #1f2937;border-radius:8px;padding:8px 14px;font-size:14px;background:#fffbea}
+/* 直觉条形图 + token 流 */
+.mb{display:flex;align-items:center;gap:10px;margin:8px 0;flex-wrap:wrap}
+.mblab{width:200px;font-size:13px;text-align:right}
+.mbtrack{position:relative;height:26px;background:#f1f5f9;border-radius:4px;width:520px;max-width:70%}
+.mbw{position:absolute;left:0;top:0;height:100%;background:#2563eb;border-radius:4px 0 0 4px}
+.mbc{position:absolute;top:0;height:100%;background:#c2410c}
+.mbval{font-size:13px;color:#555}
+.toks{display:flex;gap:4px;flex-wrap:wrap;align-items:stretch;margin:8px 0}
+.tok{min-width:40px;padding:5px 7px;border-radius:6px;border:2px solid #999;background:#fff;text-align:center;font-size:15px}
+.tok small{display:block;font-size:10px;color:#666;font-family:inherit}
+.tok.ctx{background:#f1f5f9;border-color:#94a3b8}
+.tok.dr{border-color:#c2410c;background:#fff7ed}
+.tok.vfy{border-color:#2563eb}
+.tok.ok{border-color:#15803d;background:#dcfce7}
+.tok.bad{border-color:#c2410c;background:#fee2e2}
+.tok.fix{border-color:#15803d;background:#ecfdf5}
+.tok.root{border-color:#7e22ce;background:#f5f3ff}
+.ctrs{display:flex;gap:10px;margin:8px 0;flex-wrap:wrap}
+.ctr{border:1px solid #bbb;border-radius:8px;padding:4px 14px;background:#fff;font-size:13px;text-align:center;min-width:96px}
+.ctr b{font-size:18px;display:block}
+.ctr .cl{color:#666;font-size:12px}
+.ctr.hot{border-color:#c2410c;background:#fff7ed}
+table.cmp{border-collapse:collapse;font-size:14px;margin:8px 0;width:100%;max-width:1150px}
+table.cmp td,table.cmp th{border:1px solid #ddd;padding:6px 10px;text-align:left;vertical-align:top}
+table.cmp th{background:#f3f4f6}
+</style>
+</head>
+<body>
+<header><h1>EAGLEDraftNpuGraphRunner：昇腾 NPU 上，EAGLE 投机解码的"草稿步"是怎么被一张图跑完的</h1></header>
+<nav class="steps" id="nav" aria-label="页面导航"></nav>
+<main>
+  <h2 id="title" tabindex="-1"></h2>
+  <div id="stage"></div>
+</main>
+<script>
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TABS = [];
+
+// ---------- Tab 1：投机解码是什么 ----------
+const SCTX = ['今','天','天'], SROOT = '气', SDRAFT = ['很','好','，'], SFIX = '真';
+const SDSTEPS = [
+ {t:'先看痛点：一个 token 一次大前向', d:'大模型生成文本是<b>自回归</b>的：第 n+1 个 token 依赖第 n 个的结果，只能一个一个来——注意，串行的原因是<b>"不知道下一个 token 是什么"</b>，不是"模型算不了多个"（第 3 步会用到这一点）。而一次 decode 前向的大头是<b>把几十 GB 权重从显存搬进计算单元</b>（memory-bound），搬一遍的时间跟"算几个 token"关系不大。batch 小的时候 GPU 算力大量闲置，时间全花在一趟一趟搬权重上——上面的条形图就是这个意思。'},
+ {t:'让小模型先猜：3 次小前向', d:'投机解码请一个"小模型"（draft，通常只有一两层，参数是大模型的零头）<b>自回归连猜 3 个 token</b>："很"、"好"、"，"。小模型一次前向比大模型快几个数量级，猜错也不罚——下一步大模型会亲自验收，最坏只是白跑几次小前向。'},
+ {t:'大模型一次前向，把 3 笔账一起验', d:'<b>关键认知：大模型不是"一次只会吐一个 token"的机器。</b>Transformer 本质是个函数：喂一段 token，输出<b>每个位置</b>"下一个 token"的分布——训练时就是这么全位置并行算 loss 的；decode 每次只喂 1 个、只读最后 1 行，是"省着用"，不是能力上限。所以"很/好/，"虽然是大模型没生成过的、draft 猜的 token，照样能喂：模型对输入<b>没有身份校验</b>，只做计算。<br>本轮前向的实际输入是 <b>4 个新 token：气 + 很 好 ，</b>——"气"是上一轮刚被采样出来的，从没作为输入进过大模型（KV cache 里没有它），这轮要顺带写入；[今 天 天] 的 KV 已缓存，attention 直接读、不用重算。产出的 4 行预测见下方表格，验收依据就在里面。'},
+ {t:'对账：接受 2 个、修正 1 个', d:'拿前向输出逐行验收：第 1 行的分布说下一个是"很"✓、第 2 行说"好"✓、第 3 行说"真"——draft 猜的"，"✗。规则：<b>接受猜中的前缀，一错就停</b>，并采纳大模型在第 3 行的答案"真"。猜错不会产出错字，只是这一轮少赚。'},
+ {t:'本轮账本：1 次大前向 = 3 个 token', d:'普通 decode 产出 3 个 token 要 <b>3 次大前向</b>；这里只要 <b>1 次</b>，外加几次可忽略的小前向。加速比 ≈ 平均每轮接受长度 + 1（修正位保底 1 个：被拒的那行 logits 永远给出了一个正确 token）：全中一轮得 3+1=4 个，全不中也有 1 个。draft 和 target 越"合拍"，长期加速比越高——实际部署里平均一轮拿 2~3 个 token 很常见。下一轮从"真"重新开始（它成为新的根，同样要在下轮前向里写入 KV）。'},
+];
+let sdStep = 0;
+function memBars() {
+  const W = 100, C = 2, MAX = W + 8 * C;
+  const rows = [[1, '普通 decode：算 1 个 token'], [4, '投机验证：一次算 4 个'], [8, '投机验证：一次算 8 个']];
+  return rows.map(([n, lab]) => `<div class="mb"><div class="mblab">${esc(lab)}</div>` +
+    `<div class="mbtrack" role="img" aria-label="${esc(lab)}，读权重 100 份、计算 ${n * C} 份（示意）">` +
+    `<div class="mbw" style="width:${W / MAX * 100}%" title="读一遍模型权重：固定的大头"></div>` +
+    `<div class="mbc" style="left:${W / MAX * 100}%;width:${n * C / MAX * 100}%" title="算 ${n} 个 token：很小，随 token 数增长"></div>` +
+    `</div><div class="mbval">总时长 ≈ ${W + n * C}</div></div>`).join('');
+}
+function sdToks(i) {
+  let h = '<div class="toks">';
+  SCTX.forEach(c => h += `<div class="tok ctx">${esc(c)}<small>context·KV已缓存</small></div>`);
+  h += `<div class="tok root">${esc(SROOT)}<small>上轮产出·待入KV</small></div>`;
+  if (i >= 1) SDRAFT.forEach((d, k) => {
+    let cls = 'dr', mark = 'draft 猜';
+    if (i === 2) { cls = 'dr vfy'; mark = '待验'; }
+    if (i >= 3) { cls = k < 2 ? 'ok' : 'bad'; mark = k < 2 ? '✓ 接受' : '✗ 猜错'; }
+    h += `<div class="tok ${cls}">${esc(d)}<small>${mark}</small></div>`;
+  });
+  if (i >= 3) h += `<div class="tok fix">${esc(SFIX)}<small>大模型修正</small></div>`;
+  return h + '</div>';
+}
+function logitsTable(i) {
+  if (i < 2) return '';
+  const rows = [
+    {in:SROOT, pred:'很', use:'验收 draft 第 1 猜"很"', v:''},
+    {in:'很', pred:'好', use:'验收 draft 第 2 猜"好"', v:''},
+    {in:'好', pred:'真（≠ draft 猜的"，"）', use:'验收第 3 猜；被拒时这行就是修正 token"真"的出处', v:''},
+    {in:'，', pred:'（下一个）', use:'本轮作废："，"被拒不落盘', v:'pad'},
+  ];
+  return `<h3>本轮一次前向的输出：每个输入位置各一行"下一个 token"分布（即 logits 矩阵，vocab 维已略）</h3>
+  <table class="btbl"><tr><th>本轮输入的 token</th><th>该行预测的"下一个"</th><th>用途</th></tr>` +
+  rows.map((r, k) => `<tr class="${i >= 3 ? (k < 3 ? 'hl' : 'pad') : (k < 3 ? '' : 'pad')}"><td>${esc(r.in)}${k === 0 ? '<small style="color:#7e22ce">（根，顺带写 KV）</small>' : ''}</td><td>${esc(r.pred)}</td><td style="font-family:inherit">${esc(r.use)}</td></tr>`).join('') +
+  `</table><p class="note">因果注意力保证每个位置的预测只看它左边的 token——所以把 draft 猜的 token 接在后面，不会污染任何位置的预测，每行结果都等价于"模型自己一步步走到这里再预测"。这就是投机解码<b>无损</b>的根源。[今 天 天] 的 KV 已缓存，不进本轮前向。</p>`;
+}
+function sdCounters(i) {
+  const v = [[0,0,0],[0,3,0],[1,3,0],[1,3,3],[1,3,3]][i];
+  const box = (n, lab, hot) => `<div class="ctr ${hot ? 'hot' : ''}"><b>${n}</b><div class="cl">${lab}</div></div>`;
+  return `<div class="ctrs">` + box(v[0], '大模型前向', i === 2) + box(v[1], 'draft 前向', i === 1) + box(v[2], '产出 token', i === 3) + `</div>`;
+}
+TABS.push({nav:'① 投机解码是什么', title:'① 从零讲投机解码：小模型猜、大模型验，为什么又快又不掉精度',
+render(){
+  return `<div class="desc">一句话：<b>让一个小模型先把接下来的几个 token 猜出来，大模型一次前向把这几笔账一起验掉</b>。猜中的直接采纳，猜错的位置用大模型的答案修正。
+    这就是"投机"的含义——赌 draft 猜得八九不离十，赌赢了省大模型前向的次数。先建立两个直觉，再看一轮完整流程。</div>
+  <h3>直觉 1：为什么"多验几个 token"几乎是免费的</h3>
+  ${memBars()}
+  <div class="legend" style="font-size:13px"><span style="display:inline-flex;align-items:center;gap:4px;margin-right:14px"><i style="width:14px;height:14px;background:#2563eb;display:inline-block"></i>读一遍模型权重（固定的大头）</span>
+    <span style="display:inline-flex;align-items:center;gap:4px"><i style="width:14px;height:14px;background:#c2410c;display:inline-block"></i>算这些 token（很小，随 token 数增长）</span></div>
+  <p class="note">示意数字："读一遍权重"记为 100，每算一个 token 记为 2。decode 阶段真实开销以搬权重为主，所以一次前向算 1 个 token 和算 8 个 token 差距很小——<b>这就是投机解码全部收益的来源：把"串行 N 次搬运"压成"1 次搬运 + 顺手多算"</b>。</p>
+  <h3>直觉 2：一轮投机解码长什么样（逐步）</h3>
+  <div class="bar"><button id="sdPrev">← 上一步</button><button id="sdNext">下一步 →</button><span id="sdCnt" aria-live="polite"></span></div>
+  <div id="sdToks"></div>
+  <div id="sdLogits"></div>
+  <div id="sdCtr"></div>
+  <div class="info" id="sdInfo" aria-live="polite"></div>
+  <h3>几个常见问题</h3>
+  <table class="cmp">
+    <tr><th>猜错了怎么办？</th><td>不会产出错字：每个位置都要由大模型算出的分布复核，从第一个不一致的位置起全部丢弃，并用大模型的答案顶上。最坏一轮"只赚 1 个"（修正位保底），相当于退回普通 decode，外加几次小前向的浪费。</td></tr>
+    <tr><th>真的不掉精度？</th><td>是。接受/拒绝规则（rejection sampling）保证最终 token 序列的分布与大模型自己一步步生成的分布<b>完全相同</b>——它只是"把必须串行的生成变成可以并行的校对"，不改变生成内容。</td></tr>
+    <tr><th>大模型是自回归的，怎么能把"猜的"token 喂给它？</th><td>自回归是<b>使用方式</b>，不是计算上限。Transformer 是"给序列 → 每个位置各出一个'下一个 token'分布"的函数（训练时全位置并行算 loss）；decode 只喂 1 个、只读最后 1 行是省着用——串行卡在"不知道下一个是什么"，不卡在"算不了多个"。模型对输入 token <b>没有身份校验</b>，draft 拼的前文照算不误。</td></tr>
+    <tr><th>"每个位置的下一个 token"是怎么算出来的？</th><td>每层 transformer 对<b>每个</b>输入位置输出一个向量（[seq_len, hidden] 矩阵），最后一层经 lm_head 投影成 vocab 维分布：一次前向、所有行同时出现。"验收"不是新机制——<b>就是从同一次前向的 logits 矩阵里多读几行</b>。因果注意力保证位置 i 只看 ≤ i 的 token，所以每行都等价于"模型自己走到这里会怎么预测"。</td></tr>
+    <tr><th>draft 小模型哪来的？</th><td>看方案：可以是独立小模型，也可以像 EAGLE、DeepSeek-MTP 那样从大模型蒸馏/附着出来的"一两层小尾巴"。SGLang 里用 <code>--speculative-algorithm</code> 选方案，<code>--speculative-num-steps / --speculative-eagle-topk / --speculative-num-draft-tokens</code> 定每次猜多大树。</td></tr>
+    <tr><th>和本页主角什么关系？</th><td>EAGLE 是其中对单请求延迟最友好的一种：draft 直接吃大模型的 hidden state、每步猜 topk 个候选长成<b>树</b>、一次验证多条路径——<b>就在下一页展开</b>。而 <code>EAGLEDraftNpuGraphRunner</code> 只负责"draft 连跑几步"这一小段在 NPU 上的图化。</td></tr>
+  </table>`;
+},
+after(){
+  const draw = () => {
+    sdStep = Math.max(0, Math.min(SDSTEPS.length - 1, sdStep));
+    const s = SDSTEPS[sdStep];
+    document.getElementById('sdToks').innerHTML = sdToks(sdStep);
+    document.getElementById('sdLogits').innerHTML = logitsTable(sdStep);
+    document.getElementById('sdCtr').innerHTML = sdCounters(sdStep);
+    document.getElementById('sdCnt').textContent = `步骤 ${sdStep + 1} / ${SDSTEPS.length}`;
+    document.getElementById('sdInfo').innerHTML = `<b>${esc(s.t)}</b><div>${s.d}</div>`;
+  };
+  document.getElementById('sdNext').onclick = () => { sdStep++; draw(); };
+  document.getElementById('sdPrev').onclick = () => { sdStep--; draw(); };
+  draw();
+}});
+
+// ---------- Tab 1：EAGLE 投机解码（先讲清它服务的是什么流程） ----------
+const TOPK = 2, NSTEP = 3;   // 演示参数：draft 模型跑 3 步，每步选 2 个候选
+const LVL_Y = [40, 130, 220, 310];
+// 建一棵 1+2+4+8 的草稿树，叶子均分横坐标，父节点取子节点中点
+const NODES = [];
+(function build() {
+  let id = 0;
+  const mk = (lvl, parent, label) => { const n = {id:id++, lvl, parent, label, kids:[]}; NODES.push(n); return n; };
+  const root = mk(0, null, 't₀');
+  let prev = [root];
+  for (let l = 1; l <= NSTEP; l++) {
+    const next = [];
+    prev.forEach(p => { for (let k = 0; k < TOPK; k++) { const c = mk(l, p, p.label + 'ab'[k]); p.kids.push(c); next.push(c); } });
+    prev = next;
+  }
+  const leaves = NODES.filter(n => n.lvl === NSTEP);
+  leaves.forEach((n, i) => n.x = 70 + i * (760 / (leaves.length - 1)));
+  for (let l = NSTEP - 1; l >= 0; l--)
+    NODES.filter(n => n.lvl === l).forEach(n => n.x = (n.kids[0].x + n.kids[n.kids.length - 1].x) / 2);
+  NODES.forEach(n => n.y = LVL_Y[n.lvl]);
+})();
+const TSTEPS = [
+ {vis:0, t:'起点：一次普通的 target decode', d:'大模型（target）刚算出第 n 个 token <code>t₀</code>，同时得到它倒数第二层的 hidden state。正常流程下一步又是一次完整前向。EAGLE 接着上一页的思路：<b>小 draft 模型连猜几步、target 一次验证</b>，但比上一页的线性版本更进一步——先看它猜的形状。'},
+ {vis:1, t:'draft-extend：先猜出第 1 层的 2 个候选', d:'注意：这一步发生在 draft-extend 阶段（<b>循环之前、不在这张 draft 图里</b>）——draft 模型吃 target 的 hidden state 跑一次，从词表里选 topk=2 个最可能的下一个 token（a、b）。它给出的候选存进 spec_info，正是循环第一轮"收进树"的那份输入。'},
+ {vis:2, t:'图内前向①：树长到 4 个', d:'循环 i=0：把 (a,b) 收进树、跑<b>图内第 1 次前向</b>（跑在 a、b 上）→ 从 logits 选出第 2 层 4 个候选。注意树形 attention：a、b 都写进 KV 但<b>互不可见</b>，每个节点只看"前缀 + 自己路径"。'},
+ {vis:3, t:'图内前向②：8 个叶子', d:'循环 i=1：收 4 个候选、跑<b>图内第 2 次前向</b> → 选出第 3 层 8 个。i=2 那一轮<b>只把 8 个叶子收进树、不跑前向</b>（第 4 层没人要）——所以 num_steps=3 时图内只有 2 次前向：1 次 draft-extend（图外）+ 2 次图内前向构成这棵 15 节点的草稿树。'},
+ {vis:3, all:1, t:'拼路径 → target 一次前向验证', d:'从树里取 8 条根到叶的路径，拼成每个请求 8 个 draft token，<b>target 模型一次前向</b>把它们全算一遍（attention 按树结构组织），得到每个 token 位置的 logits。'},
+ {vis:3, all:1, acc:'t₀,t₀a,t₀aa,t₀aab', t:'按概率接受一条前缀', d:'逐位置比对 draft 的猜测和 target 的真实分布：本例接受了 a → aa → aab 三个（绿色），其余丢弃。接受的 token 直接追加到输出——一步 decode 出了 3 个 token，然后从新位置回到第 1 步。加速比 = 平均接受长度 + 1（验证那次前向）。'},
+];
+let tStep = 0;
+function treeSvg(s) {
+  const visLvl = s.vis, showAll = s.all, acc = (s.acc || '').split(',').filter(Boolean);
+  let edges = '', nodes = '';
+  NODES.forEach(n => {
+    if (n.parent) edges += `<line class="tedge${showAll || n.lvl <= visLvl ? '' : ' n-hide'}" x1="${n.parent.x}" y1="${n.parent.y}" x2="${n.x}" y2="${n.y}"/>`;
+  });
+  NODES.forEach(n => {
+    const shown = showAll || n.lvl <= visLvl;
+    let cls = shown ? '' : ' n-hide';
+    if (shown && s.acc) cls = acc.includes(n.label) ? ' n-acc' : ' n-rej';
+    else if (shown && n.lvl === visLvl && !showAll) cls = ' n-on';
+    nodes += `<g class="${cls}" role="img" aria-label="草稿树节点 ${n.label}"><circle class="tnode" cx="${n.x}" cy="${n.y}" r="17"/><text x="${n.x}" y="${n.y + 4}">${esc(n.label)}</text></g>`;
+  });
+  return `<svg viewBox="0 0 900 348" width="100%" height="348" style="min-width:720px">${edges}${nodes}
+    <text x="860" y="${LVL_Y[0] + 5}" font-size="11" fill="#888">target 出</text>
+    <text x="860" y="${LVL_Y[1] + 5}" font-size="11" fill="#888">extend 提议</text>
+    <text x="860" y="${LVL_Y[2] + 5}" font-size="11" fill="#888">图内前向①</text>
+    <text x="860" y="${LVL_Y[3] + 5}" font-size="11" fill="#888">图内前向②</text></svg>`;
+}
+TABS.push({nav:'② EAGLE 怎么猜', title:'② EAGLE 这种方案：draft 吃 hidden state，连猜几步长出一棵候选树',
+render(){
+  return `<div class="desc">上一页末尾的通用流程是"猜一条链"；EAGLE 猜的是<b>一棵树</b>：draft 每步从 hidden state 里选 topk 个候选同时往下走，一次验证多条路径——猜中率大幅提高。本页主角 <code>EAGLEDraftNpuGraphRunner</code> 只服务于其中一小段：<b>draft_forward 循环里那 2 次图内前向</b>（下图橙色节点；第 1 层候选由循环前的 draft-extend 图外给出）。
+    它不猜 token 的内容、不做验证、不管接受策略——它只负责让这 2 次前向在 NPU 上<b>用一次图回放跑完</b>。点"下一步"看草稿树怎么长出来。</div>
+    <div class="bar"><button id="tPrev">← 上一步</button><button id="tNext">下一步 →</button><span id="tCnt" aria-live="polite"></span></div>
+    <div class="tree" id="tree"></div>
+    <div class="info" id="tInfo" aria-live="polite"></div>
+    <div class="warn"><b>为什么 draft 阶段特别需要图？</b>draft 模型只有一两层，单个 kernel 只有几微秒，比 decode 还"短"；eager 模式下这几次前向要几百次 CPU 提交，GPU 大部分时间在等。
+    而草稿树的形状只由三个<b>固定的配置</b>决定——<code>speculative_num_steps</code>（几步）、<code>speculative_eagle_topk</code>（每步选几个）、batch size——跟这次请求的内容无关，正好满足"形状录死"的图的要求。</div>
+    <p class="note">示意参数：num_steps=3、topk=2 → 每个请求 8 个 draft token。SGLang 里这三个数来自 <code>--speculative-num-steps / --speculative-eagle-topk / --speculative-num-draft-tokens</code>。真实部署常用 num_steps=5、topk=4 之类，树会大得多，但逻辑一样。</p>`;
+},
+after(){
+  const draw = () => {
+    tStep = Math.max(0, Math.min(TSTEPS.length - 1, tStep));
+    const s = TSTEPS[tStep];
+    document.getElementById('tree').innerHTML = treeSvg(s);
+    document.getElementById('tCnt').textContent = `步骤 ${tStep + 1} / ${TSTEPS.length}`;
+    document.getElementById('tInfo').innerHTML = `<b>${esc(s.t)}</b><div>${s.d}</div>`;
+  };
+  document.getElementById('tNext').onclick = () => { tStep++; draw(); };
+  document.getElementById('tPrev').onclick = () => { tStep--; draw(); };
+  draw();
+}});
+
+// ---------- Tab 2：架构图（它夹在哪一层） ----------
+const AC = {w:'#7e22ce', run:'#b45309', base:'#475569', npu:'#c2410c', back:'#0e7490', g:'#15803d', attn:'#be185d', sib:'#6b7280'};
+const ARCH = {
+  w:{c:AC.w, t:'EagleWorkerV2.draft()', s:'speculative/eagle_worker_v2.py:619', d:`一次 draft 的入口。
+    <br>• <code>prepare_for_draft</code>（<span class="loc">eagle_worker_common.py:241</span>）把调度器给的一批请求拼成 <code>ForwardBatch</code>（每请求一行），顺带问一句 <code>can_run_graph</code> 能不能走图；
+    <br>• 能走 → <code>self.cuda_graph_runner.execute(forward_batch)</code>（<span class="loc">eagle_worker_v2.py:652</span>）；不能 → eager 直接调 <code>draft_forward</code>。`},
+  dw:{c:AC.w, t:'EagleDraftWorker', s:'speculative/eagle_worker_v2.py', d:`draft 侧的"小 ModelRunner"：持有 draft 模型、draft attention backend，以及本页主角。
+    启动时 <code>_capture_cuda_graphs</code>（<span class="loc">:455</span>）创建 draft 图 runner——<b>只有 speculative_num_steps &gt; 1 才建</b>（<span class="loc">:475</span>），因为 num_steps=1 时 draft 只有一次前向，用不上树，也不建这个 runner。`},
+  disp:{c:AC.base, t:'Device2DraftCudaGraphRunner 查表', s:'eagle_worker_v2.py:465-471', d:`按设备选类：cuda/xpu/musa 都用 <code>EAGLEDraftCudaGraphRunner</code>，只有 <b>npu 换成 EAGLEDraftNpuGraphRunner</b>。
+    这张表就是"每加一种设备就要复制一个子类"的老模式——也是我们想删掉它的原因（见第 ⑥ 页）。`},
+  base:{c:AC.run, t:'EAGLEDraftCudaGraphRunner', s:'speculative/eagle_draft_cuda_graph_runner.py:86', d:`<b>跨设备共用的大头</b>，继承自 DecodeCudaGraphRunner（借用它的 capture 循环和档位补齐）。它做：
+    <br>• 分配静态 buffer：input_ids、positions、seq_lens、topk_p/topk_index、hidden_states…，其中 <code>out_cache_loc</code> 大小是 max_bs × topk × num_steps（三步要写的 KV 槽位全预留）；
+    <br>• <code>capture_one_shape</code>（<span class="loc">:372</span>）：把 <code>eagle_worker.draft_forward</code>——<b>内部含 for 循环跑满 num_steps 步</b>（<span class="loc">eagle_worker_v2.py:789</span>）——交给 backend 录；
+    <br>• <code>execute</code>（<span class="loc">:557</span>）：拷输入 → 补齐 bs → 让子类回放 → 按真实 bs 切片输出。`},
+  npu:{c:AC.npu, t:'EAGLEDraftNpuGraphRunner（本页主角）', s:'hardware_backend/npu/graph_runner/eagle_draft_npu_graph_runner.py:36', d:`总共 107 行、5 个 override 的<b>薄适配层</b>，只在 npu 设备时生效：
+    <br>① <code>_cache_loc_dtype</code>：out_cache_loc 用 int32；
+    <br>② <code>_replay_graph</code>：<b>逐 draft 步重绑 host 侧 KV 长度</b>再回放（存在的核心理由，见第 ④ 页）；
+    <br>③ <code>can_run_graph</code>：attention-DP 下对 seed 就绪性做跨 rank 投票（见第 ⑤ 页）；
+    <br>④⑤ arch 映射两个方法——实际是死代码（见第 ⑤ 页）。`},
+  back:{c:AC.back, t:'NPUCudaGraphBackend', s:'hardware_backend/npu/graph_runner/npu_cudagraph_backend.py:42', d:`runner 手里的 <code>self.backend</code>，管"怎么录怎么放"：warmup×2 → <code>torch.npu.graph(...)</code> 录成 <code>torch.npu.NPUGraph</code>，按 shape 存进 <code>_graphs</code>。
+    <br>特有武器 <code>replay_with_input_update</code>（<span class="loc">:426</span>）：回放前用 CANN 的 <code>graph.update(cpu_update_input=...)</code> 把新的 host 输入<b>重新绑到已录好的图上</b>，不用重录。它的 docstring 明说支持"一份列表一个 draft step，给 EAGLE draft 用"。`},
+  g:{c:AC.g, t:'torch.npu.NPUGraph × 每个 bs 一张', s:'CANN 的整图对象', d:'一个 batch size 档位一张图，图里录着 num_steps 次 draft 前向的<b>全部</b> kernel 和它们的参数地址。'},
+  attn:{c:AC.attn, t:'draft_attn_backend（ascend）——又一个 "backend"！', s:'hardware_backend/npu/attention/*', d:`和 graph backend 是两回事：它决定 attention 用哪个算子。replay 前由 runner 调 <code>init_forward_metadata_out_graph</code>，把<b>每个 draft step 各自的</b> kv_indices 等写进固定地址的 buffer。树形 attention 的"每个请求 3 步各自看多长的 KV"有一半信息在这里（设备侧），另一半是 host 侧的长度列表（第 ④ 页的主角）。`},
+  sib:{c:AC.sib, t:'EAGLEDraftExtendNpuGraphRunner（姊妹类）', s:'hardware_backend/npu/graph_runner/eagle_draft_extend_npu_graph_runner.py:30', d:'draft 树定型后还有一个 draft-extend 阶段（把每个叶子候选的 hidden state 过一遍 draft），它有自己的 runner，也是同套老模式（NPU 子类 + 两个 override）。不在本页范围。'},
+};
+const abox = (id, cls = '') => `<button class="abox ${cls}" data-a="${id}" style="--c:${ARCH[id].c}"><b>${esc(ARCH[id].t)}</b><small>${esc(ARCH[id].s)}</small></button>`;
+TABS.push({nav:'③ 它夹在哪一层', title:'③ 位置：worker 管"草稿逻辑"，runner 管"录什么怎么喂"，backend 管"怎么录怎么放"',
+render(){
+  return `<div class="cols" style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+    <div class="arch" style="flex:1.5;min-width:640px">
+      <div class="span3">${abox('w')}</div>
+      <div class="down span3">↓ self.cuda_graph_runner（worker 启动时创建）</div>
+      <div class="span3">${abox('dw')}</div>
+      <div class="down span3">↓ 按设备查表（eagle_worker_v2.py:465）</div>
+      <div class="span3">${abox('disp')}</div>
+      ${abox('base')}<div class="down" style="grid-column:2/3">继承</div>${abox('npu')}
+      <div class="down">↓ self.backend</div><div></div><div class="down">↓（resolve_decode_backend，npu 固定返回它）</div>
+      ${abox('back')}<div></div>${abox('g')}
+      <div class="span3">${abox('attn', 'dash')}</div>
+      <div class="span3">${abox('sib', 'dash')}</div>
+    </div>
+    <div class="info" id="archInfo" aria-live="polite" style="flex:1;min-width:320px;position:sticky;top:10px"></div></div>
+    <div class="warn">和 <a href="sglang-cudagraph-viz.html">CUDA graph 那页</a>一样的分层：<b>Runner 管"录什么、怎么喂数据"，Backend 管"怎么录、怎么放"</b>。
+    EAGLEDraftNpuGraphRunner 不是第三种 runner，而是 EAGLEDraftCudaGraphRunner 在昇腾上的薄子类——真正的 EAGLE 逻辑全在父类，它只补 NPU 和 CUDA 录制机制的三点差异。点方框看说明。</div>`;
+},
+after(){
+  const show = id => {
+    document.querySelectorAll('.abox').forEach(b => b.classList.toggle('sel', b.dataset.a === id));
+    const a = ARCH[id];
+    document.getElementById('archInfo').innerHTML = `<h3 style="margin-top:0;color:${a.c}">${esc(a.t)}</h3><div class="loc">${esc(a.s)}</div><div style="margin-top:6px">${a.d}</div>`;
+  };
+  document.querySelectorAll('.abox').forEach(b => b.onclick = () => show(b.dataset.a));
+  show('npu');
+}});
+
+// ---------- Tab 3：capture / replay 逐步演示 ----------
+// 具体例子：2 个请求（A 已生成 5 个 token、B 3 个），topk=2、num_steps=3、bs 档位 [1,2,4,8]
+let cPhase = 'cap', cStep = 0;
+const RLEN = {cap:[
+  {t:'创建 runner', d:'worker 启动、<code>_capture_cuda_graphs</code> 里：因为 <code>speculative_num_steps(3) &gt; 1</code> 且设备是 npu，查表选中 <code>EAGLEDraftNpuGraphRunner</code>。', loc:'eagle_worker_v2.py:455-486'},
+  {t:'分配静态 buffer', d:'input_ids / positions / seq_lens / topk_p / topk_index / hidden_states / draft_probs…，其中 <b>out_cache_loc 形状是 (max_bs × topk × num_steps)、dtype 是 int32</b>（<code>_cache_loc_dtype</code>，NPU 算子要 32 位索引）。这些地址从此固定，图里录的就是它们。', loc:'eagle_draft_cuda_graph_runner.py:172-279'},
+  {t:'按档位录制（bs=8,4,2,1 各来一遍）', d:'每个档位：先 eager 跑 2 遍 warmup（加载 kernel、懒初始化），然后进 <code>torch.npu.graph(graph, pool, stream)</code>，把 <code>draft_forward</code> <b>连同内部 for 循环的 3 步</b>一次录完。', loc:'eagle_draft_cuda_graph_runner.py:372 / npu_cudagraph_backend.py:349'},
+  {t:'存图', d:'<code>_graphs[shape_key] = graph</code>、<code>_outputs[shape_key] = out</code>。注意：录制时喂给图的 <b>host 侧</b>输入 <code>actual_seq_lengths_kv</code>（每请求的 KV 长度列表）也被<b>烧进了图里</b>——这是 NPU 和 CUDA 最大的不同，回放阶段展开。', loc:'npu_cudagraph_backend.py:388-398'},
+], rep:[
+  {t:'can_run_graph：能不能走图', d:'父类先查：请求宽度 == 录制宽度（topk）、bs ≤ max_bs…；NPU 子类再追加 attention-DP 下的一致性投票（第 ⑤ 页）。通过才继续，否则 worker 直接 eager 调 <code>draft_forward</code>，图根本不碰。', loc:'eagle_draft_cuda_graph_runner.py:330 / eagle_draft_npu_graph_runner.py:60'},
+  {t:'execute：拷输入 + 补齐', d:'把这次的 input_ids、positions、topk_p… 批量拷进静态 buffer；真实 bs=2 <b>补齐到录制档位 4</b>，空槽填哨兵值（seq_len_fill_value）。这就是下表 buffer 的样子。', loc:'eagle_draft_cuda_graph_runner.py:557-645'},
+  {t:'图外刷 attention metadata', d:'<code>draft_attn_backend.init_forward_metadata_out_graph</code>：按 A、B 的真实长度<b>给每个 draft step 各自规划</b> kv_indices 等设备侧信息（树形 attention 三步各看不同的 KV 范围），写进固定地址的 buffer。', loc:'eagle_draft_cuda_graph_runner.py:726-730'},
+  {t:'构造逐 step 的长度列表（NPU 特有的一步）', d:'CUDA 上长度是设备 buffer 里的数值，改了图就"看见"；NPU 图里的长度是<b>录制时烧死的 host 数组</b>，改 buffer 没用——必须为图内每次前向各准备一份新列表，靠 <code>graph.update</code> 重新绑定。第 k 份 = 当前长度 + k + 1（每个查询节点的路径深度），空槽补 0。见下表。', loc:'eagle_draft_npu_graph_runner.py:90-104'},
+  {t:'graph.update + graph.replay', d:'<code>replay_with_input_update</code>：update 提交给专用 worker 线程、与 replay 并发发起；因为 host 数组设备可能还在读，上一轮留了 <code>_rebind_fence</code> 事件，本轮重写前先等它读完。<b>一次回放跑完 3 步 draft 前向</b>，Python 一行模型代码都不执行。', loc:'npu_cudagraph_backend.py:426-464'},
+  {t:'切片输出', d:'从固定的输出 buffer 按真实 bs=2 切出 parent_list / top_scores_index / draft_tokens / draft_probs，交回 worker 去拼树、发 target 验证。', loc:'eagle_draft_cuda_graph_runner.py:735-757'},
+]};
+function bufTable(stepIdx) {
+  // stepIdx: 演示进度（rep 阶段第 2、4 步之后分别展示不同状态）
+  // 图内前向 = num_steps-1 次：第 k 次（i=k, backend[k]）读 当前长度 + k + 1
+  const rows = [
+    {n:'图内第 1 次前向（i=0）', a:'6', b:'4', p1:'0', p2:'0', src:'update 列表 #1：当前长度 + 0 + 1（每个节点只见"前缀+自己路径"）', hl:0},
+    {n:'图内第 2 次前向（i=1）', a:'7', b:'5', p1:'0', p2:'0', src:'update 列表 #2：当前长度 + 1 + 1（路径更深一层）', hl:0},
+  ];
+  if (stepIdx >= 3) rows[0].hl = rows[1].hl = 1;       // 从"构造列表"步起高亮两份 update 列表
+  if (stepIdx >= 5) rows.forEach(r => r.hl = 1);       // 回放完成后再看第 1 次前向
+  return `<table class="btbl"><tr><th>图内的前向</th><th>请求A</th><th>请求B</th><th>空槽</th><th>空槽</th><th>长度从哪来</th></tr>` +
+    rows.map(r => `<tr class="${r.hl ? 'hl' : ''}"><td>${esc(r.n)}</td><td>${r.a}</td><td>${r.b}</td><td class="pad">${r.p1}</td><td class="pad">${r.p2}</td><td style="font-family:inherit">${esc(r.src)}</td></tr>`).join('') +
+    `</table><p class="note">每行就是喂给 attention 的 <code>actual_seq_lengths_kv</code>（num_steps=3 → 图内 2 次前向，最后一轮循环只选 token 不前向）。NPU 图里这份数组录制时被烧死，所以<b>每一行</b>都要每次 replay 前 <code>graph.update</code> 重绑——这正是原 NPU 子类 <code>_replay_graph</code> override 存在的理由。空槽补 0 表示"这行没有请求，attention 别看"。</p>`;
+}
+TABS.push({nav:'④ 录制与回放', title:'④ 完整流程：capture 录什么、每次 draft 时 replay 怎么喂（逐步演示）',
+render(){
+  return `<div class="desc">沿用一个具体例子：batch 里 2 个请求（A 已有 <b>5</b> 个 token、B 有 <b>3</b> 个），topk=2、num_steps=3，录制档位 <code>[1,2,4,8]</code>（补齐到 4）。先看"启动时录什么"，再看"每次 draft 喂什么"。</div>
+    <div class="bar" role="group" aria-label="阶段">
+      <button data-cp="cap" aria-pressed="${cPhase === 'cap'}">启动时：录制（capture）</button>
+      <button data-cp="rep" aria-pressed="${cPhase === 'rep'}">每次 draft：回放（replay）</button></div>
+    <div class="bar"><button id="cPrev">← 上一步</button><button id="cNext">下一步 →</button><span id="cCnt" aria-live="polite"></span></div>
+    <div class="info" id="cInfo" aria-live="polite"></div>
+    <div id="cBuf"></div>`;
+},
+after(){
+  const draw = () => {
+    const steps = RLEN[cPhase];
+    cStep = Math.max(0, Math.min(steps.length - 1, cStep));
+    const s = steps[cStep];
+    document.getElementById('cCnt').textContent = `步骤 ${cStep + 1} / ${steps.length}`;
+    document.getElementById('cInfo').innerHTML = `<b>${esc(s.t)}</b> &nbsp;<span class="loc">${esc(s.loc)}</span><div>${s.d}</div>`;
+    document.getElementById('cBuf').innerHTML = cPhase === 'rep' ? `<h3>attention 看到的 KV 长度（每行一次图内前向）</h3>` + bufTable(cStep) : '';
+  };
+  document.querySelectorAll('[data-cp]').forEach(b => b.onclick = () => {
+    cPhase = b.dataset.cp; cStep = 0;
+    document.querySelectorAll('[data-cp]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    draw();
+  });
+  document.getElementById('cNext').onclick = () => { cStep++; draw(); };
+  document.getElementById('cPrev').onclick = () => { cStep--; draw(); };
+  draw();
+}});
+
+// ---------- Tab 4：这个类的 5 个 override 逐个说 ----------
+const VOTES = [
+  {name:'缺 seed 的场景', ranks:[{r:'rank0', g:1, why:'有 seed'}, {r:'rank1', g:0, why:'PD 传的 IndexShare seed 还没到'}, {r:'rank2', g:1, why:'有 seed'}, {r:'rank3', g:1, why:'idle（无请求，放行）'}]},
+  {name:'全员就绪', ranks:[{r:'rank0', g:1, why:'有 seed'}, {r:'rank1', g:1, why:'有 seed'}, {r:'rank2', g:1, why:'有 seed'}, {r:'rank3', g:1, why:'idle（放行）'}]},
+  {name:'有 rank 超出录制档位', ranks:[{r:'rank0', g:1, why:'可走图'}, {r:'rank1', g:0, why:'bs 超过 max_bs'}, {r:'rank2', g:1, why:'可走图'}, {r:'rank3', g:1, why:'可走图'}]},
+];
+let vIdx = 0;
+TABS.push({nav:'⑤ 5 个 override', title:'⑤ 全文 107 行：5 个 override 逐个说（含死代码和三个绕过场景）',
+render(){
+  return `<table class="cmp">
+    <tr><th>方法</th><th>干嘛的</th><th>值得知道的</th></tr>
+    <tr><td><code>_cache_loc_dtype</code> <span class="loc">:51</span></td><td>把静态 <code>out_cache_loc</code>（KV 写入槽位表）的 dtype 从父类的 int64 改成 <b>int32</b></td><td>NPU 的 KV 索引算子按 32 位索引工作。这行在 CUDA graph 那页讲过的 <code>cache_loc_dtype</code> backend 属性出现后，已不需要子类来改</td></tr>
+    <tr><td><code>_replay_graph</code> <span class="loc">:90</span></td><td><b>存在的核心理由</b>：构造逐 draft step 的 KV 长度列表（第 ④ 页那张表），调 <code>backend.replay_with_input_update</code> 先 <code>graph.update</code> 重绑 host 输入再回放</td><td>特例：DeepSeek-DSA / V4 走 sync-free 路径，直接 <code>backend.replay</code>，不做 update（<span class="loc">:105-106</span>）。父类的 <code>_replay_graph</code> 只会调 <code>backend.replay</code>，所以必须 override</td></tr>
+    <tr><td><code>can_run_graph</code> <span class="loc">:60</span></td><td>先跑父类判断，再在"seed 由 draft-extend 提供 + attention DP&gt;1"时，把"本 rank 能否走图"在 TP 组的 CPU group 上 <b>all_reduce(MIN) 投票</b>，全体一致才走图</td><td>修的 bug：PD disagg 下 seed 是异步传的、按请求算的，各 rank 本地判断可能不一致；而 draft 前向里有 TP/EP 集合通信，<b>一半 rank 走图一半走 eager 会直接挂死</b>。见下方演示</td></tr>
+    <tr><td><code>_init_arch_map</code> <span class="loc">:41</span></td><td>建 MLA→<code>actual_seq_lengths_kv</code>、MHA→<code>context_lens</code> 的映射表</td><td><b>半死代码</b>：取值永远只走 MLA 那一项，MHA 分支选不到</td></tr>
+    <tr><td><code>_get_update_attr_name/type</code> <span class="loc">:54-58</span></td><td>给 update 取属性名/类型</td><td><b>死代码</b>：<code>attr_type</code> 全仓没有任何调用方（NPU 的 decode 路径在 <code>4e1ef559</code> 之后直接传常量 <code>[]</code>）。这两个方法是为了对齐旧的 <code>NPUGraphRunner</code> 的写法抄来的，旧类删了它们就该跟着删</td></tr>
+  </table>
+  <h3>DP 投票演示：为什么必须全体一致</h3>
+  <p>每格是一个 attention-DP rank 对"这次能不能走 draft 图"的<b>本地</b>判断。点按钮换一种分布：</p>
+  <div class="bar"><button id="vNext">换一组分布 →</button><span id="vName"></span></div>
+  <div class="ranks" id="vBox"></div>
+  <p class="note">投票用的是 <code>tp_group.cpu_group</code> 上的 MIN（<span class="loc">eagle_draft_npu_graph_runner.py:78-88</span>）：任何一个 rank 说"不行"，全体转 eager。idle rank 放行（它没有请求、不算缺席）。门控条件（seed 由 draft-extend 提供、DP&gt;1）是全体一致的配置，所以"要不要投票"本身不会产生分歧。</p>
+  <h3>三个绕过它的场景（没有它参与的时候）</h3>
+  <table class="cmp">
+    <tr><th>场景</th><th>行为</th></tr>
+    <tr><td><code>speculative_num_steps == 1</code></td><td>worker 压根不创建 draft 图 runner（<span class="loc">eagle_worker_v2.py:475</span>），没有这个类的事</td></tr>
+    <tr><td><code>can_run_graph</code> 不通过</td><td>worker 直接 eager 调 <code>draft_forward</code>（<span class="loc">eagle_worker_v2.py:652</span> 的 else 分支），逐 kernel 提交</td></tr>
+    <tr><td>DeepSeek-DSA / V4 模型</td><td><code>_replay_graph</code> 里走 <code>backend.replay</code> 直通，不构造 update 列表——这两个模型的 attention 用 sync-free 的元数据方案，长度不靠 host 输入烧进图</td></tr>
+  </table>`;
+},
+after(){
+  const draw = () => {
+    const v = VOTES[vIdx];
+    const mn = v.ranks.reduce((a, r) => a * (r.g ? 1 : 0), 1);
+    document.getElementById('vName').textContent = `「${v.name}」（${(vIdx + 1)}/${VOTES.length}）`;
+    document.getElementById('vBox').innerHTML =
+      v.ranks.map(r => `<div class="rank ${r.g ? 'g' : 'e'}"><b>${esc(r.r)}</b>${r.g ? '✓ 走图' : '✗ 走 eager'}<br><small>${esc(r.why)}</small></div>`).join('') +
+      `<div class="down" style="font-size:22px">→ all_reduce(MIN) →</div>` +
+      `<div class="minres">${mn ? '1 → <b>全体走图</b>' : '0 → <b>全体转 eager</b>（哪怕三个 rank 本可以走图）'}</div>`;
+  };
+  document.getElementById('vNext').onclick = () => { vIdx = (vIdx + 1) % VOTES.length; draw(); };
+  draw();
+}});
+
+// ---------- Tab 5：为什么想删它、删完去哪 ----------
+TABS.push({nav:'⑥ 现状与去向', title:'⑥ 为什么这个类正在被删掉：一次已经完成的同款手术（4e1ef559）',
+render(){
+  return `<div class="desc">第 ③ 页那张"按设备查表选子类"的模式，SGLang 正在系统性地拆掉。前一阶段的 <code>4e1ef559</code>（NPU Graph refactor: delete npu_graph_runner）刚把 decode 阶段的 <code>NPUGraphRunner</code> 用同样手法删了，套路是：</div>
+  <table class="cmp">
+    <tr><th>老模式（子类携带设备差异）</th><th>新模式（backend 吸收设备差异）</th></tr>
+    <tr><td>每种设备一个 runner 子类，override <code>_cache_loc_dtype</code> / <code>_replay_graph</code> / …</td><td>差异全部下沉到 backend：<code>cache_loc_dtype</code> 变成 backend 属性、NPU 的回放准备变成 <code>NPUCudaGraphBackend.replay()</code> 内部分支、runner 通过 <code>bind_decode_runner</code> 把自己交给 backend</td></tr>
+    <tr><td>worker 里 <code>Device2XxxRunner</code> 查表，设备越多表越长</td><td>表坍缩成一行：所有设备用同一个类，backend 由 <code>resolve_decode_backend</code> 按 <code>model_runner.device</code> 选</td></tr>
+  </table>
+  <p>照这个手术，<code>EAGLEDraftNpuGraphRunner</code> 的 5 个 override 各有归宿：</p>
+  <table class="cmp">
+    <tr><th>override</th><th>去向</th></tr>
+    <tr><td><code>_cache_loc_dtype</code>（int32）</td><td>删。父类把 backend 创建提前、改读 <code>backend.cache_loc_dtype</code>（NPU backend 已经声明了 int32）</td></tr>
+    <tr><td><code>_replay_graph</code>（逐 step 重绑）</td><td>搬进 <code>NPUCudaGraphBackend.replay()</code> 的 EAGLE 分支——backend 的 <code>replay_with_input_update</code> 本来就为"一份列表一个 draft step"留了入口</td></tr>
+    <tr><td><code>can_run_graph</code>（DP 投票）</td><td>上移进父类 <code>can_run_graph</code>——分歧挂死在哪个设备上都可能发生，这不是 NPU 特有问题</td></tr>
+    <tr><td>arch 映射两个方法</td><td>直接删（死代码），属性名坍缩成常量 <code>"actual_seq_lengths_kv"</code></td></tr>
+    <tr><td>整文件 + 查表项</td><td>删 <code>eagle_draft_npu_graph_runner.py</code>，<code>eagle_worker_v2.py:465</code> 的表少一项</td></tr>
+  </table>
+  <p>删完之后第 ③ 页的图变成：<code>EAGLEDraftCudaGraphRunner</code> 不再有 NPU 子类，直接配 <code>NPUCudaGraphBackend</code>；draft-extend 的姊妹类（<code>EAGLEDraftExtendNpuGraphRunner</code> 等）按同款手术排队。</p>
+  <div class="warn">细节和风险清单在 docs 仓的设计文档里：<a href="../FE/RemoveEAGLEDraftNpuGraphRunner设计方案/remove_eagle_draft_npu_graph_runner_design.md">FE/RemoveEAGLEDraftNpuGraphRunner设计方案</a>。读完这一页再去看那份文档，术语应该都对得上。</div>
+  <h3>代码入口速查</h3>
+  <table class="cmp">
+    <tr><th>是什么</th><th>位置</th></tr>
+    <tr><td>本类（107 行）</td><td class="loc">python/sglang/srt/hardware_backend/npu/graph_runner/eagle_draft_npu_graph_runner.py</td></tr>
+    <tr><td>父类：buffer / capture / execute / can_run_graph</td><td class="loc">python/sglang/srt/speculative/eagle_draft_cuda_graph_runner.py</td></tr>
+    <tr><td>创建与查表</td><td class="loc">python/sglang/srt/speculative/eagle_worker_v2.py:455-486</td></tr>
+    <tr><td>NPU backend（录制 / update+replay / fence）</td><td class="loc">python/sglang/srt/hardware_backend/npu/graph_runner/npu_cudagraph_backend.py</td></tr>
+    <tr><td>draft_forward（图里录的那个函数，含 3 步循环）</td><td class="loc">python/sglang/srt/speculative/eagle_worker_v2.py:700-830</td></tr>
+    <tr><td>背景：CUDA graph 与两种 backend</td><td class="loc">learn/sglang-cudagraph-viz.html</td></tr>
+  </table>`;
+}});
+
+// ---------- 导航 ----------
+let cur = 0;
+const nav = document.getElementById('nav');
+nav.innerHTML = TABS.map((s, i) => `<button data-i="${i}">${esc(s.nav)}</button>`).join('');
+nav.querySelectorAll('button').forEach(b => b.onclick = () => go(+b.dataset.i));
+function go(i) {
+  cur = i;
+  const s = TABS[cur];
+  document.getElementById('title').textContent = s.title;
+  document.getElementById('stage').innerHTML = s.render();
+  if (s.after) s.after();
+  nav.querySelectorAll('button').forEach((b, j) =>
+    j === cur ? b.setAttribute('aria-current', 'step') : b.removeAttribute('aria-current'));
+}
+go(0);
+</script>
+</body>
+</html>
