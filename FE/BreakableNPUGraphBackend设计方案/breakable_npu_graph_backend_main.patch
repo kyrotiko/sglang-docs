@@ -1,0 +1,267 @@
+diff --git a/python/sglang/srt/hardware_backend/npu/graph_runner/breakable_npu_graph_backend.py b/python/sglang/srt/hardware_backend/npu/graph_runner/breakable_npu_graph_backend.py
+new file mode 100644
+index 0000000..58e11c3
+--- /dev/null
++++ b/python/sglang/srt/hardware_backend/npu/graph_runner/breakable_npu_graph_backend.py
+@@ -0,0 +1,61 @@
++"""NPU segment graphs using the existing breakable graph protocol."""
++
++from contextlib import contextmanager
++
++from sglang.srt.distributed.device_communicators.pynccl_allocator import set_graph_pool_id
++from sglang.srt.environ import envs
++from sglang.srt.model_executor.runner_backend.breakable_cuda_graph_backend import (
++    BreakableCudaGraphBackend,
++)
++from sglang.srt.runtime_context import get_flags, get_parallel
++
++
++class BreakableNPUGraphBackend(BreakableCudaGraphBackend):
++    def __init__(
++        self,
++        cuda_graph_runner,
++        *,
++        enable_memory_saver=False,
++        debug_eager=False,
++    ):
++        model_runner = cuda_graph_runner.model_runner
++        if model_runner.model_config.hf_config.model_type != "deepseek_v41":
++            raise NotImplementedError("This first NPU prefill profile targets DSV4.1")
++        if model_runner.is_draft_worker or not model_runner.spec_algorithm.is_none():
++            raise ValueError("Disable speculative decoding for the first NPU prefill profile")
++        parallel = get_parallel()
++        if (
++            parallel.pp_size != 1
++            or parallel.attn_dp_size != 1
++            or parallel.attn_cp_size != 1
++            or parallel.attn_dcp_size != 1
++            or parallel.moe_ep_size != 1
++        ):
++            raise ValueError("The first NPU prefill profile uses TP only")
++        if get_flags().capture.enable_torch_compile:
++            raise ValueError("NPU breakable prefill does not support torch.compile")
++        if envs.SGLANG_ENABLE_GRAPH_POOL_PRECARVE.get():
++            raise ValueError("CUDA graph pool precarve is not supported on NPU")
++        if envs.SGLANG_NPU_USE_MULTI_STREAM.get():
++            raise ValueError("Disable NPU multi-stream for the first prefill profile")
++        super().__init__(
++            cuda_graph_runner,
++            enable_memory_saver=enable_memory_saver,
++            debug_eager=debug_eager,
++        )
++
++    @contextmanager
++    def capture_session(self, stream):
++        if self._graphs:
++            raise RuntimeError("Call cleanup before recapturing NPU prefill graphs")
++        if self._pool is None:
++            self._pool = self._device_module.graph_pool_handle()
++        set_graph_pool_id(self._pool)
++        self._capture_stream = stream
++        self._shared_output_buffer = None
++        self.deduped_cuda_graph = None
++        try:
++            with self.replay_session():
++                yield
++        finally:
++            self._capture_stream = None
+diff --git a/python/sglang/srt/layers/engram.py b/python/sglang/srt/layers/engram.py
+index 7d8e7c4..6b03d8d 100644
+--- a/python/sglang/srt/layers/engram.py
++++ b/python/sglang/srt/layers/engram.py
+@@ -1489,7 +1489,7 @@ class Engram(nn.Module):
+         # The lookup runs first even for an idle DP-attention batch: under DP
+         # attention it is a collective every rank has to join.
+         if (
+-            self.embed.staged_by_scheduler
++            (self.embed.staged_by_scheduler or x.device.type == "npu")
+             and forward_batch is not None
+             and forward_batch.forward_mode.is_extend_without_speculative()
+             and is_in_breakable_cuda_graph()
+diff --git a/python/sglang/srt/model_executor/runner/prefill_cuda_graph_runner.py b/python/sglang/srt/model_executor/runner/prefill_cuda_graph_runner.py
+index 810da1e..3d251c7 100644
+--- a/python/sglang/srt/model_executor/runner/prefill_cuda_graph_runner.py
++++ b/python/sglang/srt/model_executor/runner/prefill_cuda_graph_runner.py
+@@ -2057,6 +2057,7 @@ class PrefillCudaGraphRunner(BaseCudaGraphRunner):
+         )
+         # The n-gram hasher runs outside the graph and reads this at replay.
+         static_forward_batch.ngram_embedding_info = forward_batch.ngram_embedding_info
++        static_forward_batch.out_cache_loc_dsv4 = forward_batch.out_cache_loc_dsv4
+         static_forward_batch.engram_history = forward_batch.engram_history
+         # The engram lookup break reads the staged rows at replay.
+         static_forward_batch.engram_staged_rows = forward_batch.engram_staged_rows
+diff --git a/python/sglang/srt/model_executor/runner_backend/utils.py b/python/sglang/srt/model_executor/runner_backend/utils.py
+index 9857fe3..36a8e46 100644
+--- a/python/sglang/srt/model_executor/runner_backend/utils.py
++++ b/python/sglang/srt/model_executor/runner_backend/utils.py
+@@ -111,6 +111,19 @@ def resolve_prefill_backend(
+     cfg = get_exec().graph.cuda_graph_config
+     backend_name = cfg.prefill.backend if cfg is not None else Backend.BREAKABLE
+ 
++    if cuda_graph_runner.model_runner.device == "npu":
++        if backend_name != Backend.BREAKABLE:
++            raise ValueError("NPU prefill graph only supports 'breakable'")
++        from sglang.srt.hardware_backend.npu.graph_runner.breakable_npu_graph_backend import (
++            BreakableNPUGraphBackend,
++        )
++
++        return BreakableNPUGraphBackend(
++            cuda_graph_runner,
++            enable_memory_saver=get_exec().features.enable_memory_saver,
++            debug_eager=get_exec().graph.debug_cuda_graph,
++        )
++
+     if backend_name == Backend.BREAKABLE:
+         return BreakableCudaGraphBackend(
+             cuda_graph_runner,
+diff --git a/python/sglang/srt/model_executor/runner_backend_utils/breakable_cuda_graph/breakable_cuda_graph.py b/python/sglang/srt/model_executor/runner_backend_utils/breakable_cuda_graph/breakable_cuda_graph.py
+index 34dfa59..4b423b1 100644
+--- a/python/sglang/srt/model_executor/runner_backend_utils/breakable_cuda_graph/breakable_cuda_graph.py
++++ b/python/sglang/srt/model_executor/runner_backend_utils/breakable_cuda_graph/breakable_cuda_graph.py
+@@ -38,7 +38,7 @@ except ImportError:
+ from sglang.srt.model_executor.runner_backend_utils.breakable_cuda_graph.cuda_utils import (
+     checkCudaErrors,
+ )
+-from sglang.srt.utils import get_device_module, is_hip, is_xpu
++from sglang.srt.utils import get_device_module, is_hip, is_npu, is_xpu
+ 
+ _is_xpu = is_xpu()
+ 
+@@ -87,12 +87,20 @@ def _capture_status(stream_ptr: int) -> "rt.cudaStreamCaptureStatus":
+     return status
+ 
+ 
++def _device_graph_cls():
++    if is_npu():
++        return torch.npu.NPUGraph
++    if _is_xpu:
++        return torch.xpu.XPUGraph
++    return torch.cuda.CUDAGraph
++
++
+ def _is_stream_capturing(stream: torch.Stream) -> bool:
+     # On ROCm/HIP and XPU, cuda-python is unavailable, so use the portable torch
+     # API (which maps to the HIP / XPU runtime). On NVIDIA, keep querying the
+     # CUDA runtime directly via cuda-python: torch.cuda.is_current_stream_capturing()
+     # has proven unreliable there, so we preserve the original behavior.
+-    if is_hip() or _is_xpu:
++    if is_npu() or is_hip() or _is_xpu:
+         with get_device_module().stream(stream):
+             return get_device_module().is_current_stream_capturing()
+     return (
+@@ -355,7 +363,7 @@ class BreakableCUDAGraphCapture:
+         return False
+ 
+     def _begin_new_segment(self) -> None:
+-        graph_cls = torch.xpu.XPUGraph if _is_xpu else torch.cuda.CUDAGraph
++        graph_cls = _device_graph_cls()
+         # keep_graph retains the raw graph for dedup; skip it on the plain path.
+         # Dedup is CUDA-only (it introspects the raw graph via cuda-python), so
+         # XPU always takes the plain path below.
+diff --git a/python/sglang/srt/models/deepseek_v4.py b/python/sglang/srt/models/deepseek_v4.py
+index 63e5ba1..2472e9b 100644
+--- a/python/sglang/srt/models/deepseek_v4.py
++++ b/python/sglang/srt/models/deepseek_v4.py
+@@ -1,6 +1,7 @@
+ from __future__ import annotations
+ 
+ import concurrent.futures
++import copy
+ import functools
+ import logging
+ import time
+@@ -992,6 +993,56 @@ bcg_deepseek_v4_exit_late_layer_tail = eager_on_graph(
+ )
+ 
+ 
++def _npu_bcg_live_batch():
++    batch = copy.copy(get_tc_piecewise_forward_context().forward_batch)
++    n = batch.global_num_token_non_padded_cpu
++    batch.out_cache_loc = batch.out_cache_loc[:n]
++    batch.positions = batch.positions[:n]
++    if batch.input_ids is not None:
++        batch.input_ids = batch.input_ids[:n]
++    batch.extend_num_tokens = n
++    return batch, n
++
++
++@eager_on_graph
++def bcg_dsv4_npu_store_cache(layer_id, kv) -> None:
++    batch, n = _npu_bcg_live_batch()
++    if n:
++        get_attn_backend().store_cache(
++            layer_id=layer_id, swa_k=kv[:n], forward_batch=batch
++        )
++
++
++@eager_on_graph
++def bcg_dsv4_npu_sources(layer, x, q_lora, positions) -> None:
++    batch, n = _npu_bcg_live_batch()
++    if not n:
++        return
++    backend = get_attn_backend()
++    if layer.compress_ratio in (1, 2):
++        if layer.compressor is not None or layer.indexer is not None:
++            # Requires the independent V4.1 low-ratio NPU eager implementation.
++            backend.forward_low_ratio_sources(
++                layer=layer,
++                x=x[:n],
++                q_lora=q_lora[:n],
++                positions=positions[:n],
++                forward_batch=batch,
++            )
++        return
++    if layer.indexer is not None:
++        layer.indexer(
++            x=x[:n],
++            q_lora=q_lora[:n],
++            forward_batch=batch,
++            attn_backend=backend,
++        )
++    if layer.compressor is not None:
++        backend.forward_core_compressor(
++            x[:n], batch, layer.layer_id, layer.compressor
++        )
++
++
+ class MqaAttentionBase(nn.Module):
+     # Class-level default for subclasses that read it without running __init__.
+     wo_a_fp8: bool = False
+@@ -2453,11 +2504,17 @@ class MQALayer(MqaAttentionBase):
+                     forward_batch,
+                     torch.cuda.current_stream(),
+                 )
+-            attn_backend.store_cache(
+-                layer_id=self.layer_id,
+-                swa_k=kv_for_cache,
+-                forward_batch=forward_batch,
+-            )
++            if (
++                forward_batch.forward_mode.is_extend_without_speculative()
++                and is_in_breakable_cuda_graph()
++            ):
++                bcg_dsv4_npu_store_cache(self.layer_id, kv_for_cache)
++            else:
++                attn_backend.store_cache(
++                    layer_id=self.layer_id,
++                    swa_k=kv_for_cache,
++                    forward_batch=forward_batch,
++                )
+             kv = None
+             if q_out is not None:
+                 q_out.copy_(q)
+@@ -2537,7 +2594,13 @@ class MQALayer(MqaAttentionBase):
+ 
+         del qkv_a
+ 
+-        if self.compress_ratio in (1, 2) and (
++        if (
++            _is_npu
++            and forward_batch.forward_mode.is_extend_without_speculative()
++            and is_in_breakable_cuda_graph()
++        ):
++            bcg_dsv4_npu_sources(self, x, q_lora, positions)
++        elif self.compress_ratio in (1, 2) and (
+             self.compressor is not None or self.indexer is not None
+         ):
+             if _low_ratio_sources_break(attn_backend, forward_batch):
