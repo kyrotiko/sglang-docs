@@ -202,6 +202,8 @@ return is_bs_supported
 
 **风险（跨设备行为变更）**：CUDA/XPU/MUSA 在上述组合下从"各 rank 本地决策"变为"全员一票否决转 eager"——正确性严格更好（消除潜在 collective 挂死），但触发组合下每次 draft 多一次 CPU all_reduce。验证：CUDA 侧 DSA+attn-DP 回归一条（无环境则单测 mock `tp_group` 验证门控路径）。若回归不过，退路是加 backend 属性 `needs_uniform_graph_decision`（NPU True）门控投票，一行改动。
 
+> 逐变量设备无关性审计、参与对称性论证与跨设备影响明细见[配套分析](dp_vote_promotion_analysis.md)。
+
 ### 4.4 死代码删除
 
 `_init_arch_map` / `_get_update_attr_*` / `attr_name`、`attr_type` 字典及相关 import 随文件删除，无替代品。

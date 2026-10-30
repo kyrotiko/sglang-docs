@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>draft_extend 是什么：EAGLE 投机解码里草稿模型的"对账"前向</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:#fafafa;color:#222;line-height:1.6}
+header{padding:14px 24px;background:#1f2937;color:#fff}
+header h1{margin:0;font-size:19px}
+nav.steps{display:flex;flex-wrap:wrap;gap:6px;padding:10px 24px;background:#fff;border-bottom:1px solid #ddd}
+nav.steps button{border:1px solid #bbb;background:#fff;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:14px}
+nav.steps button[aria-current="step"]{background:#1f2937;color:#fff;border-color:#1f2937}
+main{padding:14px 24px;max-width:1320px}
+h2{margin:4px 0 8px;font-size:18px}
+h3{font-size:15px;margin:14px 0 6px}
+.desc{background:#fff;border-left:4px solid #1f2937;padding:8px 14px;margin-bottom:12px}
+.warn{background:#fff7ed;border-left:4px solid #c2410c;padding:8px 14px;margin:10px 0}
+.note{font-size:13px;color:#555}
+.info{background:#fff8e1;border:1px solid #e8c86a;border-radius:6px;padding:8px 12px;margin:8px 0;min-height:48px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.bar button{padding:5px 14px;font-size:14px;cursor:pointer;background:#fff;border:1px solid #888;border-radius:4px}
+button:focus-visible,[tabindex]:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+code{background:#eef;padding:0 4px;border-radius:3px;font-size:13px}
+a{color:#1d4ed8}
+/* 颜色角色（与本系列其他页一致）：橙=draft小模型 蓝=target大模型 绿=接受 紫=root/提议 青=seed */
+.c-blue{--c:#2563eb}.c-org{--c:#c2410c}.c-grn{--c:#15803d}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+/* 流程图 */
+.flow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin:10px 0}
+.fbox{all:unset;box-sizing:border-box;display:block;cursor:pointer;background:#fff;border:2px solid var(--c);border-radius:8px;padding:8px 12px;font-size:13px;text-align:center;min-width:150px}
+.fbox b{color:var(--c);font-size:14px;display:block}
+.fbox small{color:#666;font-size:11px}
+.fbox.sel{background:#fffbea;box-shadow:0 0 0 3px #f59e0b}
+.farr{font-size:20px;color:#94a3b8;align-self:center}
+.loopwrap{border:2px dashed #cbd5e1;border-radius:12px;padding:12px;margin:10px 0}
+.looplab{text-align:center;font-size:12px;color:#64748b;margin-bottom:6px}
+.protag{display:inline-block;background:var(--c);color:#fff;font-size:10px;border-radius:8px;padding:0 6px;margin-top:3px}
+/* token 行 */
+.toks{display:flex;gap:4px;flex-wrap:wrap;align-items:stretch;margin:8px 0}
+.tok{min-width:40px;padding:5px 7px;border-radius:6px;border:2px solid #999;background:#fff;text-align:center;font-size:15px}
+.tok small{display:block;font-size:10px;color:#666}
+.tok.ctx{background:#f1f5f9;border-color:#94a3b8}
+.tok.dr{border-color:#c2410c;background:#fff7ed}
+.tok.vfy{border-color:#2563eb}
+.tok.ok{border-color:#15803d;background:#dcfce7}
+.tok.bad{border-color:#c2410c;background:#fee2e2;opacity:.75}
+.tok.fix{border-color:#15803d;background:#ecfdf5}
+.tok.root{border-color:#7e22ce;background:#f5f3ff}
+.tok.prop{border-color:#7e22ce;background:#f5f3ff;border-style:dashed;color:#6b21a8}
+.tok.ghost{border-style:dashed;color:#999;background:#fafafa}
+.tok.st{border-style:dashed;background:#f8fafc;color:#555;font-size:12px}
+.tok.hl{box-shadow:0 0 0 3px #f59e0b}
+/* 双世界对照 */
+.tracks{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px;margin:10px 0}
+.trklab{font-size:12px;color:#555;margin:4px 0 2px}
+.seedchip{display:inline-flex;align-items:center;gap:6px;border:2px solid #0d9488;background:#f0fdfa;color:#134e4a;border-radius:8px;padding:4px 10px;font-size:12px;margin:4px 0}
+/* 职责三卡 */
+.jobs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0;max-width:1100px}
+.job{border:2px solid #ddd;border-radius:8px;padding:8px 10px;background:#fff;font-size:13px;opacity:.45}
+.job b{display:block;font-size:14px}
+.job.on{opacity:1;border-color:#15803d;background:#f0fdf4}
+.machine{border:3px solid #c2410c;border-radius:12px;padding:8px 20px;background:#fff7ed;font-weight:600;color:#7c2d12;display:inline-block;margin:8px 0}
+/* 链路 */
+.chain{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+.chub{border:2px solid #64748b;background:#fff;border-radius:8px;padding:6px 10px;font-size:13px}
+.chub small{display:block;color:#666;font-size:11px}
+.chub.warn{border-color:#c2410c;background:#fff7ed}
+.chub.ok{border-color:#15803d;background:#f0fdf4}
+.charr{font-size:18px;color:#94a3b8}
+/* 请求分组形状 */
+.req{display:inline-flex;flex-direction:column;border:1px dashed #94a3b8;border-radius:8px;padding:4px;margin:4px}
+.req .rlab{font-size:10px;color:#666;text-align:center}
+.req .toks{margin:0}
+table.cmp{border-collapse:collapse;font-size:14px;margin:8px 0;width:100%;max-width:1150px}
+table.cmp td,table.cmp th{border:1px solid #ddd;padding:6px 10px;text-align:left;vertical-align:top}
+table.cmp th{background:#f3f4f6}
+</style>
+</head>
+<body>
+<header><h1>draft_extend：EAGLE 投机解码里，草稿模型的"对账"前向 —— 为什么有它、它干什么、和你要验证的代码有什么关系</h1></header>
+<nav class="steps" id="nav" aria-label="页面导航"></nav>
+<main>
+  <h2 id="title" tabindex="-1"></h2>
+  <div id="stage"></div>
+</main>
+<script>
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TABS = [];
+function tk(t, cls, sub){ return '<div class="tok ' + (cls||'') + '">' + esc(t) + (sub ? '<small>' + sub + '</small>' : '') + '</div>'; }
+
+// ================= Tab 1：循环全景 =================
+const FLOW = [
+ {c:'c-blue', t:'prefill', s:'target · 一趟读完 prompt', d:'大模型把整段 prompt 一次读入，KV 入库。这一步没有投机解码的事——但 draft（小模型）要上工，需要先知道 prompt 说了什么、并且拿到自己的初始状态，所以接下来有第一次 draft-extend。'},
+ {c:'c-org', t:'draft-extend ①', s:'draft · 播种', star:1, d:'draft 用一次 extend 形态的前向把 prompt 过一遍（建立自己的 KV / 隐状态），并在<b>每个请求的最后一个位置</b>上产出：第一轮循环的 root 提议（第一个猜测的 token），以及 DSA 模型的 top-k seed。没有这一步，draft decode 的第一步就没有输入。'},
+ {c:'c-org', t:'draft decode ×N', s:'draft · 逐步猜（graph）', d:'小模型自回归连猜：每步吃 1 个 token、吐下一个的分布。N 步里只有 N−1 次真正的前向（最后一步只做挑选）——上一篇讲的 EAGLEDraftCudaGraphRunner 抓的就是这些前向。'},
+ {c:'c-blue', t:'target verify', s:'target · 一趟全验', d:'大模型把 root + 全部猜的 token 一次喂进去，一趟前向逐个验收（大模型本来就能一次算一串 token，这是投机解码成立的根基）。'},
+ {c:'c-grn', t:'对账', s:'接受前缀 + 修正', d:'接受猜中的前缀，一错就停，并采纳大模型在错位的修正 token。这一轮"真正定案"的 token = 接受的 + 修正的——它们是下一步 draft-extend 的输入。'},
+ {c:'c-org', t:'draft-extend ②', s:'draft · 对账 + 再播种', star:1, d:'<b>本页主角。</b>把这一轮定案的 token 一次喂回 draft，沿真实路径重放（状态从"假想未来"拉回现实）；在最后接受位上产出下一轮的 root 提议，DSA 模型再抓一份新的 seed。然后循环回到 draft decode。'},
+];
+let flowSel = 5;
+TABS.push({t:'循环全景：它站在哪', cur:0, n:1, render(){
+  const row1 = '<div class="flow">' + FLOW.slice(0,2).map((f,i)=>fbox(i)).join('<div class="farr">→</div>') + '</div>';
+  const loop = '<div class="loopwrap"><div class="looplab">↻ 每轮循环（这段在 decode 阶段反复转）</div><div class="flow">' +
+    [2,3,4,5].map(i=>fbox(i)).join('<div class="farr">→</div>') + '</div></div>';
+  return '<div class="desc">EAGLE 的一轮里，draft 模型要做<b>两种形态完全不同</b>的前向：<b>draft decode</b>（每请求 1 个 token，逐步往<b>假想的未来</b>猜）和 <b>draft extend</b>（每请求一串 token，把状态<b>拉回现实</b>）。后者在循环里出现两次：开头播种一次（①）、每轮结尾对账一次（②）。点击方块看每个环节干什么。</div>'
+   + row1 + loop
+   + '<div class="info" id="finfo">' + FLOW[flowSel].d + '</div>'
+   + cmpTable();
+}});
+function fbox(i){ const f=FLOW[i];
+  return '<button class="fbox ' + f.c + (i===flowSel?' sel':'') + '" onclick="selFlow(' + i + ')"><b>' + f.t + '</b><small>' + f.s + '</small>' + (f.star?'<span class="protag">本页主角</span>':'') + '</button>'; }
+function selFlow(i){ flowSel=i; refresh(); }
+function cmpTable(){
+  return '<h3>draft 的两种前向：一张表看清差别</h3><table class="cmp"><tr><th></th><th><span class="dot" style="background:#c2410c"></span>draft decode</th><th><span class="dot" style="background:#c2410c"></span>draft extend</th></tr>'
+  + '<tr><td>每次喂多少</td><td>每请求 <b>1</b> 个 token</td><td>每请求<b>一串</b> token（这轮定案的 / prompt）</td></tr>'
+  + '<tr><td>往哪个方向走</td><td>往<b>假想的未来</b>推进</td><td>把状态<b>拉回现实</b>（对账）</td></tr>'
+  + '<tr><td>graph runner</td><td><code>EAGLEDraftCudaGraphRunner</code>（上一篇的主角）</td><td><code>EAGLEDraftExtendCudaGraphRunner</code>（独立的另一个）</td></tr>'
+  + '<tr><td>顺产的东西</td><td>一棵候选 token 树</td><td>下一轮 root 提议 + DSA seed</td></tr></table>';
+}
+
+// ================= Tab 2：世界分叉（核心） =================
+const W_CTX=['今','天','天'], W_ROOT='气', W_G=['很','好','，'], W_FIX='真', W_PROP='的';
+const W_STEPS=['起点','连猜','验证','分叉','对齐','顺产'];
+const W_DESC=[
+ '起点。context [今 天 天] 已在两个模型的 KV 里；<b>气</b> 是<b>上一轮</b> draft-extend 在上一个最后接受位提议、并被验证采纳的 root。此刻两个世界完全一致。',
+ 'draft decode：小模型自回归连猜——每步吃 1 个 token、吐下一个的分布，3 步猜出 <b>很、好、，</b>。draft 的状态随之推进到"，"之后。注意：这是它<b>自己想象出来的未来</b>。',
+ 'target verify：大模型一趟前向把 <b>气 很 好 ，</b> 4 个新 token 全部验掉。大模型还没发表意见，两个世界的分歧在下一步揭晓。',
+ '对账：<b>很✓ 好✓ ，✗</b>（修正为 <b>真</b>）。两个世界从"好"之后<b>分叉</b>：draft 的状态停在假想的"，"之后，现实却是"真"。下一轮必须从 真 出发——draft 眼里的世界作废了一截。',
+ '<b>draft-extend（本页主角）</b>：把这一轮真正定案的 <b>很 好 真</b> 一次喂进 draft，沿真实路径<b>重放一趟</b>。draft 的世界被改写："，"退场、"真"入列，状态推进到 真 之后——两个世界重新对齐。',
+ '收尾顺产（都在 <b>真</b> 这个最后接受位上）：draft 的 logits 给出下一轮第一个猜测 <b>的</b>（= 新 root）；DSA-MTP 模型还把 indexer 的 top-k 拍照存为 <b>seed</b>。循环回到 draft decode，新一轮开始。',
+];
+TABS.push({t:'核心：两个世界分叉了', cur:0, n:6, render(){
+  const s=this.cur;
+  return '<div class="desc">draft extend 存在的理由一句话：<b>draft 沿着自己猜的路径走，target 却只认其中一段——两个世界分叉了。</b>点"下一步"看分叉怎么产生、又怎么被对齐。上排是 draft 眼中的世界，下排是现实世界。</div>'
+  + ctr(s,6)
+  + '<div class="tracks">' + draftTrack(s) + realityTrack(s) + '</div>'
+  + (s===3?'<div class="warn"><b>分叉了：</b>"好"之后，draft 认为下一个是"，"，现实是"真"。draft 的状态（KV / 隐状态）还停在假想终点；而下一轮猜 token 必须从 真 出发——所以先对账，再猜。</div>':'')
+  + '<div class="info">' + W_DESC[s] + '</div>';
+}});
+function draftTrack(s){
+  let h='<div class="trklab"><span class="dot" style="background:#c2410c"></span>draft 眼中的世界（小模型一路"吃"到这）</div><div class="toks">';
+  h += W_CTX.map(t=>tk(t,'ctx')).join('') + tk(W_ROOT,'root','root');
+  if(s===1||s===2||s===3) h += W_G.map((t,i)=>tk(t,'dr','猜'+(i+1))).join('') + tk('状态→','st');
+  if(s===4||s===5) h += tk(W_G[0],'dr') + tk(W_G[1],'dr') + tk(W_FIX,'fix','重放') + tk('状态→','st');
+  if(s===5) h += tk(W_PROP,'prop','下一轮root');
+  h+='</div>';
+  if(s===5) h+='<div class="seedchip">🌱 seed：top-k 拍照存档（在 真 的位置，DSA-MTP 模型）</div>';
+  if(s===0) h+='<div class="note">大模型还没出手，此刻两行一模一样。</div>';
+  return h;
+}
+function realityTrack(s){
+  let h='<div class="trklab"><span class="dot" style="background:#2563eb"></span>现实世界（target 定案）</div><div class="toks">';
+  h += W_CTX.map(t=>tk(t,'ctx')).join('');
+  if(s<=1){ h += tk(W_ROOT,'root','root') + tk('…','ghost','还没轮到大模型'); }
+  else if(s===2){ h += tk(W_ROOT,'vfy') + W_G.map((t,i)=>tk(t,'vfy','验'+(i+1))).join(''); }
+  else{
+    h += tk(W_ROOT,'root','✓');
+    const hl = s>=4 ? ' hl' : '';
+    h += tk(W_G[0],'ok'+hl,'✓') + tk(W_G[1],'ok'+hl,'✓') + tk(W_G[2],'bad','✗') + tk(W_FIX,'fix'+hl,'修正');
+    if(s>=4) h += '<div class="note" style="align-self:center">← 这 3 个一次喂进 draft（draft-extend）</div>';
+  }
+  h+='</div>';
+  return h;
+}
+
+// ================= Tab 3：一次干的三件事 =================
+const J_STEPS=['输入','前向','提议','抓seed'];
+const J_DESC=[
+ '输入就位：这一轮<b>定案的 token</b> [很 好 真]，每个都带着 target 验证时顺手产出的隐状态（EAGLE 的 draft 吃的是 (token, 隐状态) 对，不是光秃秃的 token）。',
+ '一趟前向把 [很 好 真] 过完。<b>职责 ① 状态重同步：</b>draft 的 KV / 隐状态沿真实路径重建——上一张图里的"分叉"在这里被抹平。这一步是 draft-extend 的本体。',
+ '<b>职责 ② 提议：</b>在<b>最后接受位</b>（真）上，draft 的输出分布选出下一轮的第一个猜测 <b>的</b>——它就是下一轮的 root。所以"draft decode 从哪开始猜"的答案是：从 draft-extend 的提议开始。',
+ '<b>职责 ③ 抓 seed（仅 DSA-MTP 模型）：</b>同一个最后接受位上，把 indexer 的 top-k（"接下来该重点关注哪些历史 token"）拍照存进 buffer。下一轮所有 draft 步都复用这一份（IndexShare），不用每步重算。',
+];
+TABS.push({t:'它一次干的三件事', cur:0, n:4, render(){
+  const s=this.cur;
+  const jobs=[
+   ['① 状态重同步','把 draft 的世界改写回现实：重放定案 token，KV / 隐状态沿真实路径重建。'],
+   ['② 提议下一轮 root','在最后接受位读 draft logits，选出下一轮第一个猜测（topk=1 时就是 top-1）。'],
+   ['③ 抓 DSA seed','同一位置把 indexer top-k 存进 buffer，供下一轮所有 draft 步复用（IndexShare）。'],
+  ];
+  return '<div class="desc">对账之外，draft-extend 在<b>最后接受位</b>上还顺产两个东西：下一轮的 root 提议、（DSA 模型的）top-k seed。三个职责点亮到当前步。</div>'
+  + ctr(s,4)
+  + '<div class="toks">' + tk(W_G[0],'dr','＋h') + tk(W_G[1],'dr','＋h') + tk(W_FIX,'fix' + (s===0?' hl':''),'＋h') + '</div>'
+  + '<div class="farr" style="text-align:left">↓</div>'
+  + '<div class="machine">draft 小模型 · 一次 extend 前向' + (s>=1?'（跑）':'（待命）') + '</div>'
+  + '<div class="jobs">' + jobs.map((j,i)=>'<div class="job' + (s>=i+1?' on':'') + '"><b>' + j[0] + '</b>' + j[1] + '</div>').join('') + '</div>'
+  + (s===3?'<div class="seedchip">🌱 seed buffer：top-k 位置清单（index_topk 个）→ 下一轮 draft 各步直接查表</div>':'')
+  + '<div class="info">' + J_DESC[s] + '</div>';
+}});
+
+// ================= Tab 4：为什么叫 extend =================
+TABS.push({t:'为什么叫 "extend"', cur:0, n:1, render(){
+  return '<div class="desc">凡是<b>"一次喂一串 token"的前向</b>都叫 extend 家族——target 侧的 prefill 就是最大的 extend。它和 decode 的输入形状完全不同，所以 draft 侧有两个<b>各自独立</b>的 graph runner。下面用 3 个请求示意形状差异。</div>'
+  + '<h3>decode 形态：每请求 1 个 token</h3>'
+  + '<div>' + req(0,[tk('气','dr')]) + req(1,[tk('的','dr')]) + req(2,[tk('好','dr')]) + '</div>'
+  + '<div class="note">batch 形状 <code>[3, ...]</code> —— 按 bs 分档（1,2,4,8,…），档位数有限 → 适合一张图装下 → <code>EAGLEDraftCudaGraphRunner</code>（上一篇的主角，你这次 PR 改的就是它）。</div>'
+  + '<h3>extend 形态：每请求一串（变长）</h3>'
+  + '<div>' + req(0,[tk('很','dr'),tk('好','dr'),tk('真','fix')]) + req(1,[tk('的','dr'),tk('不','dr')]) + req(2,[tk('好','dr')]) + '</div>'
+  + '<div class="note">所有请求的 token <b>摊平</b>成一个 <code>[6, ...]</code> 的序列，长度每轮都变 → 形状不可枚举 → 另一个独立 runner <code>EAGLEDraftExtendCudaGraphRunner</code>（按 token 数分档 / 走 eager）。</div>'
+  + '<div class="warn">所以看到 "draft-extend" 这个词，拆开读：<b>draft</b>（小模型干的）+ <b>extend</b>（多 token 前向形态）。"对账、提议、抓 seed" 是它<b>为什么存在</b>；"extend" 只是它<b>长什么样</b>（输入形状）。</div>';
+}});
+function req(i, toks){ return '<span class="req"><span class="rlab">请求' + i + '</span><span class="toks">' + toks.join('') + '</span></span>'; }
+
+// ================= Tab 5：连回你的代码 =================
+TABS.push({t:'连回场景 C 的代码', cur:0, n:1, render(){
+  return '<div class="desc">把这条链和你正在验证的代码连起来——最后一步就是你 PR 里搬进基类的那段投票。</div>'
+  + '<div class="chain">'
+  + '<div class="chub">draft-extend 抓 seed<small>最后接受位（本页 Tab3 ③）</small></div><div class="charr">→</div>'
+  + '<div class="chub">IndexShare 复用<small>下一轮所有 draft 步查同一份 top-k</small></div><div class="charr">→</div>'
+  + '<div class="chub warn">PD 分离部署：seed 异步传输<small>到达时刻各 rank 不同</small></div><div class="charr">→</div>'
+  + '<div class="chub warn">rank 间可能路径不一致<small>seed 到的想走 graph，没到的走 eager</small></div><div class="charr">→</div>'
+  + '<div class="chub ok">投票 all_reduce(MIN)<small>全员一票否决 → 一致走 eager</small></div>'
+  + '</div>'
+  + '<div class="info">draft forward 里有 TP/EP 集体通信，全员必须同走 graph 或同走 eager，否则挂死——投票就是把"各自决定"收敛成"最保守者的决定"。变量名 <code>seed_dsa_topk_from_draft_extend</code> 现在可以整句读出了：<b>DSA 的 top-k seed 取自 draft-extend 轮</b>（而非 draft-decode 第 0 步）。</div>'
+  + '<h3>本系列其他页</h3>'
+  + '<ul><li><a href="sglang-eagle-draft-npu-graph-runner-viz.html">EAGLE draft 图与 DP 投票</a>（draft decode 的 graph、投票一节）</li>'
+  + '<li><a href="sglang-npu-graph-update-viz.html">NPU graph.update 机制</a>（重绑怎么做到的）</li>'
+  + '<li><a href="../FE/RemoveEAGLEDraftNpuGraphRunner设计方案/dp_vote_promotion_analysis.md">投票上移基类的风险分析</a>（本次 PR 的配套文档）</li></ul>';
+}});
+
+// ================= 公共：计数器 / 步进 =================
+function ctr(s, n){
+  return '<div class="bar"><button onclick="mv(-1)">← 上一步</button><button onclick="mv(1)">下一步 →</button><span class="note">第 ' + (s+1) + ' / ' + n + ' 步</span></div>';
+}
+function mv(d){
+  const tb=TABS[curTab];
+  if(tb.n<=1) return;
+  tb.cur=Math.min(tb.n-1, Math.max(0, tb.cur+d));
+  refresh();
+}
+let curTab=0;
+function refresh(){
+  const stage=document.getElementById('stage');
+  stage.innerHTML=TABS[curTab].render();
+}
+function showTab(i){
+  curTab=i;
+  document.getElementById('title').textContent=(i+1)+'. '+TABS[i].t;
+  const btns=document.getElementById('nav').querySelectorAll('button');
+  btns.forEach((b,j)=>b.setAttribute('aria-current', j===i?'step':'false'));
+  refresh();
+}
+(function(){
+  if (typeof document==='undefined') return;
+  const nav=document.getElementById('nav');
+  TABS.forEach((tb,i)=>{
+    const b=document.createElement('button');
+    b.textContent=(i+1)+'. '+tb.t;
+    b.onclick=()=>showTab(i);
+    nav.appendChild(b);
+  });
+  showTab(0);
+})();
+if (typeof module!=='undefined' && module.exports) module.exports={TABS};
+</script>
+</body>
+</html>

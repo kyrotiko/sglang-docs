@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="1400" viewBox="0 0 1680 1400" role="img" aria-labelledby="title desc">
+  <title id="title">PR #32210 与 PR #32196：同一个缺 seed 问题的两条修复流程</title>
+  <desc id="desc">左侧是原始 PR #32210，在 NPU runner 中对 seed 可用性额外做 MIN 归约；右侧是 PR #32196，把输入兼容位放入 scheduler 已有的 metadata 交换。活跃 rank 缺 seed 投 0，idle rank 投 1，两种修复都使所有 rank 走 eager。右侧修复生效后，同一缺 seed 场景中再做 runner 投票仅得到 MIN(0,0)=0。图示以其它图条件全组一致且通过为前提。</desc>
+  <defs>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#4772b3"/></marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#25846b"/></marker>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#7b8796"/></marker>
+    <style>
+      text { font-family: "Microsoft YaHei", "Noto Sans CJK SC", "PingFang SC", sans-serif; fill: #172b40; }
+      .title { font-size: 32px; font-weight: 700; }
+      .subtitle { font-size: 19px; fill: #53667c; }
+      .heading { font-size: 28px; font-weight: 700; }
+      .step { font-size: 21px; font-weight: 600; }
+      .body { font-size: 19px; }
+      .small { font-size: 17px; fill: #53667c; }
+      .tiny { font-size: 15px; fill: #53667c; }
+      .ref { font-family: Consolas, "Microsoft YaHei", monospace; font-size: 13px; fill: #52677f; }
+      .code { font-family: Consolas, "Microsoft YaHei", monospace; font-size: 19px; }
+      .value { font-size: 24px; font-weight: 700; }
+      .bad { fill: #b34849; }
+      .good { fill: #13795f; }
+      .blue { fill: #285b9a; }
+      .line-blue { fill: none; stroke: #4772b3; stroke-width: 2.5; }
+      .line-green { fill: none; stroke: #25846b; stroke-width: 2.5; }
+    </style>
+  </defs>
+
+  <rect width="1680" height="1400" fill="#ffffff"/>
+  <text x="40" y="51" class="title">同一个缺 seed 场景，两次修复把“全员 eager”放在了哪里？</text>
+  <text x="40" y="79" class="subtitle">DSA MTP · attention DP &gt; 1 · 标准 seed 输入协议 · 其它图条件均满足且全组一致</text>
+
+  <rect x="40" y="100" width="1600" height="90" rx="14" fill="#f5f7fa" stroke="#dce3ec"/>
+  <text x="64" y="133" class="step">相同输入</text>
+  <text x="210" y="133" class="body bad">rank A：active，有请求，但 seed=None</text>
+  <text x="890" y="133" class="body">rank B：idle，没有请求，不需要 seed</text>
+  <text x="210" y="161" class="small">若只有本地 fallback：A 走 eager，B 仍走 graph，原始问题由此产生。</text>
+  <text x="210" y="181" class="ref">S0 · 示例输入；PD seed：eagle_disaggregation.py:80；idle stub：eagle_info.py:227（当前代码）</text>
+
+  <rect x="40" y="212" width="780" height="884" rx="18" fill="#f8faff" stroke="#b7ccef" stroke-width="2"/>
+  <rect x="860" y="212" width="780" height="884" rx="18" fill="#f6fbf8" stroke="#a9d6c3" stroke-width="2"/>
+  <text x="64" y="253" class="heading blue">原来 · PR #32210</text>
+  <text x="64" y="282" class="subtitle">原始合入版 @db9143ee08（2026-07-27）</text>
+  <text x="884" y="253" class="heading good">后来 · PR #32196</text>
+  <text x="884" y="282" class="subtitle">当前源码 @925d7d8676（含 #32196 修复）</text>
+  <line x1="64" y1="303" x2="796" y2="303" stroke="#d4e0f2"/>
+  <line x1="884" y1="303" x2="1616" y2="303" stroke="#cfe5da"/>
+
+  <rect x="64" y="326" width="732" height="84" rx="12" fill="#fff" stroke="#c6d6ee"/>
+  <text x="86" y="358" class="step">① 原有 scheduler 同步</text>
+  <text x="86" y="389" class="body">没有表达“本轮 draft 缺 seed”的独立兼容位。</text>
+  <text x="86" y="405" class="ref">L1 · dp_attn.py:99 / MLPSyncBatchInfo._get_local_tensor()</text>
+  <rect x="884" y="326" width="732" height="84" rx="12" fill="#fff" stroke="#bcdccf"/>
+  <text x="906" y="358" class="step">① 构造当前 decode 输入，记录 seed 兼容性</text>
+  <text x="906" y="389" class="code">EagleDraftInput.cuda_graph_compatible</text>
+  <text x="906" y="405" class="ref">R1 · eagle_disaggregation.py:124 / build_eagle_disagg_draft_input()</text>
+
+  <path d="M430 410V422H241V446 M430 422H619V446" class="line-blue"/>
+  <path d="M1250 410V428H1061V446 M1250 428H1439V446" class="line-green"/>
+  <rect x="64" y="446" width="354" height="124" rx="12" fill="#fff3f2" stroke="#edc5c2"/>
+  <text x="84" y="476" class="step">② rank A · active</text>
+  <text x="84" y="508" class="code">seed_ready=False</text>
+  <text x="84" y="546" class="value bad">本地图 True AND False → 0</text>
+  <text x="84" y="563" class="ref">L2A · eagle_draft_npu_graph_runner.py:70</text>
+  <rect x="442" y="446" width="354" height="124" rx="12" fill="#fff" stroke="#c6d6ee"/>
+  <text x="462" y="476" class="step">② rank B · idle</text>
+  <text x="462" y="508" class="code">seed_ready=True</text>
+  <text x="462" y="546" class="value blue">本地图 True AND True → 1</text>
+  <text x="462" y="563" class="ref">L2B · eagle_draft_npu_graph_runner.py:70</text>
+
+  <rect x="884" y="446" width="354" height="124" rx="12" fill="#fff3f2" stroke="#edc5c2"/>
+  <text x="904" y="476" class="step">rank A · active</text>
+  <text x="904" y="508" class="body">所需 seed 缺失</text>
+  <text x="904" y="546" class="value bad">compatible=False → 0</text>
+  <text x="904" y="563" class="ref">R1A · eagle_disaggregation.py:131</text>
+  <rect x="1262" y="446" width="354" height="124" rx="12" fill="#fff" stroke="#bcdccf"/>
+  <text x="1282" y="476" class="step">rank B · idle</text>
+  <text x="1282" y="508" class="body">scheduler 对 idle 使用中性票</text>
+  <text x="1282" y="546" class="value good">本地兼容票 True → 1</text>
+  <text x="1282" y="563" class="ref">R1B · dp_attn.py:92 / idle → True</text>
+
+  <path d="M241 570V590H619V570 M430 590V612" class="line-blue"/>
+  <path d="M430 596V612" class="line-blue" marker-end="url(#arrow-blue)"/>
+  <path d="M1061 570V590H1439V570 M1250 590V612" class="line-green"/>
+  <path d="M1250 596V612" class="line-green" marker-end="url(#arrow-green)"/>
+
+  <rect x="64" y="612" width="732" height="102" rx="12" fill="#e6effe" stroke="#8caee0" stroke-width="2"/>
+  <text x="86" y="645" class="step blue">③ 新增一次 device all_reduce(MIN)</text>
+  <text x="86" y="678" class="value blue">MIN(0, 1) = 0 → 全组收到 False</text>
+  <text x="86" y="701" class="ref">L3 · eagle_draft_npu_graph_runner.py:78 / can_run_graph()</text>
+  <rect x="884" y="612" width="732" height="102" rx="12" fill="#def3e8" stroke="#80bba0" stroke-width="2"/>
+  <text x="906" y="645" class="step good">② 复用已有 MLP metadata 交换</text>
+  <text x="906" y="675" class="value good">兼容位列（索引 8）：MIN(0, 1) = 0</text>
+  <text x="906" y="694" class="tiny">兼容位随既有 metadata 交换；不增加一次 collective。</text>
+  <text x="906" y="710" class="ref">R2 · dp_attn.py:187（打包）→ :260（交换）→ :294（MIN）</text>
+
+  <path d="M430 714V756" class="line-blue" marker-end="url(#arrow-blue)"/>
+  <path d="M1250 714V756" class="line-green" marker-end="url(#arrow-green)"/>
+  <rect x="64" y="756" width="732" height="90" rx="12" fill="#fff" stroke="#c6d6ee"/>
+  <text x="86" y="789" class="step">④ NPU 子类 can_run_graph() 返回</text>
+  <text x="86" y="823" class="code">rank A=False；rank B=False</text>
+  <text x="86" y="840" class="ref">L4 · eagle_draft_npu_graph_runner.py:83 / return bool(decision.item())</text>
+  <rect x="884" y="756" width="732" height="90" rx="12" fill="#fff" stroke="#bcdccf"/>
+  <text x="906" y="789" class="step">③ 所有 rank 的 ForwardBatch 都携带</text>
+  <text x="906" y="823" class="code good">can_run_dp_draft_cuda_graph=False</text>
+  <text x="906" y="840" class="ref">R3 · dp_attn.py:348 → forward_batch_info.py:1089（另见 :961）</text>
+
+  <path d="M430 846V888" class="line-blue" marker-end="url(#arrow-blue)"/>
+  <path d="M1250 846V888" class="line-green" marker-end="url(#arrow-green)"/>
+  <rect x="64" y="888" width="732" height="94" rx="12" fill="#e7f4ed" stroke="#a0ccb6"/>
+  <text x="86" y="923" class="step good">⑤ worker：全员走 eager</text>
+  <text x="86" y="960" class="value good">rank A：eager　　rank B：eager</text>
+  <text x="86" y="978" class="ref">L5 · eagle_worker_v2.py:535 / EagleDraftWorker.draft() 的 else 分支</text>
+  <rect x="884" y="888" width="732" height="94" rx="12" fill="#fff" stroke="#bcdccf"/>
+  <text x="906" y="923" class="step">④ 公共 can_run_graph() 合取 DP draft 位</text>
+  <text x="906" y="960" class="code">本地图条件 AND False → False（所有 rank）</text>
+  <text x="906" y="978" class="ref">R4 · eagle_draft_cuda_graph_runner.py:388 / can_run_graph()；:395 返回</text>
+
+  <rect x="64" y="1018" width="732" height="58" rx="10" fill="#eef2f8"/>
+  <text x="86" y="1043" class="small">原始保护：在 runner 消费点消除分歧。</text>
+  <text x="86" y="1065" class="small">代价：单独增加一次 collective。</text>
+  <path d="M1250 982V1018" class="line-green" marker-end="url(#arrow-green)"/>
+  <rect x="884" y="1018" width="732" height="58" rx="10" fill="#e7f4ed" stroke="#a0ccb6"/>
+  <text x="906" y="1050" class="value good">⑤ rank A：eager　　rank B：eager</text>
+  <text x="906" y="1071" class="ref">R5 · eagle_worker_v2.py:722 / draft()；idle 的实际 forward 在 :972</text>
+
+  <rect x="40" y="1120" width="1600" height="104" rx="14" fill="#f4f5f7" stroke="#d8dee7"/>
+  <text x="64" y="1151" class="step">历史对照：若继续保留 d0258809d8 迁入的额外投票（当前源码已无该块）</text>
+  <text x="64" y="1195" class="body">scheduler：所有 rank 已得 False</text>
+  <text x="64" y="1216" class="ref">C1 · eagle_draft_cuda_graph_runner.py:388</text>
+  <path d="M394 1189H466" stroke="#7b8796" stroke-width="2.5" marker-end="url(#arrow-gray)"/>
+  <text x="488" y="1195" class="code">runner 再归约：MIN(0, 0) = 0</text>
+  <text x="488" y="1216" class="ref">C2 · 同文件 @d0258809d8:408（seed）/ :416（MIN）/ :421（返回）</text>
+  <path d="M1068 1189H1140" stroke="#7b8796" stroke-width="2.5" marker-end="url(#arrow-gray)"/>
+  <text x="1164" y="1195" class="step">仍然全员 eager，决策没变化</text>
+  <text x="1164" y="1216" class="ref">C3 · eagle_worker_v2.py:722（同 R5）</text>
+
+  <rect x="40" y="1248" width="1600" height="96" rx="14" fill="#e9f6ef" stroke="#a9d6bd"/>
+  <text x="64" y="1285" class="value good">对于 #32210 最初修复的缺 seed 问题，#32196 已经覆盖，额外 seed 投票重复。</text>
+  <text x="64" y="1320" class="body">图示前提：其它图条件全组一致。整段删除还需处理本地 bs / graph key 差异，见分析文档 §6。</text>
+  <text x="40" y="1374" class="tiny">L=原始 db9143ee08；R=当前 925d7d8676；C2=迁移态 d0258809d8。完整路径、函数和关键语句见 draft_seed_sync_code_map.md。</text>
+</svg>
