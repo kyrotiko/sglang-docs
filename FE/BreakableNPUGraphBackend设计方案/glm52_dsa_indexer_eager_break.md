@@ -6,6 +6,8 @@
 
 实现提交：`sglang@6ceb3d9fa7`，位于 `support_breakable_graph_back` 分支，包含运行时代码和 7 项 CPU 回归。
 
+真机反馈：该提交可以完成启动和捕图，但几个请求后仍然挂起、NPU 100%，尚未解决原问题。后续按[诊断日志采集说明](glm52_prefill_graph_debug.md)追踪实际 replay。
+
 [运行时代码单文件补丁](glm52_dsa_indexer_eager_break.patch) 可在基于上述提交、尚未包含此改动的服务器源码根目录用 `git apply /path/to/glm52_dsa_indexer_eager_break.patch` 应用。当前工作区主仓已应用，勿重复应用；应用后需重启服务重新捕图。
 
 ## 修改范围
