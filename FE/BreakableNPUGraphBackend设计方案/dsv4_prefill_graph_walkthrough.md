@@ -46,7 +46,72 @@ def wrapper(*args, **kwargs):
 | --- | --- | --- |
 | **warmup**（`capture_one` 录图前跑 2 遍） | `capture is None`，走第一个分支 | **执行** |
 | **capture**（正在录图） | 结束当前段 → 把 `partial(run, *参数)` 记进 `_break_fns` → 开新段 | **不执行** |
-| **replay**（每次真实请求） | 段 replay 与 `_break_fns` 交替调用 | **执行** |
+| **replay**（每次真实请求） | 不走 `wrapper`，由 `replay()` 直接调 `_break_fns[i]()`，见 1.1.1 | **执行** |
+
+replay 这一行跟另两行不是一回事，单独说。
+
+#### 1.1.1 replay 时是谁调用断点的
+
+warmup 和 capture 时，是**模型代码调用那个被装饰的函数**，走进上面那个 `wrapper`。
+replay 时完全不同：**decoder 层里那几行代码根本不会再执行**，所以 `forward_c4_indexer`
+这个函数在 replay 时一次也不会被调用。
+
+runner 的做法是把 layer model 的 forward 整体替换掉
+（`prefill_cuda_graph_runner.py:2296`）：
+
+```python
+self.layer_model.forward = replay_layer_forward     # 换成"重放这张图"
+...
+finally:
+    self.layer_model.forward = original_layer_forward
+```
+
+注意被换掉的只是 `layer_model.forward`，也就是那 61 层 decoder。**外层
+`model.forward` 仍然 eager 执行**（embedding 查表、最终 norm 和 lm head），它照常调用
+`layer_model.forward`，只是这一次调到的是重放。
+
+断点是被 `BreakableCUDAGraph.replay()` 按下标取出来调的，整个函数就 6 行：
+
+```python
+def replay(self) -> None:
+    stream = get_device_module().current_stream()
+    token = _current_stream_var.set(stream)
+    try:
+        for i, seg in enumerate(self._segments):   # 录了 N 段
+            seg.replay()                           # 放第 i 段（纯 device 执行）
+            if i < len(self._break_fns):
+                self._break_fns[i]()               # 调第 i 个断点（eager 执行）
+    finally:
+        _current_stream_var.reset(token)
+```
+
+三件事从这 6 行直接读出来：
+
+1. **`_break_fns[i]()` 是个无参调用。** 参数早在 capture 期就被 `functools.partial` 绑进去了
+   （`partial(run, *captured_args, **captured_kwargs)`），所以这里不需要、也没法再传参。
+   这就是"参数在 capture 固定、函数体在 replay 执行"的实现方式。
+2. **段与断点严格按下标配对**，所以执行顺序就是列表顺序。indexer 断点写
+   `c4_topk_indices`、sparse attention 断点随后读它，这个先后关系靠的就是它们被 append
+   进 `_break_fns` 的顺序。
+3. **判定只在 capture 期做过一次。** `if in_prefill_graph(forward_batch)` 这行代码在 replay
+   时不会被重新求值——capture 时它为真，于是记下了一个断点；replay 时那个断点被无条件调用。
+
+你那次报错的调用栈正好把这条路径完整打印出来了，自下往上读：
+
+```
+_execute_body_capture        prefill_cuda_graph_runner.py:2331
+  forward                    deepseek_v4.py:4938
+    replay_layer_forward     prefill_cuda_graph_runner.py:2291   ← 模型层被换成图重放
+      replay                 breakable_cuda_graph_backend.py:304
+        replay               breakable_cuda_graph.py:367         ← 正是 _break_fns[i]()
+          run                breakable_cuda_graph.py:283         ← partial 绑定的 run
+            bcg_dsv4_c4_indexer   dsv4_prefill_graph.py:54       ← 断点函数体
+```
+
+栈里没有 `forward_c4_indexer`，也没有 `in_prefill_graph`——它们属于 capture 期，replay
+期已经不在路径上了。
+
+---
 
 这里有一个**本 commit 的全部设计都建立在上面的关键区别**：
 
