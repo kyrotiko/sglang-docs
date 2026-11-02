@@ -138,47 +138,48 @@ capture 期算出的 host 值。
 断点的输入张量是上一段在图 pool 里产出的，以弱引用保存、由 pool 的 use-count 保活，
 段图存活期间跨重放有效；每次重放由该段在同一地址重写。所以不需要为弱引用加开关。
 
-## 4. P1 改动前后对比
+## 4. 重构前后对比
 
-改前 NPU 上没有任何参数能**成功**开启 prefill 图：门禁能过、runner 能建，但后端解析没有
-NPU 分支，拿到 CUDA 版后端后在段捕获处崩。
+重构前 NPU 上没有任何参数能**成功**开启 prefill 图：门禁能过、runner 能建，但后端解析
+没有 NPU 分支，拿到 CUDA 版后端后在段捕获处崩。
 
 ```mermaid
 flowchart LR
-    subgraph BEFORE["改前"]
+    subgraph BEFORE["重构前：NPU 上开不起来"]
         direction TB
-        A0["默认 disabled"] --> A1["eager prefill"]
-        A2["--cuda-graph-backend-prefill breakable"] --> A3["capture_prefill_graph 门禁"]
-        A3 --> A4["PrefillCudaGraphRunner"]
-        A4 --> A5["resolve_prefill_backend<br/>无 NPU 分支"]
-        A5 --> A6["BreakableCudaGraphBackend<br/>（CUDA 版）"]
-        A6 --> A7["_begin_new_segment<br/>graph_cls = torch.cuda.CUDAGraph"]
-        A7 --> A8["捕获期崩溃<br/>NPU 上没有这个类"]
+        A1{"prefill.backend"}
+        A1 -->|"disabled（默认）"| A2["eager prefill"]
+        A1 -->|"breakable"| A3["capture_prefill_graph 门禁<br/>PrefillCudaGraphRunner"]
+        A3 --> A4["resolve_prefill_backend<br/>无 NPU 分支"]
+        A4 --> A5["BreakableCudaGraphBackend<br/>（CUDA 版）"]
+        A5 --> A6["_begin_new_segment<br/>graph_cls = torch.cuda.CUDAGraph"]
+        A6 --> A7["捕获期崩溃<br/>NPU 上没有这个类"]
     end
-    subgraph AFTER["改后"]
+    subgraph AFTER["重构后"]
         direction TB
-        B0["默认 disabled"] --> B1["eager prefill"]
-        B2["--cuda-graph-backend-prefill breakable"] --> B3["capture_prefill_graph 门禁"]
-        B3 --> B4["PrefillCudaGraphRunner<br/>零改动"]
-        B4 --> B5["resolve_prefill_backend<br/>NPU 分支 · §4.3"]
-        B5 --> B6["BreakableNPUGraphBackend<br/>不覆盖任何方法"]
-        B6 --> B7["_device_graph_cls() · §4.1<br/>每段一个 torch.npu.NPUGraph"]
-        B7 --> B8["_is_stream_capturing<br/>便携分支 · §4.2"]
-        B8 --> B9["段 / 断点交替，捕获成功"]
+        B1{"prefill.backend"}
+        B1 -->|"disabled（默认）"| B2["eager prefill"]
+        B1 -->|"其他值"| B9["ValueError<br/>不再静默拿错后端"]
+        B1 -->|"breakable"| B3["capture_prefill_graph 门禁<br/>PrefillCudaGraphRunner（零改动）"]
+        B3 --> B4["resolve_prefill_backend<br/>NPU 分支 · §4.3"]
+        B4 --> B5["BreakableNPUGraphBackend<br/>不覆盖任何方法"]
+        B5 --> B6["_device_graph_cls() · §4.1<br/>每段一个 torch.npu.NPUGraph"]
+        B6 --> B7["_is_stream_capturing<br/>便携分支 · §4.2"]
+        B7 --> B8["段 / 断点交替<br/>捕获成功"]
     end
+    A1 ~~~ B1
 ```
 
-默认值没变：NPU 上"不入图"本来就是默认，改动只让显式开启这条路走得通。`breakable`
-以外的值现在直接报 `ValueError`，不再静默拿错后端。
+默认值没变：NPU 上"不入图"本来就是默认，重构只让显式开启这条路走得通。
 
-下面三处逐一对比，左改前、右改后，第三列只回答"不改会怎样"。`…` 为未改动部分。
+下面三处逐一对比，左重构前、右重构后，第三列只回答"不改会怎样"。`…` 为未改动部分。
 
 ### 4.1 `_device_graph_cls()`：设备无关图类
 
 `runner_backend_utils/breakable_cuda_graph/breakable_cuda_graph.py`
 
 <table>
-<tr><th>改前</th><th>改后</th><th>为什么</th></tr>
+<tr><th>重构前</th><th>重构后</th><th>为什么</th></tr>
 <tr>
 <td><pre>
 def _begin_new_segment(self):
@@ -214,7 +215,7 @@ kernel、捕获流本身有 kernel）地址依然稳定，所以这个同步可�
 同一文件。段收尾合旁流时调用。
 
 <table>
-<tr><th>改前</th><th>改后</th><th>为什么</th></tr>
+<tr><th>重构前</th><th>重构后</th><th>为什么</th></tr>
 <tr>
 <td><pre>
 if is_hip() or is_musa() or _is_xpu:
@@ -240,7 +241,7 @@ return _capture_status(stream.cuda_stream) == …
 `runner_backend/utils.py`
 
 <table>
-<tr><th>改前</th><th>改后</th><th>为什么</th></tr>
+<tr><th>重构前</th><th>重构后</th><th>为什么</th></tr>
 <tr>
 <td><pre>
 backend_name = cfg.prefill.backend …
@@ -334,7 +335,7 @@ flowchart LR
 ```
 
 <table>
-<tr><th>改前</th><th>改后</th></tr>
+<tr><th>修复前</th><th>修复后</th></tr>
 <tr>
 <td><pre>
 bundle_loc = (… if bundle is not None
@@ -402,7 +403,7 @@ min(tokenSize, tokenSize/cmpRatio+batchSize): 17, but got 33
 bucket 长度的 positions。eager 下 `positions.shape[0] == cu[-1]` 恒成立，所以从未暴露。
 
 <table>
-<tr><th>改前</th><th>改后</th></tr>
+<tr><th>修复前</th><th>修复后</th></tr>
 <tr>
 <td><pre>
 positions = forward_batch.positions
