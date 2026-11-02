@@ -303,18 +303,130 @@ host，在 host 上算出 `positions_cmp_padding_c*` 的长度，再喂给 compr
 metadata，capture 期那套会被释放。所以它们必须在函数体里现取——这正是下面
 `get_tc_piecewise_forward_context()` 的用途。
 
-### 1.2 DSV4 的压缩路径为什么进不了图
+### 1.2 DSV4 Flash 的 attention 长什么样，为什么它进不了图
 
-DSV4 Flash 每层 attention 除了常规 QKV，还要跑：
+#### 1.2.1 每层一种形态：ratio 0 / 4 / 128
 
-| 组件 | 作用 | 依赖 |
-| --- | --- | --- |
-| c4 / c128 compressor | 把 KV 按 4 / 128 的比例压缩后写进压缩 KV 池 | `positions_cmp_padding_c*`、`start_pos`、`seqused`、`actual_seq_lengths_q_pa`、state block table、`c*_loc` |
-| lightning indexer | 算出 sparse attention 要读哪些 topk 块 | `actual_seq_lengths_q/kv`、`c4_page_table`、`kernel_metadata["li_quant_metadata"]` |
+DSV4 的压缩比例是**按层配置**的，来自 checkpoint config 的一个列表：
 
-这些 metadata 全是**在 host 上算出来的**（`kernel_metadata` 由 AICPU/host 算子生成，state
-block table 的宽度来自 host 上的序列长度）。它们的值和形状都跟着当次请求变，所以录进图里
-必然读到 capture 期的旧值。这不是性能问题，是正确性问题。
+```python
+# models/deepseek_v4.py:1041
+self.compress_ratio: int = compress_ratio if ... else config.compress_ratios[layer_id]
+assert self.compress_ratio in (0, 1, 2, 4, 128)
+```
+
+`compress_ratios: List[int]` 每层一个值（`configs/deepseek_v4.py:105`），所以模型是把不同
+形态的层交错堆起来的。NPU 的 attention 入口只接受 `(0, 4, 128)` 三种：
+
+| ratio | 近期 KV（`ori_kv`，未压缩） | 远期 KV（`cmp_kv`，压缩） | 入口 |
+| --- | --- | --- | --- |
+| **0** | 滑窗 128 内精确 | 无，只看窗口 | `_forward_swa` |
+| **4** | 同上 | 4:1 压缩，**indexer 选 top-k 条** | `_forward_compressed` |
+| **128** | 同上 | 128:1 压缩，**全读** | 同上 |
+
+容易误解的一点：压缩层**不是只看压缩 KV**。`_forward_compressed` 把 `ori_kv` 和 `cmp_kv`
+同时传进同一个融合算子，`ori_win_left = sliding_window - 1`（= 127）管局部精确、
+`cmp_mask_mode = 3` 管全局压缩。所以每个压缩层都是**局部精确 + 全局压缩**两路合一。
+
+代码里那行注释把 c4 和 c128 的差别说尽了：
+
+```python
+# c4 attends via indexer topk; c128 reads the full compressed history
+if compress_ratio == 4:
+    attn_kwargs["cmp_sparse_indices"] = topk.view(-1, 1, topk.shape[-1])
+else:
+    attn_kwargs["cmp_sparse_indices"] = None
+```
+
+为什么只有 c4 需要挑：4:1 压完历史还是很长（1M token 压成 25 万条），全读不划算；128:1 压完
+只剩几千条，直接全读更省事。所以 `cmp_topk = index_topk` 这个参数只有 c4a 那一路会传。
+
+#### 1.2.2 compressor 做什么
+
+把**连续 `ratio` 个 token 的 KV 压成 1 条**。权重形状就是机制本身（`compressor.py:58-64`）：
+
+```python
+self.overlap = self.ratio == 4
+self.coff = coff = 1 + self.overlap          # c4 → 2，c128 → 1
+self.ape = nn.Parameter(
+    torch.empty(self.ratio, coff * self.head_dim, dtype=torch.float32)
+)
+```
+
+`ape` 有 `ratio` 行，是"组内第几个位置"的学习式嵌入；配上一个门控投影
+（`wkv_gate` 拆成 `wkv` 和 `wgate`），`ratio` 个 token 进、1 条压缩 KV 出。c4 的 `coff=2`
+表示每条压缩项保留 `2 × head_dim`（代码里把这叫 overlap），c128 是 1。
+
+#### 1.2.3 indexer 和 top-k 是什么
+
+**indexer 不算 attention 输出，它只负责"挑出该读哪些"。** 它是一个便宜的打分器：有自己的
+一套小 Q/K、自己的压缩 KV 缓冲（int8 或 fp8 量化），对每个 query token 给每条压缩 KV 打一个
+分，然后取分最高的 `k` 条，把**下标**交给真正的 attention。
+
+bf16 回退分支里写着 "architecture-faithful"，是最清楚的说明
+（`ascend_dsv4_backend.py:786-807`）：
+
+```python
+index_score = torch.einsum("shd,td->sht", q[start:end], kv_cache_value.squeeze(1))
+#   s = query token，h = indexer 的头，d = 头维度，t = 压缩 KV 条数 → [s, h, t]
+index_score = (index_score.relu_() * weights.unsqueeze(-1)[start:end]).sum(dim=1)
+#   ReLU、按头加权、对头求和 → [s, t]：每个 query 对每条压缩 KV 一个分
+index_score += torch.where(causal, float("-inf"), 0)
+#   因果屏蔽：压缩块下标必须 <= query_pos // ratio，不能看未来
+topk_idx = index_score.topk(min(self._dsv4_index_topk, seq_i // ratio), dim=-1)[1]
+#   [1] 取的是 indices，不是 values —— 要的是"读哪些"，不是分数
+topk_idx = torch.where(drop, -1, topk_idx)     # -1 = 这个槽位没用上
+```
+
+所以 **top-k 就是"每个 query token 挑 k 条压缩 KV"**，`k = index_topk`，配置默认 512
+（`configs/deepseek_v4.py:60`）。产物 `c4_topk_indices` 形状 `[T, index_topk]`、dtype int32，
+元素是压缩 KV 的下标，`-1` 表示空位。它随后被塞进真正的 attention 当 `cmp_sparse_indices`，
+于是那个重算子只读这 k 条，而不是整段压缩历史。
+
+indexer 之所以便宜：它的头维度小、KV 被量化成 int8/fp8、而且它打分的对象**本身已经是 4:1
+压缩过的**。相当于用一次廉价的粗筛，换掉一次昂贵的全读。
+
+#### 1.2.4 和别的模型比，特殊在哪
+
+| | 每层 KV | 稀疏选择 | KV 压缩 |
+| --- | --- | --- | --- |
+| 标准 MLA（V3 / R1） | 全量 | 无 | 无 |
+| DSA（V3.2） | 全量 | lightning indexer 选 top-k | **无** |
+| **DSV4 Flash** | 滑窗 + 压缩，两路合一 | c4 层用 indexer | **有，多档比例、按层配置** |
+
+DSA 已经有 indexer 和 top-k 了，但它挑的是**未压缩**的 KV；DSV4 多出来的是 KV 压缩本身。
+代码上也对得起来：`layers/attention/dsv4/compressor.py` 只被 `deepseek_v4*` 系列引用，而
+`layers/attention/dsa/` 下有 indexer、没有 compressor。
+
+DSV4 还有两个结构特征：`num_key_value_heads == 1`（单 KV 头），以及
+`kv_source_layer_ids` / `index_source_layer_ids`——跨层共享 KV。
+
+#### 1.2.5 于是这条路径进不了图
+
+压缩是**有状态**的：一个压缩组可能跨 chunk 边界，所以每个 ratio 都有一个 compress state
+pool 当进位缓冲，它的表宽要往前多看 `coff * ratio` 个 token
+（`ascend_dsv4_backend.py:134`）：
+
+```python
+history_size = coff * compress_ratio
+width = history_size + max_input_capacity
+positions = start_pos[:, None] - history_size + columns
+```
+
+`start_pos`（本 chunk 的全局起点）、`max_input_capacity`、表宽——**全要在 host 上算**。
+加上 metadata 本身：
+
+| 组件 | 依赖的 metadata |
+| --- | --- |
+| c4 / c128 compressor | `positions_cmp_padding_c*`、`start_pos`、`seqused`、`actual_seq_lengths_q_pa`、state block table、`c*_loc` |
+| lightning indexer | `actual_seq_lengths_q/kv`、`c4_page_table`、`kernel_metadata["li_quant_metadata"]` |
+
+这些值和形状都跟着当次请求变，而且 `kernel_metadata` 由 AICPU/host 算子生成、state block
+table 的宽度来自 host 上的序列长度。按 1.1.2 的结论，这类标量一旦录进图就被写死；按
+1.1.3 的分类，这是情况 ③（数据绕 host 一圈），**根本录不进去**。
+
+这不是性能问题，是正确性问题——也正因如此，`_build_npu_compress_metadata_prefill` 是整条
+链上唯一需要 host 参与的环节，而第三部分那三个 bug 全部出在它里面。
 
 ### 1.3 三种 batch 的差异
 
