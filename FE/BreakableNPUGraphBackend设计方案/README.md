@@ -11,7 +11,7 @@ eager 执行。行号会漂移，以内容为准。
 | 开关 | `--cuda-graph-backend-prefill breakable`（NPU 上只接受 `breakable`，其他值报 `ValueError`） |
 | bucket | `--cuda-graph-bs-prefill`，**必须 >= 128** |
 | GLM-5.2（DSA） | 重构后直接支持，已测，无需模型侧适配 |
-| DSV4 Flash | 经 §7 的适配后支持，已跑通 capture 与在线请求（DP16/TP16/EP16） |
+| DSV4 Flash | 经 §6 的适配后支持，已跑通 capture 与在线请求（DP16/TP16/EP16） |
 | 提交 | `d08d2b52b0` P1 接线 · `1c095d6948` DSV4 断点 · `85860762c4` rope 口径 |
 
 已知限制：
@@ -37,7 +37,7 @@ NPU 的注意力算子吃 **host 侧的 IntArray** 序列长度，捕获时会�
 | breakable 下 | 不变 | 注意力在断点处 eager 执行，每次重放现读现传，**不需要 `update`** |
 
 立足点就是最后一行：把吃 host 输入的算子摘到段之间 eager 执行，绕开 `graph.update`
-那套机制及其限制（§6.1）。
+那套机制及其限制（§5.1）。
 
 ## 2. 结构
 
@@ -72,6 +72,10 @@ classDiagram
 设备相关的只有三处，都在 §4：图类、stream capture 查询、后端解析。
 `BreakableCudaGraphBackend`、`BreakableCUDAGraphCapture` 和 `PrefillCudaGraphRunner`
 都没有为 NPU 改动。
+
+同一 stream、同一 pool 下连续捕获多段是合法的，段间地址稳定，换输入重放结果正确；空段
+也能正常捕获和重放，所以不需要把连续的断点合并。`NPUGraph` 的裸
+`capture_begin/capture_end` 签名与 CUDA 一致，父类的段捕获代码原样可用。
 
 ```mermaid
 flowchart LR
@@ -124,6 +128,9 @@ sequenceDiagram
 **录制期不执行断点函数体**，只记 `functools.partial(run, *args)`。所以断点逻辑每次
 重放都重跑、读当次 metadata——这是 replay 正确性的全部依据，也意味着断点里不能依赖任何
 capture 期算出的 host 值。
+
+断点的输入张量是上一段在图 pool 里产出的，以弱引用保存、由 pool 的 use-count 保活，
+段图存活期间跨重放有效；每次重放由该段在同一地址重写。所以不需要为弱引用加开关。
 
 ## 4. P1 改动前后对比
 
@@ -224,24 +231,9 @@ if backend_name == Backend.BREAKABLE:
 身份和一条 `torch.compile` 断言，其余全部继承；`capture_session` 不重写，父类内部就是
 `device_module.graph_pool_handle()`。
 
-## 5. 真机已验证的事实
+## 5. 三个坑
 
-2026-10 在 Ascend 真机验证，spike 脚本在本目录。
-
-| 结论 | 证据 | 影响 |
-|---|---|---|
-| `NPUGraph` 有裸 `capture_begin/capture_end`，签名与 CUDA 一致 | `inspect.getsource` | 父类段捕获代码原样可用 |
-| 同 stream + 同 pool 连捕两段合法，地址稳定，换输入重放 `err=0` | [v2](v2_spike_two_segments.py) | 共享池分段成立 |
-| 段图存活期间，弱引用跨重放可用 | [v4](v4_weak_ref_spike.py) | 默认弱引用，不加开关 |
-| 空段可以捕获和重放 | v2 脚本末尾 | 不需要合并连续断点 |
-| 裸捕获在三种在途场景下地址稳定、`err=0`（显式 sync / 另一流有 kernel / 捕获流本身有 kernel） | [v8](v8_raw_capture_spike.py) | 不需要每段同步，见 §6.2 |
-| `is_current_stream_capturing` / `Stream.wait_stream` 均存在 | 真机 introspect | §4.2 成立 |
-
-v4 的负对照（删光段图后读弱引用）不作为安全保证，判定依据是"段图存活时"的正向用例。
-
-## 6. 三个坑
-
-### 6.1 不要对段图调 `graph.update()`
+### 5.1 不要对段图调 `graph.update()`
 
 `auto_dispatch_capture` 的唯一作用是让 `graph.update(cpu_update_input=...)` 可用，且只
 对 5 类注册过的注意力算子生效（`torch_npu/npu/_npugraph_handlers/`）。breakable 下注意力
@@ -250,21 +242,22 @@ v4 的负对照（删光段图后读弱引用）不作为安全保证，判定�
 `torch.npu.graph(..., auto_dispatch_capture=True)` 并重新验证，代价是最大 workspace
 预分配、`.out` 重载、record 数对齐。
 
-### 6.2 裸捕获省掉了每段的整设备同步
+### 5.2 裸捕获省掉了每段的整设备同步
 
-不走 `torch.npu.graph` 上下文，就没有它每段的 `synchronize()` + `empty_cache()`。v8
-验证可以省，收益是 61 层 ≈ 122 次整设备同步消失。
+不走 `torch.npu.graph` 上下文，就没有它每段的 `synchronize()` + `empty_cache()`。裸捕获
+在有在途 kernel 时（显式 sync、另一条流有 kernel、捕获流本身有 kernel）地址依然稳定，
+所以这个同步可以省，收益是 61 层 ≈ 122 次整设备同步消失。
 
-### 6.3 池 token 在图全销毁后不可复用
+### 5.3 池 token 在图全销毁后不可复用
 
 `graph_pool_handle()` 的 token，在所有引用它的图销毁后**不能再用**：`use_count` 计的是
 活图数（`NPUCachingAllocator.cpp`，递减在 `NPUGraph` 析构）。降到 0 后池被标记 freeable
 但 token 仍在表里，再用会撞 `create_or_incref_pool: use_count > 0`，进程随之不可恢复。
 BCG 的图常驻 `_graphs`，当前不触发；将来做图卸载 / 重捕时必须重新取 token。
 
-## 7. DSV4 Flash 怎么适配的
+## 6. DSV4 Flash 怎么适配的
 
-### 7.1 一层 attention 怎么被切开
+### 6.1 一层 attention 怎么被切开
 
 ```mermaid
 flowchart TB
@@ -282,7 +275,7 @@ flowchart TB
 
 NPU 上 `is_unified_kv_triton()` 恒为 False（只在 HIP 为 True），mega attention 只在 CUDA
 启用，所以 prefill attention 一定走断点3。断点1 与 断点2 之间没有被录制的算子，于是产生
-空段——可录可放（§5），但重放开销待 profiling。
+空段。空段能正常捕获和重放（§2），但重放开销待 profiling。
 
 适配只动了两个 NPU 专属文件，公共代码零改动：
 
@@ -291,7 +284,7 @@ NPU 上 `is_unified_kv_triton()` 恒为 False（只在 HIP 为 True），mega at
 | `attention/dsv4_prefill_graph.py`（新增 69 行） | 两个断点函数 + `in_prefill_graph` 判定 |
 | `attention/ascend_dsv4_backend.py`（+49/-2） | 两个入口分发到断点；indexer 函数体拆成 `forward_c4_indexer_eager`；capture 期补占位 loc |
 
-### 7.2 为什么 indexer 和 compressor 必须是断点
+### 6.2 为什么 indexer 和 compressor 必须是断点
 
 它们依赖 host 侧算出的 metadata，本来就进不了图。录进 segment 的后果：
 
@@ -309,7 +302,7 @@ CUDA 侧有同样先例：ratio 1/2 的 indexer 和 compressor 由
 `bcg_deepseek_v4_low_ratio_sources` 作为断点执行，注释写的是 "The compressor and prefill
 indexer sync with the host, like the attention."
 
-### 7.3 三个口径 bug
+### 6.3 三个口径 bug
 
 断点把 **live 行数** 和 **bucket 行数** 两套口径同时带进同一个函数，三个 bug 都出在这里。
 
@@ -416,7 +409,7 @@ t = int(cu_cpu[bs])
 > 是哪一套。** 下一个候选是断点里的 `global_num_token_non_padded_cpu`——它必须恒等于
 > `cu[-1]`，目前只在单请求场景核对过，DP 下未在设备上验证。
 
-### 7.4 为什么不照搬 CUDA 的 captured-metadata 契约
+### 6.4 为什么不照搬 CUDA 的 captured-metadata 契约
 
 CUDA 的 DSV4 后端打开 `use_captured_forward_metadata_for_breakable_cuda_graph`：capture
 时建一份地址稳定的 metadata，replay 时原地刷新。这套契约的前提是**段内有 kernel 读这份
@@ -426,7 +419,7 @@ metadata**。NPU 的 compressor、lightning indexer 和 sparse attention 都依�
 `_init_dsv4_graph_metadata` / `_refresh_graph_*` 相当（数百行），换不来任何算子进图。只有
 将来 compressor 有了纯 device 侧接口、能进图时，这套契约才值得做。
 
-## 8. 未覆盖的风险
+## 7. 未覆盖的风险
 
 | 风险 | 状态 |
 | --- | --- |
@@ -434,3 +427,9 @@ metadata**。NPU 的 compressor、lightning indexer 和 sparse attention 都依�
 | attn-TP 序列切分 | 断点按 `global_num_token_non_padded_cpu` 切行，与已有 attention 断点一致，前提是 `attn_tp_size == 1`（DP16 部署满足） |
 | CP 与 MoE | DSV4 不在 `PREFILL_CP_BCG_SUPPORTED_COMBINATIONS` 里，CP 的 BCG capture 不会为它打开；CP batch 是否会 replay 非 CP 的图没有分析。这些路径里若有 host 同步，capture 会直接报错，不会悄悄算错 |
 | 段粒度 | 每层 1~2 个断点，61 层 ≈ 122 次段 launch，另有空段。必要时改粗断点（每 N 层），或在模型层合成一个断点，仿照 `bcg_deepseek_v4_low_ratio_sources`，代价是要改共享的模型文件 |
+
+---
+
+本目录的 [v2](v2_spike_two_segments.py) / [v4](v4_weak_ref_spike.py) /
+[v8](v8_raw_capture_spike.py) 脚本是上述 NPUGraph 行为的真机探针，CANN 或 torch_npu
+升级后可以复跑确认。
