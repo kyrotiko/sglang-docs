@@ -280,6 +280,9 @@ if backend_name == Backend.BREAKABLE:
 
 ## 5. DSV4 Flash 怎么适配的
 
+本节讲设计。逐行代码讲解（改了什么、为什么）见
+[dsv4_prefill_graph_walkthrough.md](dsv4_prefill_graph_walkthrough.md)。
+
 ### 5.1 一层 attention 怎么被切开
 
 ```mermaid
@@ -366,9 +369,12 @@ setattr(fm, f"c{ratio}_loc",
 - 条件用 `capturing_prefill_graph`，**不能用 `is_in_breakable_cuda_graph()`**——后者
   replay 时也为真，万一 replay 缺 bundle 会把真实数据悄悄写进 slot 0。该标志挂在 `dp`
   下但不论是否开 DP 都会设置，且在 `warmup()` 之后才置位。
-- slot 0 不会分给真实请求：`page_size` 固定 128；`NPUPagedTokenToKVPoolAllocator` 继承的
-  `clear()` 让空闲页从 1 开始，注释写明 slot 0 留给 padding 写入；c4 loc 由
-  `full_loc // 4` 推出，full page 0 的 slot 0~127 不分配，对应 c4 slot 0~31 也不会分出去。
+- slot 0 不会分给真实请求：分页分配器的 `clear()` 让空闲页从 **1** 开始
+  （`mem_cache/allocator/paged.py:396-398`，注释写明 slot 0 留给 padding 写入），所以
+  page 0 整页不分配；而 c4 loc 由 `full_loc // 4` 推出
+  （`hardware_backend/npu/dsv4/dsv4_allocator.py:181`），c4 slot 0 只能来自 full slot
+  0~3，属于 page 0。该推导只需 `page_size >= 4`，与具体取值无关
+  （DSV4 断言 `page_size in (64, 128)`）。
 
 **(2) 断点内要把输入切到 live 行。** `static_forward_batch` 的 `positions` 按 bucket
 补齐，而 indexer 的 `_compute_q_npu` 要按 live 行算 RoPE。对 batch 浅拷贝再切片，不改

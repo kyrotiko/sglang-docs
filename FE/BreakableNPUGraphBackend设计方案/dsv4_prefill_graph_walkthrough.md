@@ -1,0 +1,600 @@
+# f7d7201a09 逐行讲解：DSV4 适配 prefill graph
+
+这个 commit 让 DSV4 Flash 能在 `--cuda-graph-backend-prefill breakable` 下跑起来。
+改了 3 个文件、251 行。设计背景见
+[breakable_npu_graph_backend_design.md](breakable_npu_graph_backend_design.md)，
+本文只讲这个 commit 的每一处改动是什么意思、为什么必须这么改。
+
+它修的是两个线上报错：
+
+```
+# 启动 capture 时
+set_index_k_scale: loc_long = loc.view(-1, 1).long()
+AttributeError: 'NoneType' object has no attribute 'view'
+
+# 修好上面那个、能起服务之后，第一个真实请求进来时
+[compressor] ropeSin shape dim 0, should be equal to
+min(tokenSize, tokenSize/cmpRatio+batchSize): 17, but got 33
+```
+
+---
+
+## 第一部分：三个预备概念
+
+不懂这三件事，后面的代码看不出所以然。
+
+### 1.1 eager 断点有三个执行时机，行为各不相同
+
+`@eager_on_graph` 装饰的函数（下称**断点**）在三种场合被调用，走三条完全不同的路径。
+代码在 `breakable_cuda_graph.py` 的 `eager_on_graph`：
+
+```python
+def wrapper(*args, **kwargs):
+    capture = _current_capture_var.get()
+    if capture is None:              # ← 不在录图：直接执行
+        run(*args, **kwargs)
+        return
+    capture._end_current_segment()   # ← 正在录图：结束当前段
+    captured_args = tuple(_weak_ref_if_tensor(a) for a in args)
+    capture.cuda_graph._break_fns.append(
+        functools.partial(run, *captured_args, **captured_kwargs)
+    )                                #   把调用记下来，但不执行函数体
+    capture._begin_new_segment()     #   开新段
+```
+
+| 时机 | 发生什么 | 函数体执行吗 |
+| --- | --- | --- |
+| **warmup**（`capture_one` 录图前跑 2 遍） | `capture is None`，走第一个分支 | **执行** |
+| **capture**（正在录图） | 结束当前段 → 把 `partial(run, *参数)` 记进 `_break_fns` → 开新段 | **不执行** |
+| **replay**（每次真实请求） | 段 replay 与 `_break_fns` 交替调用 | **执行** |
+
+这里有一个**本 commit 的全部设计都建立在上面的关键区别**：
+
+- **参数在 capture 时就被固定**了（存的是 capture 期张量的弱引用）。
+- **函数体在 replay 时才执行**，所以函数体内部现读的东西是当次的。
+
+为什么参数可以被固定？因为断点的张量参数（`x`、`q_lora`）是**上一个段在图内存池里产出的**，
+每次 replay 这个段都会在**同一地址**重写它们。弱引用由池的 use-count 保活。
+
+为什么 batch 和 metadata 不能当参数传？因为 replay 时 runner 会为当次请求**重建**一整套
+metadata，capture 期那套会被释放。所以它们必须在函数体里现取——这正是下面
+`get_tc_piecewise_forward_context()` 的用途。
+
+### 1.2 DSV4 的压缩路径为什么进不了图
+
+DSV4 Flash 每层 attention 除了常规 QKV，还要跑：
+
+| 组件 | 作用 | 依赖 |
+| --- | --- | --- |
+| c4 / c128 compressor | 把 KV 按 4 / 128 的比例压缩后写进压缩 KV 池 | `positions_cmp_padding_c*`、`start_pos`、`seqused`、`actual_seq_lengths_q_pa`、state block table、`c*_loc` |
+| lightning indexer | 算出 sparse attention 要读哪些 topk 块 | `actual_seq_lengths_q/kv`、`c4_page_table`、`kernel_metadata["li_quant_metadata"]` |
+
+这些 metadata 全是**在 host 上算出来的**（`kernel_metadata` 由 AICPU/host 算子生成，state
+block table 的宽度来自 host 上的序列长度）。它们的值和形状都跟着当次请求变，所以录进图里
+必然读到 capture 期的旧值。这不是性能问题，是正确性问题。
+
+### 1.3 三种 batch 的差异
+
+同一套代码会收到三种不同的 `ForwardBatch`，本 commit 的三个 bug 全部源于它们的差异：
+
+| | eager batch | capture dummy batch | replay static batch |
+| --- | --- | --- | --- |
+| 来源 | 调度器真实请求 | `capture_prepare()` 造的假 batch | 静态缓冲 + runner 用当次值刷新 |
+| `out_cache_loc_dsv4` | 调度器分配 KV 时写入 | **没有这个字段** | 当次真实 bundle |
+| `positions` 长度 | 等于 token 数 | bucket 大小 | **bucket 大小**（补齐） |
+| `extend_seq_lens` / `cu` | 真实长度 | bucket 大小 | **当次真实长度** |
+
+注意最后两行：replay 时 `positions` 是 bucket 长度（如 128），而 `cu` 是真实长度（如 64）。
+**eager 下这两者恒等**，所以这个分歧在改成入图之前永远不会暴露。这就是第二个报错的根源。
+
+---
+
+## 第二部分：新文件 `dsv4_prefill_graph.py`（69 行）
+
+整个文件只有两个断点函数和一个判定函数。为什么单独建文件：断点是"图"和"DSV4"的交界处，
+放在 DSV4 后端里会让后端文件再长 69 行，放在 graph backend 里则让通用代码知道 DSV4 的细节。
+
+### 2.1 判定函数
+
+```python
+def in_prefill_graph(forward_batch: ForwardBatch) -> bool:
+    # Same predicate as the attention break in models/deepseek_v4.py.
+    return forward_batch.forward_mode.is_extend() and is_in_breakable_cuda_graph()
+```
+
+两个条件都必要：
+
+- `is_extend()`：只有 prefill 走这条路。decode 用的是另一套全图后端，它有自己的
+  metadata 刷新机制（`_init_dsv4_graph_metadata` / `_refresh_graph_*`），不能混。
+- `is_in_breakable_cuda_graph()`：这是个全局开关，由 `enable_breakable_cuda_graph()`
+  上下文置位，**capture 和 replay 期间都为 True**。eager 服务时为 False，所以 eager
+  路径完全不受影响。
+
+和 `models/deepseek_v4.py` 里 sparse attention 断点用的是同一个判定——这不是巧合，
+三个断点必须同时生效或同时不生效，否则会出现"indexer 进了图、attention 没进"的半截状态。
+
+### 2.2 indexer 断点
+
+```python
+@eager_on_graph
+def bcg_dsv4_c4_indexer(
+    *,
+    backend: C4IndexerAscendBackendMixin,
+    x: torch.Tensor,
+    q_lora: torch.Tensor,
+    c4_indexer,
+    skip_compressor: bool,
+) -> None:
+```
+
+- `@eager_on_graph`：套上就具备 1.1 的三时机行为。
+- **返回 `None` 是硬要求**。`eager_on_graph` 内部 `assert out is None`，报错信息是
+  "is a graph break and must return None; write the results into buffers the caller
+  allocated"。原因是 capture 期函数体不执行，没有真实返回值可给后续段用。本例的结果
+  写在 `self.forward_metadata.c4_topk_indices` 上，不靠返回值。
+- `*` 强制关键字传参，按仓库规范（2 个以上参数用关键字）。
+- `backend` 作为普通参数传进来：`_weak_ref_if_tensor` 只对张量做弱引用，非张量原样保留，
+  而 backend 是生命周期长于图的对象，所以可以安全固定。
+
+```python
+    forward_batch = get_tc_piecewise_forward_context().forward_batch
+    num_tokens = forward_batch.global_num_token_non_padded_cpu
+    if num_tokens == 0:
+        return
+```
+
+- **batch 从 forward context 现取，不从参数拿**——这就是 1.1 讲的那条分界线。warmup 时
+  取到的是 capture dummy batch，replay 时取到的是 runner 刷新过的 static batch。
+- `num_tokens == 0`：DP attention 下某个 rank 可能这一轮没有请求（idle）。它仍要参与
+  集合通信所以保留图形状，但没有真实 token，直接返回，不写任何 KV。
+
+```python
+    # The static batch keeps bucket-sized positions; the indexer RoPE reads one
+    # per live row.
+    live_batch = copy.copy(forward_batch)
+    live_batch.positions = forward_batch.positions[:num_tokens]
+```
+
+这两行是 1.3 那张表的直接后果。indexer 内部 `_compute_q_npu` 要用 `positions` 算 RoPE，
+而 static batch 的 `positions` 是 bucket 长度。
+
+为什么用**浅拷贝**而不是直接改 `forward_batch.positions`：这个 batch 对象是三个断点共用的，
+后面的 sparse attention 断点还要读它。如果原地改了再改回去（初稿用的是 context manager
+`try/finally`），任何一次异常都会让它停在被改过的状态。浅拷贝只是新建一个对象头，
+字段仍指向同一批张量，代价可以忽略，而且 runner 自己构造 `padded_view` / `tail_batch`
+时也是这么写的。
+
+浅拷贝安全的前提是**断点不往 batch 上写结果**。indexer 的结果写在后端的
+`forward_metadata` 上，所以拷贝不会丢结果。另外 RoPE 的 per-forward 缓存是按 positions
+对象匹配的，换了切片对象后会按真实 positions 重算，不会误用 bucket 长度那份缓存。
+
+```python
+    backend.forward_c4_indexer_eager(
+        x=x[:num_tokens],
+        q_lora=q_lora[:num_tokens],
+        forward_batch=live_batch,
+        c4_indexer=c4_indexer,
+        skip_compressor=skip_compressor,
+    )
+```
+
+- 调的是 `forward_c4_indexer_eager`，**不是** `forward_c4_indexer`。后者是入口，里面有
+  `in_prefill_graph` 判定；断点执行时 `is_in_breakable_cuda_graph()` 仍然为 True，
+  要是调入口就会无限递归。所以本 commit 把原来的函数体拆成了 `_eager` 版本（见 3.6）。
+- `x[:num_tokens]` / `q_lora[:num_tokens]`：切到真实行。张量本身是 bucket 大小的，
+  尾部是 padding。
+
+### 2.3 compressor 断点
+
+```python
+@eager_on_graph
+def bcg_dsv4_compressor(*, x: torch.Tensor, compressor) -> None:
+    forward_batch = get_tc_piecewise_forward_context().forward_batch
+    num_tokens = forward_batch.global_num_token_non_padded_cpu
+    if num_tokens == 0:
+        return
+    compressor(x[:num_tokens], forward_batch)
+```
+
+结构同上，但有两点不同：
+
+- **不需要浅拷贝**。compressor 不读 `positions`（它的 rope 表来自
+  `fm.positions_cmp_padding_c*`，由 metadata 构建时算好），所以把原 batch 直接传进去即可。
+- **没有 `layer_id` 参数**。入口 `forward_core_compressor(self, x, forward_batch, layer_id, compressor)`
+  收了 `layer_id`，但它的函数体 `compressor(x, forward_batch)` 根本没用到——层号由
+  `compressor.layer_id` 自带。断点不传它，就少固定一个无用参数。
+
+---
+
+## 第三部分：`ascend_dsv4_backend.py`（+57 / -4）
+
+### 3.1 新增 import
+
+```python
+from sglang.srt.hardware_backend.npu.attention.dsv4_prefill_graph import (
+    bcg_dsv4_c4_indexer, bcg_dsv4_compressor, in_prefill_graph,
+)
+from sglang.srt.runtime_context import get_flags, get_parallel   # 原来只有 get_parallel
+```
+
+`get_flags` 是为 3.4 的 capture 判定加的。
+
+### 3.2 一句过期注释
+
+```diff
+-        # eager-only: prefill is never graph-captured, host reads (cu_cpu) are safe here
++        # Runs outside captured segments (prefill graph breaks read its output
++        # eagerly), so host reads (cu_cpu) are safe here.
+```
+
+这不是文字润色。`_build_npu_compress_metadata_prefill` 里有 `cu.cpu().tolist()`，
+这是一次 **host 同步**——录在图里会直接报错。原注释给出的安全理由是"prefill 永远不入图"，
+而这个前提被 P1 打破了。
+
+新的安全理由不同：这个函数由 runner 在**段外**调用（capture 期在
+`_init_forward_metadata_for_capture`，replay 期在 `_prepare_forward_metadata_for_replay`），
+它产出的 metadata 只被 eager 断点读取。所以 host 读依然安全，但成立的原因换了。
+注释必须跟着换，否则下一个人会据此做出错误推断。
+
+### 3.3 token 数改为取自 cu（第二个报错的修复）
+
+```diff
+         fm = self.forward_metadata
+         device = forward_batch.seq_lens.device
+-        positions = forward_batch.positions
+-        t = positions.shape[0]
+         bs = forward_batch.batch_size
+         cu = fm.actual_seq_lengths_q_pa
+ 
+         cu_cpu = cu.cpu().tolist()
++        # Token count must come from cu, not positions: the compressor derives
++        # its own tokenSize from cu_seqlens, while prefill graph replay keeps
++        # positions at the bucket-padded length.
++        t = int(cu_cpu[bs])
+```
+
+`t` 在这个函数里只有一个用途——决定 rope / padding 数组的长度：
+
+```python
+padding_size = min(t, t // ratio + bs)
+padding = torch.zeros(padding_size, dtype=torch.int64, device=device)
+...
+setattr(fm, f"positions_cmp_padding_c{ratio}", padding)
+```
+
+而 `forward_compress` 用这个数组去建 rope 表：
+
+```python
+cos, sin = Dsv4NpuRoPE.for_freqs(...).get_cos_sin(
+    getattr(fm, f"positions_cmp_padding_c{ratio}"), ...
+)
+```
+
+算子自己**从 `cu_seqlens` 推 tokenSize**，并校验
+`ropeSin.shape[0] == min(tokenSize, tokenSize/cmpRatio + batchSize)`。
+
+代入线上那个请求（bucket 128，一个 64 token 的请求，ratio=4，bs=1）：
+
+| | 取自 `positions` | 取自 `cu` |
+| --- | --- | --- |
+| `t` | 128（bucket 补齐） | 64（真实） |
+| `padding_size` = `min(t, t//4+1)` | min(128, 33) = **33** | min(64, 17) = **17** |
+| 算子期望（按 cu 推 tokenSize=64） | 17 | 17 |
+| 结果 | **不匹配,报错** | 匹配 |
+
+同一个函数里的 `cu`、`seqused`、`start_pos` 和算子收到的 `x` 全都是 live 的，只有 `t`
+跟着 bucket，这是一处纯粹的口径不一致。
+
+`cu_cpu[bs]` 取的是**第 bs 个前缀和**，即前 bs 个请求的 token 总数。`cu` 有 `bs+1` 个元素，
+所以这是最后一个。用 `cu_cpu[bs]` 而不是 `cu_cpu[-1]`，是因为别处（dspark 分支）出现过
+`cu` 比 `bs+1` 长的情况，按下标取更稳。
+
+把 `t` 的赋值移到 `cu_cpu` 之后，是因为它现在依赖 `cu_cpu`。`positions` 这个局部变量
+至此无人使用，连同删掉。
+
+### 3.4 capture 期的占位 loc（第一个报错的修复）
+
+```diff
+             bundle_loc = (
+                 (bundle.out_c4_loc if ratio == 4 else bundle.out_c128_loc)
+                 if bundle is not None
+                 else None
+             )
++            if bundle_loc is None and get_flags().dp.capturing_prefill_graph:
++                # The capture batch has no allocation bundle; route its compressed
++                # writes to padding slot 0, as decode graph capture does.
++                bundle_loc = torch.zeros(
++                    sum(blocks.numel() for blocks in ratio_lists[ratio]),
++                    dtype=torch.int32,
++                    device=device,
++                )
+             setattr(
+                 fm,
+                 f"c{ratio}_loc",
+                 bundle_loc.to(torch.int32) if bundle_loc is not None else None,
+             )
+```
+
+**崩溃链条**：capture dummy batch 没有 `out_cache_loc_dsv4`（它只由调度器分配 KV 时写入）
+→ `bundle is None` → `c4_loc = None` → `forward_compress` 在 `loc is None` 时跳过长度检查、
+照常进入 epilog → `set_index_k_scale` 执行 `loc.view(-1, 1)` → `AttributeError`。
+
+四个设计选择逐一说明：
+
+**(a) 长度为什么用 `sum(blocks.numel() for blocks in ratio_lists[ratio])`**
+
+`ratio_lists` 是同一个函数里刚算好的、每个请求新完成的压缩块下标。直接求和得到的就是本次
+新增的块数，与 `positions_cmp_padding_c*` 的来源**天然一致**，不需要另写一遍公式——
+另写就意味着两处要同步维护。
+
+真实 bundle 给出的也是这个量（"本次 extend 新分配的压缩槽位，按 batch 顺序紧凑排列"）。
+
+块数会**少于** `cmp_kv` 的行数（后者按 `padding_size` 补齐），这会走 `forward_compress`
+里已有的裁剪分支：
+
+```python
+if is_prefill and loc.numel() < cmp_kv.shape[0]:
+    cmp_kv = cmp_kv[: loc.numel()]
+elif loc.numel() != cmp_kv.shape[0]:
+    raise RuntimeError("DSV4 NPU fused compressor loc/kv length mismatch ...")
+```
+
+所以长度算错不会变成显存越界，而是一个带信息的 Python 报错。这一点在排查第二个报错时
+帮了忙：它直接排除了"占位长度写错导致显存被污染"这条假设。
+
+**(b) 条件为什么是 `capturing_prefill_graph` 而不是 `is_in_breakable_cuda_graph()`**
+
+这是本处最要紧的一个判断。`is_in_breakable_cuda_graph()` 在 **replay 时也为 True**。
+如果用它，那么万一哪天 replay 时 bundle 缺失（比如调度器路径改动引入 bug），占位 loc 会把
+**真实请求的压缩 KV 悄悄写进 slot 0**，服务不报错、精度慢慢变差，极难排查。
+
+`capturing_prefill_graph` 只在 capture 期为真：
+
+```python
+# prefill_cuda_graph_runner.py _capture()
+self.warmup()                                   # ← 置位之前
+dp_flags.capturing_prefill_graph = True
+try:
+    ...  self._capture_one_stream()             # 每个 bucket 的 metadata init + warmup + 录图
+finally:
+    dp_flags.capturing_prefill_graph = False
+```
+
+用它就保证了 replay 期缺 bundle 依然会按原样抛错。两个附带事实：这个标志虽然挂在 `dp`
+下，但 `_capture` 不论是否开 DP 都会设置；它在 `self.warmup()` **之后**才置位，所以不影响
+capture 之前的 kernel warmup。
+
+**(c) 为什么写 slot 0 是安全的**
+
+需要证明 slot 0 永远不会被分给真实请求，否则 capture 期的 warmup 就会破坏真实数据。
+三步：
+
+1. **page 0 整页永不分配。** 分页分配器的 `clear()` 让空闲页从 **1** 开始
+   （`mem_cache/allocator/paged.py:396-398`）：
+
+   ```python
+   # The padded slot 0 is used for writing dummy outputs from padded tokens.
+   self.free_pages = torch.arange(1, self.num_pages + 1, ...)
+   ```
+
+   所以 full slot `0 .. page_size-1` 这一整页不会被分出去。NPU 用的
+   `NPUPagedTokenToKVPoolAllocator`（`hardware_backend/npu/allocator_npu.py:15`）继承
+   `PagedTokenToKVPoolAllocator`，直接得到这个行为。
+
+2. **c4 的 loc 由 full loc 整除 4 得到**
+   （`hardware_backend/npu/dsv4/dsv4_allocator.py:181`）：
+
+   ```python
+   return out_full_loc[completed_group] // 4
+   ```
+
+3. 于是 c4 slot 0 只能来自 full slot 0~3，而它们属于 page 0，由第 1 步永不分配。
+
+这个推导**不依赖 page_size 的具体取值**，只需要 `page_size >= 4`。DSV4 的断言是
+`assert page_size in (64, 128)`（`kernels/ops/attention/dsv4/attn.py:58`），两种取值都满足。
+（本次部署用的是 `--page-size 128`，但结论与它无关。）
+
+decode 的图捕获用的是同一个办法（`metadata.c4_loc = torch.zeros(...)`），所以这不是新发明。
+
+**(d) 为什么是 int32 全 0**
+
+全 0 = slot 0。int32 与 eager 路径从 bundle 转换出来的 dtype 一致（下一行的
+`bundle_loc.to(torch.int32)`），避免下游算子遇到两种 dtype。
+
+### 3.5 compressor 入口分发
+
+```diff
+     def forward_core_compressor(self, x, forward_batch, layer_id, compressor) -> None:
+         if forward_batch.forward_mode.is_idle():
+             return
++        if in_prefill_graph(forward_batch):
++            bcg_dsv4_compressor(x=x, compressor=compressor)
++            return
+         compressor(x, forward_batch)
+```
+
+插在 idle 判定**之后**：idle 的 rank 连断点都不需要记。
+
+紧跟其后的这一行是本文件里一个容易看漏的点：
+
+```python
+    # The NPU fused compressor writes c4/indexer payloads identically.
+    forward_indexer_compressor = forward_core_compressor
+```
+
+`forward_indexer_compressor` 是**类级别名**，指向同一个函数对象，所以它自动获得了断点分发。
+CP 路径走的是这个别名。
+
+### 3.6 indexer 入口分发 + 拆出 `_eager`
+
+```diff
+     def forward_c4_indexer(self, *, x, q_lora, forward_batch, c4_indexer=None,
+                            alt_streams=None, enable_multi_stream=False,
+                            q_lora_ready=None, skip_compressor=False) -> None:
+         if forward_batch.forward_mode.is_idle():
+             return
++        if in_prefill_graph(forward_batch):
++            # A break runs on the replay stream after the preceding segment,
++            # so q_lora is ready without the capture-time event.
++            bcg_dsv4_c4_indexer(
++                backend=self, x=x, q_lora=q_lora,
++                c4_indexer=c4_indexer, skip_compressor=skip_compressor,
++            )
++            return
++        self.forward_c4_indexer_eager(
++            x=x, q_lora=q_lora, forward_batch=forward_batch,
++            c4_indexer=c4_indexer, q_lora_ready=q_lora_ready,
++            skip_compressor=skip_compressor,
++        )
++
++    def forward_c4_indexer_eager(self, *, x, q_lora, forward_batch, c4_indexer,
++                                 q_lora_ready=None, skip_compressor=False) -> None:
+         # 以下为原 forward_c4_indexer 的函数体，一行未改
+         self._ensure_npu_c4_indexer(c4_indexer, x.device)
+         ...
+```
+
+**为什么必须拆函数**：断点函数体执行时 `is_in_breakable_cuda_graph()` 仍为 True，如果断点
+回调入口就会再次命中 `in_prefill_graph` 判定，无限递归。拆出 `_eager` 后，入口负责分发、
+`_eager` 负责干活，断点直接调后者。原函数体一行未改地搬了过去。
+
+**断点少传了三个参数**，各有原因：
+
+| 参数 | 为什么不传 |
+| --- | --- |
+| `forward_batch` | 必须在函数体里现取（1.1），传进来就固定成 capture 期那个了 |
+| `alt_streams` / `enable_multi_stream` | `_eager` 签名里本来就没有，它内部用 `self._can_use_indexer_multi_stream()` 自己判断 |
+| `q_lora_ready` | 见下 |
+
+`q_lora_ready` 是一个 **CUDA event**，由 `deepseek_v4.py` 里 `current_stream.record_event()`
+记录，用途是在 `_forward_prepare_multi_stream` 里让侧流等待主流上的 q_lora 算完：
+
+```python
+if q_lora_ready is not None:
+    stream_q.wait_event(q_lora_ready)
+```
+
+断点路径下不需要它：断点在**上一个段结束之后**、在 replay 流上按序执行，上一段产出的
+`q_lora` 已经在流序上先于断点完成，不存在需要 event 跨流对齐的时序。传 `None` 进去，
+上面那个 `if` 自然跳过。
+
+> 这是本 commit 里唯一一处"丢掉了一个参数"，也是多流开关下**未在设备上验证**的那条路径
+> （`SGLANG_NPU_USE_MULTI_STREAM=1`）。官方部署文档只在 decode 节点设这个开关。
+
+---
+
+## 第四部分：测试（+129 行）
+
+三组用例，每组守一个具体的失败模式。按仓库的单测准入规则，每条都要能回答"将来哪个改动会让
+它变红"。
+
+### 4.1 `test_capture_routes_every_completed_block_to_slot_zero`
+
+```python
+with get_flags().dp.override(capturing_prefill_graph=True):
+    fm = self._prefill_metadata([130, 7])
+self.assertEqual(fm.c4_loc.tolist(), [0] * 33)   # 130//4 + 7//4
+self.assertEqual(fm.c128_loc.tolist(), [0])      # 只有第一个请求凑满一个 c128 块
+self.assertEqual(fm.c4_loc.dtype, torch.int32)
+```
+
+守 3.4：占位 loc 的**块数算法**和 **dtype**。长度 130 和 7 这两个数故意选成非 4 / 非 128
+的整数倍，这样 `130//4 + 7//4 = 33` 能同时验证"按请求分别取整再相加"而不是"总长度取整"
+（后者会得到 `137//4 = 34`，错 1）。
+
+### 4.2 `test_missing_bundle_outside_capture_stays_none`
+
+```python
+fm = self._prefill_metadata([130, 7])   # 不加 capture 标志
+self.assertIsNone(fm.c4_loc)
+self.assertIsNone(fm.c128_loc)
+```
+
+守 3.4(b)：**负向分支**。如果哪天有人把条件从 `capturing_prefill_graph` 改回
+`is_in_breakable_cuda_graph()`，或者干脆去掉条件，这个用例会红。没有它，那个改动能通过
+其余所有测试，而后果是 replay 期静默写坏数据。
+
+### 4.3 `test_padding_length_follows_cu_not_padded_positions`
+
+```python
+fm = self._prefill_metadata([64], bucket_num_tokens=128)
+self.assertEqual(fm.positions_cmp_padding_c4.numel(), 17)
+self.assertEqual(fm.positions_cmp_padding_c128.numel(), 1)
+```
+
+守 3.3。测试辅助函数为此加了 `bucket_num_tokens` 参数，用来构造"`positions` 是 128 行、
+`cu` 只有 64"的 replay 情形——这正是线上那个报错的形状。修复前这里会得到 33 和 2。
+
+这个用例在修复前的代码上确实是红的（已验证），符合"bug 回归测试必须先验证它在修复前失败"
+的要求。
+
+### 4.4 `test_sources_run_at_replay_on_live_rows`
+
+用**真实的** `eager_on_graph` 和 `BreakableCUDAGraph` 走一遍 capture 和 replay，只把图类和
+设备模块 mock 掉。断言分两段：
+
+- **capture 期**：indexer 函数体和 compressor 都**没有被执行**，且恰好记下 2 个断点。
+  这守的是 1.1 的核心语义——如果哪天装饰器丢了，函数体会在 capture 期直接跑掉。
+- **replay 期**：换成 8 行 bucket、5 个真实行、positions 从 100 开始的 batch。断言 indexer
+  收到前 5 行的 `x` / `q_lora` 和 positions 100~104，compressor 收到前 5 行，而
+  **replay batch 自己的 positions 仍是 8 行**。
+
+最后那条断言专门守 2.2 的浅拷贝：如果有人改回原地修改 `forward_batch.positions`，这条会红。
+
+---
+
+## 第五部分：三个时机的完整对照
+
+```mermaid
+flowchart TB
+    %% AFTER 先声明：Mermaid 把后声明的 subgraph 排在左侧
+    subgraph R["replay（每个真实请求）"]
+        direction TB
+        R1["runner 为 live batch 重建 metadata<br/>（段外 eager，含 host 读）"]
+        R1 --> R2["段 N replay<br/>产出 x / q_lora 到固定地址"]
+        R2 --> R3["断点1 执行：indexer<br/>现取 batch，切到 live 行"]
+        R3 --> R4["断点2 执行：compressor<br/>写当次真实 bundle 的 loc"]
+        R4 --> R5["断点3 执行：sparse attention<br/>读断点1 写的 c4_topk_indices"]
+        R5 --> R6["段 N+1 replay"]
+    end
+    subgraph C["capture（每个 bucket 一次）"]
+        direction TB
+        C1["runner 为 dummy batch 建 metadata<br/>缺 bundle → 占位 loc 到 slot 0"]
+        C1 --> C2["warmup × 2：断点函数体<b>执行</b><br/>压缩写入落到 slot 0"]
+        C2 --> C3["录图开始，命中断点1"]
+        C3 --> C4["结束段 N，记下 partial<br/><b>不执行</b>函数体"]
+        C4 --> C5["命中断点2 / 断点3，同样只记录<br/>断点间无算子 → 空段"]
+        C5 --> C6["录完，存 _graphs"]
+    end
+```
+
+eager 服务（未开 prefill graph）时 `is_in_breakable_cuda_graph()` 为 False，
+`in_prefill_graph` 短路，两个入口都直接走原路径，本 commit 对它零影响。
+
+---
+
+## 第六部分：为什么不用别的做法
+
+**为什么不在 graph backend 里临时替换后端的方法**（最初考虑过的"方案 A"）：
+在 `capture_one` 期间把 `backend.forward_c4_indexer` 换成断点、`finally` 里恢复。好处是只动
+一个新增文件。坏处是隐式耦合——将来模型若改从别的入口调 indexer，这里不会报错，而是**悄悄
+把它录进图**；而且 graph backend 要知道 DSV4 metadata 的字段名，分层不干净。
+
+**为什么不照搬 CUDA 的 captured-metadata 契约**：CUDA 的 DSV4 后端打开
+`use_captured_forward_metadata_for_breakable_cuda_graph`，capture 时建一份地址稳定的
+metadata、replay 时原地刷新。这套契约的前提是**段内有 kernel 读这份 metadata**。而按 1.2，
+NPU 的 compressor / indexer / sparse attention 本来就进不了图，照搬只是把 metadata 改写成
+可原地刷新的 buffer，工作量与 decode 的 `_init_dsv4_graph_metadata` / `_refresh_graph_*`
+相当（数百行），换不来任何算子进图。只有将来 compressor 有了纯 device 侧接口才值得做。
+
+---
+
+## 已知限制
+
+- **prefill bucket 必须 >= 128。** 小于压缩粒度 128 的 bucket 会被 sparse-attn metadata
+  AICPU 算子拒绝。capture batch 对该算子而言与一个真实的 N token 单请求 prefill 无法区分，
+  所以 eager 下的超短 prompt 多半同样不可用；这是既有限制，本 commit 未处理。
+- **多流未验证。** 见 3.6 末尾。
+- **`global_num_token_non_padded_cpu` 必须恒等于 `cu[-1]`。** 两个断点都用前者切行，而
+  compressor 的算子按后者推 tokenSize。目前只在单请求场景核对过，DP 下未在设备上验证——
+  这是 3.3 那类口径问题的下一个候选位置。
