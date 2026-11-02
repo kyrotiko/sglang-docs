@@ -143,10 +143,11 @@ capture 期算出的 host 值。
 重构前 NPU 上没有任何参数能**成功**开启 prefill 图：门禁能过、runner 能建，但后端解析
 没有 NPU 分支，拿到 CUDA 版后端后在段捕获处崩。
 
+两栏不相连，所以在 `TB` 下会并排：左重构前，右重构后，每栏自上而下。
+
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph BEFORE["重构前：NPU 上开不起来"]
-        direction TB
         A1{"prefill.backend"}
         A1 -->|"disabled（默认）"| A2["eager prefill"]
         A1 -->|"breakable"| A3["capture_prefill_graph 门禁<br/>PrefillCudaGraphRunner"]
@@ -156,7 +157,6 @@ flowchart LR
         A6 --> A7["捕获期崩溃<br/>NPU 上没有这个类"]
     end
     subgraph AFTER["重构后"]
-        direction TB
         B1{"prefill.backend"}
         B1 -->|"disabled（默认）"| B2["eager prefill"]
         B1 -->|"其他值"| B9["ValueError<br/>不再静默拿错后端"]
@@ -167,7 +167,6 @@ flowchart LR
         B6 --> B7["_is_stream_capturing<br/>便携分支 · §4.2"]
         B7 --> B8["段 / 断点交替<br/>捕获成功"]
     end
-    A1 ~~~ B1
 ```
 
 默认值没变：NPU 上"不入图"本来就是默认，重构只让显式开启这条路走得通。
