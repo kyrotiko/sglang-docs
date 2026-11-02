@@ -45,6 +45,34 @@ seq_lens  =  extend_prefix_lens  +  extend_seq_lens
 decode 时为 `None`；此时 `seq_lens` 直接表示 KV 总长度，每个请求贡献 1 行 query。
 所以 decode 下 token 数 == 请求数，这也是 decode 能按 bs 分桶、prefill 不能的原因（见 §7）。
 
+### 2.1 为什么有的材料里 `seq_lens` 和 extend 长度是一回事
+
+[sglang-batch-viz.html](sglang-batch-viz.html) 第 1 步里，`extend_lens` 和 `seq_lens` 两行
+数值完全相同（都是 5 / 3 / 4）。那不矛盾，是**没有 prefix cache 命中**的场景：
+
+```
+seq_lens = extend_prefix_lens + extend_seq_lens = 0 + extend_seq_lens
+```
+
+prefix 为 0 时两者相等，所以只讲全新请求时可以不区分，那份 viz 也就全程没出现
+`extend_prefix_lens`。**一旦有 prefix 命中或走 chunked prefill，两者就分开了**，而
+attention 的两个维度分别取自它们，混用会算错。
+
+### 2.2 同一个量在不同层有不同的名字
+
+这也是两份材料对不上的常见原因——换一层就换个名字：
+
+| 层 | 字段 | 类型 |
+| --- | --- | --- |
+| 单个请求 | `Req.extend_len` | `int`（property） |
+| 调度批次 | `ScheduleBatch.extend_lens` | `List[int]` |
+| forward 批次 | `ForwardBatch.extend_seq_lens` | device tensor |
+| 同上，host 镜像 | `ForwardBatch.extend_seq_lens_cpu` | `List[int]` |
+
+转换点是 `forward_batch_info.py:1044` 的 `extend_seq_lens = batch.extend_lens`。
+`ScheduleBatch` 里搜不到 `extend_seq_lens`，`ForwardBatch` 里也基本不用裸 `extend_lens`，
+所以看代码时先确认自己在哪一层。`seq_lens` 两层同名，含义也一致。
+
 ## 3. 标量
 
 | 字段 | 单位 | 含义 |
