@@ -143,20 +143,15 @@ capture 期算出的 host 值。
 重构前 NPU 上没有任何参数能**成功**开启 prefill 图：门禁能过、runner 能建，但后端解析
 没有 NPU 分支，拿到 CUDA 版后端后在段捕获处崩。
 
-两栏不相连，所以在 `TB` 下会并排：左重构前，右重构后，每栏自上而下。
+左重构前，右重构后，每栏自上而下。
 
 ```mermaid
 flowchart TB
-    subgraph BEFORE["重构前：NPU 上开不起来"]
-        A1{"prefill.backend"}
-        A1 -->|"disabled（默认）"| A2["eager prefill"]
-        A1 -->|"breakable"| A3["capture_prefill_graph 门禁<br/>PrefillCudaGraphRunner"]
-        A3 --> A4["resolve_prefill_backend<br/>无 NPU 分支"]
-        A4 --> A5["BreakableCudaGraphBackend<br/>（CUDA 版）"]
-        A5 --> A6["_begin_new_segment<br/>graph_cls = torch.cuda.CUDAGraph"]
-        A6 --> A7["捕获期崩溃<br/>NPU 上没有这个类"]
-    end
+    %% 两栏并排靠 TB 父图 + 每栏 direction TB；Mermaid 把后声明的 subgraph 排在左侧，
+    %% 所以 AFTER 先写、BEFORE 后写，渲染出来才是左前右后。不要加跨栏连线：
+    %% subgraph 内节点一旦连到外部，它的 direction 就会被忽略，内容会倒成横向。
     subgraph AFTER["重构后"]
+        direction TB
         B1{"prefill.backend"}
         B1 -->|"disabled（默认）"| B2["eager prefill"]
         B1 -->|"其他值"| B9["ValueError<br/>不再静默拿错后端"]
@@ -166,6 +161,16 @@ flowchart TB
         B5 --> B6["_device_graph_cls() · §4.1<br/>每段一个 torch.npu.NPUGraph"]
         B6 --> B7["_is_stream_capturing<br/>便携分支 · §4.2"]
         B7 --> B8["段 / 断点交替<br/>捕获成功"]
+    end
+    subgraph BEFORE["重构前：NPU 上开不起来"]
+        direction TB
+        A1{"prefill.backend"}
+        A1 -->|"disabled（默认）"| A2["eager prefill"]
+        A1 -->|"breakable"| A3["capture_prefill_graph 门禁<br/>PrefillCudaGraphRunner"]
+        A3 --> A4["resolve_prefill_backend<br/>无 NPU 分支"]
+        A4 --> A5["BreakableCudaGraphBackend<br/>（CUDA 版）"]
+        A5 --> A6["_begin_new_segment<br/>graph_cls = torch.cuda.CUDAGraph"]
+        A6 --> A7["捕获期崩溃<br/>NPU 上没有这个类"]
     end
 ```
 
