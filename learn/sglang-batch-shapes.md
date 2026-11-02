@@ -20,11 +20,27 @@
 
 这三个是核心，理解它们的关系就理解了一半：
 
-| 字段 | 含义 |
-| --- | --- |
-| `seq_lens` | 这个请求的 **KV 总长度** = 已缓存的 + 这次新算的 |
-| `extend_prefix_lens` | 其中**已经在 KV cache 里**的部分（prefix cache 命中的长度） |
-| `extend_seq_lens` | 其中**这次要新算**的部分 |
+| 字段 | 形状 | 含义 |
+| --- | --- | --- |
+| `seq_lens` | `[bs]` | 这个请求的 **KV 总长度** = 已缓存的 + 这次新算的 |
+| `extend_prefix_lens` | `[bs]` | 其中**已经在 KV cache 里**的部分（prefix cache 命中的长度） |
+| `extend_seq_lens` | `[bs]` | 其中**这次要新算**的部分 |
+
+**三个都是一维的**，各自长度 `bs`，每个元素是一个请求的 token 计数（标量）。它们是三个
+独立的 tensor，不是一个二维 tensor——下面把它们排成三行只是为了对照着看：
+
+```
+bs = 3（请求 A / B / C）
+
+seq_lens            = [1000, 1000, 1024]    一维，shape [bs]
+extend_prefix_lens  = [   0,  900,  512]    另一个一维 tensor
+extend_seq_lens     = [1000,  100,  512]    又一个一维 tensor
+                         ↑A    ↑B    ↑C
+```
+
+`seq_lens.shape[0]` 在代码里被直接当 bs 用（如 `ascend_backend.py:658`），dim 0 就是请求轴，
+没有 dim 1。恒等式是**逐元素**成立的，就是普通向量加法。这一带唯一的二维张量是 §5 的
+`req_to_token`。
 
 ```
 seq_lens  =  extend_prefix_lens  +  extend_seq_lens
