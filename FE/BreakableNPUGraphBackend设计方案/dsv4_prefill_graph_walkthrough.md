@@ -111,6 +111,123 @@ _execute_body_capture        prefill_cuda_graph_runner.py:2331
 栈里没有 `forward_c4_indexer`，也没有 `in_prefill_graph`——它们属于 capture 期，replay
 期已经不在路径上了。
 
+#### 1.1.2 录成图之后，CPU 和 NPU 之间传的是什么
+
+先破一个误解：**录成图不会把一串计算变成"一次 NPU 计算"。** kernel 还是原来那些 kernel，
+个数一样、顺序一样、每个算的东西一样。变的只是**谁在什么时候把它们提交给设备**。
+
+##### eager 下的一次提交长什么样
+
+eager 执行时，CPU 对每个 kernel 做一次提交，每次提交带一个参数块：
+
+```
+launch gemm_wq_a    args = { in=0x7f..1000, w=0x7f..8000, out=0x7f..2000, M=64, N=…, K=… }
+launch rmsnorm      args = { in=0x7f..2000, out=0x7f..2400, n=64, eps=1e-6 }
+launch rope         args = { q=0x7f..2400, positions=0x7f..3000, n=64 }
+launch store_cache  args = { kv=0x7f..2400, loc=0x7f..4000, n=64 }
+---- host 同步：cu.cpu().tolist() ----      CPU 等 NPU，拿到 [0, 64]，在 host 上算 metadata
+launch compressor   args = { x=..., cu_seqlens=0x7f..5000, seqused=..., tokenSize=64 }
+launch sparse_attn  args = { ..., actual_seq_lengths=[64] ← host 侧 IntArray }
+launch gemm_o_proj  args = { ... }
+...                                          × 61 层
+```
+
+参数块里只有两类东西：**设备地址**和**标量值**。每层几十个 kernel，61 层下来是几千次提交，
+每次都有 host 侧的参数组装和驱动调用开销。中间还夹着 host 同步——CPU 要等 NPU 算完才能读到
+序列长度，算完 metadata 再接着提交，这期间 NPU 空着。
+
+##### 录图把什么固定下来了
+
+capture 就是把这串提交**连同它们的参数块一起**录进一个预先建好的任务序列。所以：
+
+| | 录进图里了吗 |
+| --- | --- |
+| kernel 的顺序和个数 | **是** |
+| 每个 kernel 的参数块：设备地址 | **是**（地址被写死） |
+| 每个 kernel 的参数块：标量（`n=64`、`tokenSize=64`、host IntArray `[64]`） | **是**（值被写死） |
+| 那些地址里**存的数据** | **不是** |
+
+最后一行是全部奥妙所在：地址写死了，但地址里的内容每次可以不一样。
+
+##### 于是接口从"传值"变成了"约定地址"
+
+| | eager | graph replay |
+| --- | --- | --- |
+| **入参** | 每个 kernel 一个参数块，CPU 逐次传 | replay 之前，CPU 把当次数据 `copy_()` 进那些**写死的地址**；replay 调用本身不带任何数据 |
+| **提交次数** | 段内每个 kernel 一次 | 每段一次 |
+| **出参** | 每个 kernel 产出新 tensor | 固定输出 buffer 的前 N 行 |
+
+代码里看得最清楚（`breakable_cuda_graph_backend.py:295-305`）：
+
+```python
+def replay(self, shape_key, static_forward_batch, **kwargs):
+    with graph_pool_replay_scope():
+        self._graphs[shape_key].replay()    # 不传任何数据
+    return self._outputs[shape_key]         # capture 期就建好的视图，每次返回同一个
+```
+
+**这个 `replay()` 没有数据入参，返回值也是 capture 时就存下来的对象。** 真正的"入参"动作
+发生在它之前，由 `load_batch()` 里的 `buffer_registry.fill_from(...)` 完成：把当次的
+`input_ids` / `positions` / `out_cache_loc`，以及 `seq_lens` / `extend_seq_lens` /
+`extend_prefix_lens` / `extend_start_loc` / `req_pool_indices` / `orig_seq_lens`
+（即 `_PREFILL_STATIC_FIELDS`）逐个拷进静态 buffer。
+
+##### 一个具体例子：bucket 128，来了一个 64 token 的请求
+
+**eager：**
+
+```
+CPU: launch gemm(in=0x1000, out=0x2000, M=64)     ← M 就是 64，当场传
+CPU: launch rope(positions=0x3000, n=64)
+...
+CPU: 读 seq_lens → 在 host 上算出 cu=[0,64]
+CPU: launch compressor(cu_seqlens=0x5000, tokenSize=64)
+CPU: 拿到输出 tensor，形状 [64, 7168]
+```
+
+**graph replay：**
+
+```
+CPU: static_input_ids[:64].copy_(live_input_ids)      ← 往写死的地址里填数据
+CPU: static_positions[:64].copy_(live_positions)         尾部 64~127 行是上一次的残留
+CPU: static_out_cache_loc[:64].copy_(live_loc)
+CPU: static_seq_lens[:1].copy_(live_seq_lens)
+CPU: graph.replay()                                   ← 一次提交，不带数据
+     └─ 设备按录好的序列执行：gemm(in=0x1000, out=0x2000, M=128) …
+                                                          ↑ M 是录进去的 128，不是 64
+CPU: return self._outputs[shape_key]                  ← 固定 buffer
+CPU: output[:64]                                      ← 自己切到真实行数
+```
+
+两件事直接从这个例子里掉出来：
+
+1. **shape 是写死的，所以必须 padding。** 录的是 `M=128`，replay 时设备就按 128 行算，
+   包括 64~127 行那些残留数据。算完的垃圾行由调用方切掉（`_slice_output` 的
+   `output[:num_tokens]`）。这就是 bucket 机制存在的原因，也是为什么断点里到处是
+   `x[:num_tokens]`。
+2. **写死的标量就是三个 bug 的来源。** `tokenSize` 这类标量一旦录进去就定死在 128，而当次
+   请求是 64。对纯 device 的 kernel 来说这不要紧（多算几行垃圾然后切掉），但对
+   compressor / indexer 这类**要靠 host 算出的长度去对齐内存布局**的算子，录进去就是错的
+   ——这正是 1.2 要讲的。
+
+##### 断点改变了这幅图的哪一部分
+
+breakable 不是"全录成一张图"，而是**段 + eager 区交替**：
+
+```
+段1(一次提交) → 断点1(CPU 正常逐个 launch) → 段2(一次提交) → 断点2(CPU 逐个 launch) → …
+```
+
+所以 CPU↔NPU 的交替**并没有被消除**，只是从"每个 kernel 一次"变成了"每个断点一次"：
+
+| kernel | 提交方式 | host 同步 |
+| --- | --- | --- |
+| 段内的 GEMM / norm / RoPE / MLP / MoE（数量最多） | 每段一次提交，参数全部写死 | 无 |
+| 断点内的 compressor / indexer / sparse attention | 照旧每个 kernel 一次提交 | 照旧有（这正是它们必须留在图外的原因） |
+
+省掉的是数量最多的那一类的提交开销；留下的是必须留的。DSV4 每层 3 个断点（见 5.1），
+所以每层从"几十次提交"变成"4 段提交 + 3 个断点里的若干次提交"。
+
 ---
 
 这里有一个**本 commit 的全部设计都建立在上面的关键区别**：
