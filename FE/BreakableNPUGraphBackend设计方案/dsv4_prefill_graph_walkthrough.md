@@ -228,6 +228,67 @@ breakable 不是"全录成一张图"，而是**段 + eager 区交替**：
 省掉的是数量最多的那一类的提交开销；留下的是必须留的。DSV4 每层 3 个断点（见 5.1），
 所以每层从"几十次提交"变成"4 段提交 + 3 个断点里的若干次提交"。
 
+#### 1.1.3 kernel 之间的数据是怎么交接的
+
+很自然会这样想：第一次下发写出到地址 B，第二次下发要从地址 C 读入，那原来是 CPU 把数据从
+B 搬到 C 的，录成图之后谁来搬？
+
+**这个前提不成立：eager 下 CPU 也从来不搬数据。** CPU 搬的是**地址**，不是字节。
+kernel 之间的数据流动，靠的是**同一个地址出现在前一个 kernel 的输出位和后一个 kernel 的
+输入位**。数据全程待在设备上，一步都没动过。
+
+```python
+b = torch.matmul(x, w)   # allocator 给出地址 0x2000；launch matmul(out=0x2000)
+c = torch.relu(b)        # allocator 给出地址 0x2400；launch relu(in=0x2000, out=0x2400)
+                         #                                     ↑ 就是上一行的输出地址
+```
+
+CPU 在这里只做两件事：向 allocator 要一个地址，把这个地址填进下一个 kernel 的参数块。
+`b` 这个 Python 对象也只是"地址 0x2000 + 形状 dtype"的一个壳子。
+
+所以录图时什么都不用额外做：capture 把这两次下发连同 `in=0x2000` / `out=0x2400` 一起录下，
+replay 时 matmul 往 0x2000 写、rmsnorm 从 0x2000 读，交接自然成立——因为它**本来就不是一次
+拷贝，而是同一个地址被用了两次**。
+
+这也解释了为什么必须有专门的图内存池：0x2000 这个地址在图的整个生命周期里都不能被别人拿去
+复用，否则 replay 时读到的就是别人的数据。`breakable_cuda_graph_backend.py:192` 那行注释
+把这件事说透了：
+
+```python
+# CUDA graphs retain tensor addresses, not Python tensor lifetimes.
+```
+
+图记住的是地址，不是 Python 对象的生命周期。Python 侧的 `b` 早就被回收了也没关系，
+地址由池的 use-count 钉住。
+
+于是只剩三种情况需要区分：
+
+| 情况 | eager 下 | 录图后 |
+| --- | --- | --- |
+| **① 普通串联**（上一个的输出就是下一个的输入） | 同一地址用两次，CPU 不搬数据 | 地址一起录进去，自动成立 |
+| **② eager 本来就做了一次拷贝**（`c.copy_(b)`、`cat`、`contiguous()`、device→device） | 那次拷贝**本身就是一个 kernel** | 和别的 kernel 一样被录进去 |
+| **③ 数据真的绕了 host 一圈**（`b.cpu().tolist()` → host 上算 → 作为标量/IntArray 喂给下一个 kernel） | CPU 等 NPU、算完再下发 | **录不进去**，只能做成断点 |
+
+情况 ② 在本仓就有现成例子。capture 结束时录了一次 device→device 拷贝，把 forward 的输出
+搬进一个固定的共享 buffer（`breakable_cuda_graph_backend.py:256`）：
+
+```python
+output_buffer[:num_tokens].copy_(output[:num_tokens])
+```
+
+这行拷贝是**被录进图里的一个 kernel**。正因为每次 replay 都会重新执行它，输出才总是落在同一
+个固定地址上，`replay()` 才能直接 `return self._outputs[shape_key]`——那是 capture 期就对
+着这个共享 buffer 建好的视图。
+
+情况 ③ 才是真正的麻烦，而它正是断点存在的全部理由。本 commit 里的例子就是
+`_build_npu_compress_metadata_prefill` 里的 `cu.cpu().tolist()`：把设备上的前缀和读回
+host，在 host 上算出 `positions_cmp_padding_c*` 的长度，再喂给 compressor。这个 host 往返
+没法录进图，所以这整段必须留在段外、每次 replay 重新跑一遍。
+
+最后把这条原理接回 1.1 的那个"参数在 capture 固定"：断点收到的 `x` 和 `q_lora`，
+**就是上一个段的输出地址**。每次 replay，那个段都会往同一地址写入当次的新数据，断点再从
+那里读。所以固定参数和"读到的是当次数据"并不矛盾——固定下来的是地址，变的是内容。
+
 ---
 
 这里有一个**本 commit 的全部设计都建立在上面的关键区别**：
