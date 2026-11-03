@@ -89,6 +89,36 @@ attention 的两个维度分别取自它们，混用会算错。
 `ScheduleBatch` 里搜不到 `extend_seq_lens`，`ForwardBatch` 里也基本不用裸 `extend_lens`，
 所以看代码时先确认自己在哪一层。`seq_lens` 两层同名，含义也一致。
 
+### 2.3 对照：`positions` 是按 token 给的
+
+上面三个都是 `[bs]`，`positions` 不是——它是 `[token 数]`，每个 token 一个元素，值是这个
+token 在**自己那条序列**里的绝对位置。构造处 `compute_position_torch`
+（`forward_batch_info.py:2474`）：
+
+```python
+positions = torch.cat([
+    torch.arange(prefix_len, prefix_len + extend_len)
+    for prefix_len, extend_len in zip(extend_prefix_lens, extend_seq_lens)
+])
+```
+
+```
+extend_prefix_lens = [0, 900, 512]
+extend_seq_lens    = [3,   2,   4]
+
+positions = [0, 1, 2,  900, 901,  512, 513, 514, 515]      一维 int64
+             └ A 3 个 ┘ └ B 2 个 ┘ └─── C 4 个 ───┘
+长度 = 3 + 2 + 4 = 9 = extend_num_tokens
+```
+
+值是**跳的**，每个请求从自己的 prefix 接着数，所以 `positions != arange(t)`。RoPE 拿它当
+下标查 cos/sin 表：第 i 行 token 查表的第 `positions[i]` 行。
+
+一个常见的读法陷阱：`positions.shape[0]`（第 0 维的大小，一维张量就是长度，等于
+`len(positions)`）在 eager 下恒等于真实 token 数，但在 cuda graph replay 下它是 **bucket
+长度**——static batch 的 positions 是 bucket 大小的静态 buffer。要真实 token 数得读 §6 的
+那两个量。
+
 ## 3. 标量
 
 | 字段 | 单位 | 含义 |

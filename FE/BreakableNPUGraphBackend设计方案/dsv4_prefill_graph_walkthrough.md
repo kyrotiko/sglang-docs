@@ -507,6 +507,11 @@ def in_prefill_graph(forward_batch: ForwardBatch) -> bool:
 
 ### 2.2 indexer 断点
 
+读下面的代码前先理清因果，否则很容易把结论搞反：**断点要解决的是"这两个 source 不能待在段
+内"（1.2），切片只是挪出去之后才需要的记账。** 挪出去之后 replay 时拿到的是 runner 的
+bucket-padded static batch，所以才要 `x[:num_tokens]` / `positions[:num_tokens]` 把行数切回
+真实值。先有断点，才有切片——反过来说，如果只是想修 positions 的长度，根本不需要断点。
+
 ```python
 @eager_on_graph
 def bcg_dsv4_c4_indexer(
@@ -1040,12 +1045,60 @@ eager 服务（未开 prefill graph）时 `is_in_breakable_cuda_graph()` 为 Fal
 一个新增文件。坏处是隐式耦合——将来模型若改从别的入口调 indexer，这里不会报错，而是**悄悄
 把它录进图**；而且 graph backend 要知道 DSV4 metadata 的字段名，分层不干净。
 
+**为什么不照搬 decode 的做法**（这是同一问题的另一半，值得单独说）。decode 走的正是相反的
+方向——**把 compressor 录进图**，代价是一整套定长预分配 + 原地刷新，`:1353-1912`，约 560 行、
+18 个方法：
+
+```python
+# capture：按图形状预分配，地址从此不变
+def _init_dsv4_graph_metadata(self, bs, forward_mode):
+    tokens_per_req = 1                      # decode 恒为 1
+    n_tok  = bs * tokens_per_req
+    c4_pad = min(n_tok, n_tok // 4 + bs)    # ← 只跟 bs 有关
+    metadata.positions_cmp_padding_c4 = torch.zeros(c4_pad, ...)
+    metadata.start_pos = torch.zeros(bs, ...)
+    metadata.dsv4_explicit_state_block_tables = {
+        ratio: torch.full((bs, coff*ratio + tokens_per_req), dummy, ...) }
+
+# replay：全部原地写，一次都不重新绑定
+def _apply_dsv4_graph_metadata(self, forward_batch):
+    self._refresh_graph_decode_compress_1d_direct(ctx)    # .copy_ / _stable_compact_1d
+    self._refresh_graph_explicit_state_block_tables(ctx)  # fixed_table.copy_(重算的表)
+    self._refresh_graph_kernel_metadata(ctx)              # fm.kernel_metadata[k].copy_(...)
+```
+
+连 host 同步都是专门绕开的：`_stable_compact_1d` 用 `cumsum(keep) - 1` 代替 `nonzero()`，
+docstring 写明动机是避开 "a dynamic output shape or a **device-to-host size read**"。
+
+**prefill 搬不过来，因为 decode 每请求的 token 数是常量。** decode 恒为 1（target_verify 是
+`draft_token_num`，也是 capture 期已知的常量），于是每个长度都是 `bs` 的函数，capture 期算得
+出、replay 期不必问 host。prefill 的块数和块值取决于每个请求的 `prefix_len` / `extend_len`：
+
+```python
+first_k = prefix // ratio                 # _build_npu_compress_metadata_prefill:279
+last_k  = total  // ratio
+torch.arange(first_k, last_k) * ratio     # ← 每请求一段变长 range
+```
+
+同一个 128 的 bucket，prefix 切法不同，块数和块值都不同。上界给得出
+（`min(t, t//ratio + bs)` 就是），但值要逐请求拼变长 range。decode 的同一件事是纯 device
+算术——"每请求 0 或 1 个新块"（`(live_seq_lens % ratio) == 0`，定点 scatter），prefill 是
+"每请求一段连续块"。改成定长写法就是那 560 行的量级，而按 1.2，**换不来任何算子进图**：
+compressor 算子本身吃 host 侧 IntArray，`npu_quant_lightning_indexer_metadata` 还带 Python
+字符串入参。decode 能录是因为它的 metadata 形状全是 `bs` 的函数，不是因为那些算子变成了纯
+device 的。
+
+顺带一个对照：**decode 压根没有 positions 那个问题。** 它的 compressor 不读
+`forward_batch.positions`，rope 表来自 replay 期由 `live_seq_lens` 算出的
+`fm.positions_cmp_padding_c{ratio}`，每请求一个元素。prefill 撞上是因为 fused compressor 的
+rope 表按 token 建，而 indexer 的 q-RoPE 直接读 `forward_batch.positions`（2.2）。
+
 **为什么不照搬 CUDA 的 captured-metadata 契约**：CUDA 的 DSV4 后端打开
 `use_captured_forward_metadata_for_breakable_cuda_graph`，capture 时建一份地址稳定的
 metadata、replay 时原地刷新。这套契约的前提是**段内有 kernel 读这份 metadata**。而按 1.2，
 NPU 的 compressor / indexer / sparse attention 本来就进不了图，照搬只是把 metadata 改写成
-可原地刷新的 buffer，工作量与 decode 的 `_init_dsv4_graph_metadata` / `_refresh_graph_*`
-相当（数百行），换不来任何算子进图。只有将来 compressor 有了纯 device 侧接口才值得做。
+可原地刷新的 buffer，工作量与上面 decode 那套相当，同样换不来任何算子进图。只有将来
+compressor 有了纯 device 侧接口才值得做。
 
 ---
 
