@@ -172,6 +172,35 @@ def replay(self, shape_key, static_forward_batch, **kwargs):
 `extend_prefix_lens` / `extend_start_loc` / `req_pool_indices` / `orig_seq_lens`
 （即 `_PREFILL_STATIC_FIELDS`）逐个拷进静态 buffer。
 
+##### bucket：图的形状档位
+
+图把形状写死,而请求长度任意,所以不可能为每个可能的 token 数各录一张图。做法是预先挑几个
+**档位**,每档录一张,来了请求就**向上取整**到最近的那档,多出来的行当 padding 算掉再切掉。
+这个档位就叫 bucket。
+
+| 环节 | 代码 |
+| --- | --- |
+| 档位从哪来 | `--cuda-graph-bs-prefill 128 256 512 1024 2048` → `get_prefill_num_tokens_to_capture`（去重排序 + 对齐 TP/CP 分片宽度，`prefill_cuda_graph_runner.py:173`）→ `self.capture_num_tokens` |
+| 怎么选档 | `_pad_to_bucket(raw_size, buckets)` 返回**最小的 >= raw_size 的档**（`base_cuda_graph_runner.py:180`，bisect）；replay 入口在 `:1932` |
+| 浪费上限 | `_MAX_PREFILL_CUDA_GRAPH_PADDING_FACTOR = 2`（`:167`）：补齐后超过真实行数 2 倍就不入图，退回 eager |
+| 超出最大档 | `can_run_graph` 拒掉，走 eager |
+
+```
+buckets = [128, 256, 512, 1024, 2048]
+
+来了 300 token  → 选 512 档，300~511 行是 padding       global_num_token_non_padded_cpu = 300
+来了 512 token  → 选 512 档，不补齐                      = 512
+来了 10 token   → 128/10 > 2，不入图，eager
+来了 3000 token → 超过最大档，不入图，eager
+```
+
+**prefill 的档位是 token 数，decode 的档位是请求数**，见
+[速查表](../../learn/sglang-batch-shapes.md) §7。capture 时一个 prefill bucket 是个
+"总 token 数",用**最少的合成请求**凑出来,每个请求不超过 `context_length`（`:1607-1613`）。
+
+档位挑多密是个取舍:越密 padding 浪费越小,但每档都要付捕获时间和常驻显存——61 层的模型
+乘上档数。上面那条 `PADDING_FACTOR = 2` 就是这个取舍在代码里的那一半。
+
 ##### 一个具体例子：bucket 128，来了一个 64 token 的请求
 
 **eager：**
@@ -189,8 +218,9 @@ CPU: 拿到输出 tensor，形状 [64, 7168]
 
 ```
 CPU: static_input_ids[:64].copy_(live_input_ids)      ← 往写死的地址里填数据
-CPU: static_positions[:64].copy_(live_positions)         尾部 64~127 行是上一次的残留
-CPU: static_out_cache_loc[:64].copy_(live_loc)
+                                                         尾部 64~127 是上一次的残留
+CPU: static_positions[:64].copy_(live_positions)         尾部 64~127 被清零
+CPU: static_out_cache_loc[:64].copy_(live_loc)           尾部 64~127 被清零（指向 slot 0）
 CPU: static_seq_lens[:1].copy_(live_seq_lens)
 CPU: graph.replay()                                   ← 一次提交，不带数据
      └─ 设备按录好的序列执行：gemm(in=0x1000, out=0x2000, M=128) …
@@ -202,9 +232,16 @@ CPU: output[:64]                                      ← 自己切到真实行�
 两件事直接从这个例子里掉出来：
 
 1. **shape 是写死的，所以必须 padding。** 录的是 `M=128`，replay 时设备就按 128 行算，
-   包括 64~127 行那些残留数据。算完的垃圾行由调用方切掉（`_slice_output` 的
+   包括 64~127 那些 padding 行。算完的垃圾行由调用方切掉（`_slice_output` 的
    `output[:num_tokens]`）。这就是 bucket 机制存在的原因，也是为什么断点里到处是
    `x[:num_tokens]`。
+
+   padding 行里是什么，由每个静态 buffer 自己的 `padding_policy` 决定
+   （`cuda_graph_buffer_registry.py:106-131`，填充前的 Phase 1 在
+   `raw_num_tokens < padded_num_tokens` 时必然执行）：`positions` / `out_cache_loc` 是
+   `ZERO`，每次清零——后者清零是为了让 padding 行的 KV 写入落到 slot 0 那个 padding 槽；
+   `input_ids` 没声明 policy，走默认的 `FOREACH_COPY`，尾部**确实是上一次 replay 的残留**
+   （`:212`，注释写明 "left as whatever the previous replay wrote"）。
 2. **写死的标量就是三个 bug 的来源。** `tokenSize` 这类标量一旦录进去就定死在 128，而当次
    请求是 64。对纯 device 的 kernel 来说这不要紧（多算几行垃圾然后切掉），但对
    compressor / indexer 这类**要靠 host 算出的长度去对齐内存布局**的算子，录进去就是错的
@@ -501,7 +538,32 @@ def bcg_dsv4_c4_indexer(
 - **batch 从 forward context 现取，不从参数拿**——这就是 1.1 讲的那条分界线。warmup 时
   取到的是 capture dummy batch，replay 时取到的是 runner 刷新过的 static batch。
 - `num_tokens == 0`：DP attention 下某个 rank 可能这一轮没有请求（idle）。它仍要参与
-  集合通信所以保留图形状，但没有真实 token，直接返回，不写任何 KV。
+  集合通信所以保留图形状，但没有真实 token，直接返回，不写任何 KV。这个分支能成立，
+  是因为 fabricate idle batch 时这个字段被显式置 0（`forward_batch_info.py:1986-1989`）。
+
+`global_num_token_non_padded_cpu` 是 `ForwardBatch` 上的一个 **host int**
+（`forward_batch_info.py:747`），表示**这次 forward 真实（非 padding）的 token 行数**。
+名字四段各有所指：
+
+| 段 | 含义 |
+| --- | --- |
+| `global` | attn-TP 组**切分前**的口径；切分后的 LOCAL 口径另有字段 `num_token_non_padded` |
+| `num_token` | 按 **token** 计，不是按请求计 |
+| `non_padded` | 不含 padding，即"真实"行数 |
+| `_cpu` | host 标量，不是 device tensor，所以断点里读它**不触发同步** |
+
+字段注释写了 "meaning never changes once set"。eager 下它就是 `len(input_ids)`
+（`_init_num_token_non_padded`，`:1428-1452`），和 bucket 无关，所以平时看不出它的用处。
+
+**入图后它才变成关键。** replay 时 static batch 上的张量几乎全是 bucket 长度，而 runner
+把这个字段按 **live** 值原样抄进 static batch（`prefill_cuda_graph_runner.py:2109`）——
+于是它成了静态 batch 上少数还说得清"真实有几行"的量，断点就靠它切行。capture 期它等于
+bucket 大小（`:1732`），切片是空操作，录下来的形状仍是满桶。三个 token 数的关系见
+[速查表](../../learn/sglang-batch-shapes.md) §6。
+
+为什么不用别的量：`cu[-1]` 是 device tensor，取标量要 `.cpu()`，断点里能用但多一次同步；
+`extend_num_tokens` 在 idle 场景下口径不同。更直接的理由是 CUDA 侧 DSV4 的几个断点用的就是
+这个字段（`models/deepseek_v4.py:804` 起，那边命名 `real_num_tokens`），断点口径必须一致。
 
 ```python
     # The static batch keeps bucket-sized positions; the indexer RoPE reads one
@@ -510,18 +572,61 @@ def bcg_dsv4_c4_indexer(
     live_batch.positions = forward_batch.positions[:num_tokens]
 ```
 
-这两行是 1.3 那张表的直接后果。indexer 内部 `_compute_q_npu` 要用 `positions` 算 RoPE，
-而 static batch 的 `positions` 是 bucket 长度。
+**`positions[:num_tokens]` 切的是什么。** 容易误会的地方是"positions 不就正好 num_tokens
+长吗"——eager 下确实如此，所以这行是恒等操作。但断点跑在 replay 里，`forward_batch` 是
+runner 的 static batch，它的 `positions` 是 **bucket 长度**的静态 buffer
+（`positions = registry.get_slot("positions").slice_for(bs, static_num_tokens)`，
+`prefill_cuda_graph_runner.py:1999-2000/2020`，而 `static_num_tokens` 是 1.1 讲的那个
+`_pad_to_bucket` 结果）：
 
-为什么用**浅拷贝**而不是直接改 `forward_batch.positions`：这个 batch 对象是三个断点共用的，
-后面的 sparse attention 断点还要读它。如果原地改了再改回去（初稿用的是 context manager
-`try/finally`），任何一次异常都会让它停在被改过的状态。浅拷贝只是新建一个对象头，
-字段仍指向同一批张量，代价可以忽略，而且 runner 自己构造 `padded_view` / `tail_batch`
-时也是这么写的。
+```
+positions 的含义：每个 token 在自己序列里的绝对位置，RoPE 拿它查 cos/sin 表
+64 token 的新请求 → [0,1,2,...,63]
 
-浅拷贝安全的前提是**断点不往 batch 上写结果**。indexer 的结果写在后端的
-`forward_metadata` 上，所以拷贝不会丢结果。另外 RoPE 的 per-forward 缓存是按 positions
-对象匹配的，换了切片对象后会按真实 positions 重算，不会误用 bucket 长度那份缓存。
+forward_batch.positions      = [0,1,2,...,63, 0,0,0,...,0]   128 个（尾部 ZERO 清零）
+                                └ 真实 64 个 ┘ └ padding 64 ┘
+forward_batch.positions[:64] = [0,1,2,...,63]                64 个，是个 view
+```
+
+capture 期 `num_tokens` 恰好等于 bucket，切片退化成恒等，所以同一行在两个时机都对。
+
+**为什么非得切。** 它的消费者是按 q 的行数用它的：
+
+```
+forward_c4_indexer_eager(x=x[:64], q_lora=q_lora[:64], forward_batch=?)
+  └─ _forward_prepare
+       └─ _compute_q_npu(c4_indexer, q_lora, forward_batch)
+            bs = q_lora.shape[0]                       → 64
+            q  = wq_b(q_lora).view(64, n_heads, head_dim)
+            positions = forward_batch.positions         ← 从 batch 上拿，不是参数
+            cos4, sin4 = rope_cos_sin(..., positions)   → 跟 positions 一样长
+            apply_rotary_mul_inplace(q, None, cos4, sin4)
+                         ↑ 64 行          ↑ 128 行 → 对不上
+```
+
+`x` 和 `q_lora` 是显式参数，在调用处切一下就行。**`positions` 不是参数，它搭在 batch 对象
+上**（`_compute_q_npu:842` → `_cp_local_positions` → `forward_batch.positions`）。想让它变成
+64 行只有两条路：换 batch，或者给这三层函数加一个 `positions` 参数——后者要动
+`_forward_prepare` / `_compute_q_npu` 这些被 eager 路径共用的签名。
+
+**再看为什么是新建对象而不是直接改。** `forward_batch` 不是断点的私有对象，它是 runner
+拥有的 static batch，这一次 forward 里**所有断点、所有 61 层共用同一个**。直接写
+`forward_batch.positions = ...` 会把"64 行"这个状态漏到断点外面。
+
+"改完再改回去"也能用，那是初稿的写法，也是 CUDA 侧 attention 断点对 `out_cache_loc` 的做法
+（`models/deepseek_v4.py:814` 改、`:829` 在 `finally` 里恢复）。但它需要 try/finally 兜着，
+任何一条异常路径漏了就把 batch 留在被改过的状态上。浅拷贝没有这个失败模式——不用恢复，
+函数返回时临时对象就没了；runner 自己构造 `padded_view` / `tail_batch` 时也是这么写的。
+代价可以忽略：`copy.copy` 只新建一个对象头，上百个字段仍指向同一批张量，`positions[:64]`
+是个 view，不拷数据。
+
+浅拷贝能用靠两个前提，都成立：
+
+- **断点不往 batch 上写结果。** indexer 的产物写在 `self.forward_metadata.c4_topk_indices`
+  （`ascend_dsv4_backend.py:967`），不在 batch 上。要是写 batch，拷贝一丢结果就没了。
+- **RoPE 的 per-forward 缓存按 positions 对象身份校验**：`entry[0] is positions`
+  （`dsv4_rope.py:222`）。换成切片对象后缓存必然 miss、按真实 positions 重算，不会误用那张
+  bucket 长度的表。
 
 ```python
     backend.forward_c4_indexer_eager(
@@ -561,7 +666,7 @@ def bcg_dsv4_compressor(*, x: torch.Tensor, compressor) -> None:
 
 ---
 
-## 第三部分：`ascend_dsv4_backend.py`（+57 / -4）
+## 第三部分：`ascend_dsv4_backend.py`（+53 / -4）
 
 ### 3.1 新增 import
 
@@ -953,3 +1058,6 @@ NPU 的 compressor / indexer / sparse attention 本来就进不了图，照搬�
 - **`global_num_token_non_padded_cpu` 必须恒等于 `cu[-1]`。** 两个断点都用前者切行，而
   compressor 的算子按后者推 tokenSize。目前只在单请求场景核对过，DP 下未在设备上验证——
   这是 3.3 那类口径问题的下一个候选位置。
+- **断点切行用的是 GLOBAL 口径**（见 2.2），前提是 `attn_tp_size == 1`，DP16 部署满足。
+  将来开 attn-TP 序列切分时要改用 `compute_local_num_token_non_padded_cpu`
+  （`forward_batch_info.py:418`，docstring 就写了它是给 replay-time hook 用的）。

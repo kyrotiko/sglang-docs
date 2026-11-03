@@ -140,7 +140,12 @@ self.free_pages = torch.arange(1, self.num_pages + 1, ...)
 
 ## 6. padding 相关的三个 token 数
 
-开了 prefill cuda graph 之后，同一次 forward 里**同时存在三个 token 数**：
+**bucket** = 图录形状时挑的那几个档位。图把形状写死，请求长度任意，所以预先挑几档各录一张
+图，来请求时向上取整到最近那档（`_pad_to_bucket` 取最小的 >= 真实行数的档，
+`runner/base_cuda_graph_runner.py:180`），多出的行是 padding。补齐后超过真实行数 2 倍就
+不入图、退回 eager（`_MAX_PREFILL_CUDA_GRAPH_PADDING_FACTOR`）。
+
+于是开了 prefill cuda graph 之后，同一次 forward 里**同时存在三个 token 数**：
 
 | 数 | 含义 | 例（bucket 128、实际 64 token） |
 | --- | --- | --- |

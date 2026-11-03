@@ -12,7 +12,8 @@ eager 执行。行号会漂移，以内容为准。
 | bucket | `--cuda-graph-bs-prefill`，**必须 >= 128** |
 | GLM-5.2（DSA） | 重构后直接支持，已测，无需模型侧适配 |
 | DSV4 Flash | 经 §5 的适配后支持，已跑通 capture 与在线请求（DP16/TP16/EP16） |
-| 提交 | `d08d2b52b0` P1 接线 · `1c095d6948` DSV4 断点 · `85860762c4` rope 口径 |
+| 提交 | `d08d2b52b0` P1 接线 · `f7d7201a09` DSV4 适配（断点 + rope 口径） |
+| PR | [sgl-project/sglang#48030](https://github.com/sgl-project/sglang/pull/48030)，正文见 [pr_48030_body.md](pr_48030_body.md) |
 
 已知限制：
 
@@ -308,7 +309,7 @@ NPU 上 `is_unified_kv_triton()` 恒为 False（只在 HIP 为 True），mega at
 | 文件 | 改动 |
 | --- | --- |
 | `attention/dsv4_prefill_graph.py`（新增 69 行） | 两个断点函数 + `in_prefill_graph` 判定 |
-| `attention/ascend_dsv4_backend.py`（+49/-2） | 两个入口分发到断点；indexer 函数体拆成 `forward_c4_indexer_eager`；capture 期补占位 loc |
+| `attention/ascend_dsv4_backend.py`（+53/-4） | 两个入口分发到断点；indexer 函数体拆成 `forward_c4_indexer_eager`；capture 期补占位 loc |
 
 ### 5.2 为什么 indexer 和 compressor 必须是断点
 
