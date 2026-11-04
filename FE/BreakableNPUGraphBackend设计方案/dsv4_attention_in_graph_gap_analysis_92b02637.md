@@ -1,0 +1,206 @@
+**基于 92b02637：DSV4 prefill compressor / indexer / attention 全链路入 NPU 图**
+
+分析基线：`sglang` 的 `92b02637f7732b570fe21ef03810182e4d75ef40`。
+范围：`DeepseekV4AscendAttnBackend` 支持的 ratio 0 / 4 / 128，讨论 prefill；不把 V4.1 的 ratio 1 / 2 纳入已有能力。
+用户明确要求：主 compressor、indexer 内部 compressor、indexer 和 sparse attention 全部进入图；图外只保留 replay 前的 metadata planning / 原地刷新。单算子实验可以拆开进行，最终实现不保留这些计算的 eager 断点。
+方法：源码静态分析，未运行 NPU capture / replay 或精度、性能测试。
+
+**1. 结论与基线边界**
+
+`92b02637` 接通的是分段图框架，不是 DSV4 attention 的入图实现：
+
+- `BreakableNPUGraphBackend` 仅继承公共 BCG backend，不重写 capture / replay；其文件说明明确让 attention 和 host-input 算子在段间 eager 执行。
+- segment 换成 `torch.npu.NPUGraph`，使用裸 `capture_begin/capture_end`，未接入自动 dispatch / task update。
+- `models/deepseek_v4.py:2887` 对 EXTEND + BCG 无条件走 `bcg_deepseek_v4_attention_with_output`。NPU 的非 unified 路径也会进入这里，sparse attention 核心不会被捕获。
+- NPU DSV4 没有启用 BCG 的 captured-metadata 契约；replay 仍通过 `init_forward_metadata` 重建 metadata。
+- compressor / indexer 在该基线里没有 NPU prefill 专用断点，因此它们会尝试进入 segment，但地址和动态形状尚不满足 replay 契约。
+
+当前工作分支在基线之后有两笔提交，不能混作基线能力：
+
+| 提交 | 实际作用 | 与目标的差距 |
+| --- | --- | --- |
+| `d9564f9499` | 给 c4 indexer 和主 compressor 添加 eager 断点；修 capture 缺 loc 和 live/bucket RoPE 长度不一致 | 能让 prefill graph 路径运行，但这些计算仍在图外 |
+| `a153685607` | 实验性关闭上述两个 NPU 断点 | 没有修改公共模型的 attention 断点，也没有建立固定 metadata 契约，不能据此认定实现了全 attention 入图 |
+
+最终交付覆盖以下全部计算：
+
+| 层形态 | 必须进入图的计算 | 额外状态 |
+| --- | --- | --- |
+| ratio 0 | Q/KV 投影、norm / RoPE、SWA cache 写入、sparse attention、输出投影 | SWA KV |
+| ratio 4 | 再包含 C4A 主 compressor、C4Li indexer compressor、indexer Q/weights/量化、lightning indexer、压缩后处理和 KV/scale 写入 | 两套 compressor state、main/indexer KV、top-k |
+| ratio 128 | 再包含 C128A 主 compressor、压缩后处理和 KV 写入 | compressor state、c128 KV |
+
+因此 `d9564f9499` 的两个 eager 断点不能作为最终实现；其 capture 占位与长度问题的修复只能按新的固定容量协议重新吸收。`92b02637` 的 BCG 框架仍可作为起点，DSV4 attention 链内部没有 eager break 并不要求立即实现新的 FULL backend。
+
+host 侧计算 metadata，并不意味着读取该 metadata 的 attention kernel 必须 eager；关键是图绑定的存储是否稳定，动态信息是否真正由 device 读取。
+
+**2. 先改变模型的实际分发入口**
+
+基线定位：`python/sglang/srt/models/deepseek_v4.py:790, 841, 2887`。
+
+应为已完成适配的后端提供明确能力标记，使 NPU 的 prefill 路径直接调用可捕获的 backend forward；其他后端继续使用自己的入口。
+
+不能只去掉 `eager_on_graph` 装饰器、或者把现有断点函数当作普通函数调用。`deepseek_v4_attention_with_output` 会读取 CPU 上的 `global_num_token_non_padded_cpu`，切 `query[:real_num_tokens]`，并在零行时走 Python 分支。这些选择在 capture 时固定，不能服务同 bucket 的不同真实 token 数。
+
+图内入口需要接收 bucket 形状的 Q / 输出，实际请求布局由固定 metadata 的内容表达；padding 输出必须有确定值或被设备侧 mask，不能依赖 replay 时再次执行 Python 切片。
+
+**3. 接入 BCG 已有的 captured-metadata 契约**
+
+基线定位：
+
+- `layers/attention/base_attn_backend.py:234, 328, 335`：能力标记与两个 hook。
+- `model_executor/runner/prefill_cuda_graph_runner.py:695, 1326, 1354`：按 ShapeKey 保存 metadata，并在 replay 前刷新。
+- `hardware_backend/npu/attention/ascend_backend.py:568`：每次创建新的 `ForwardMetadata`。
+- `hardware_backend/npu/attention/ascend_dsv4_backend.py:1864`：继续新建长度张量、kernel metadata 和 compress metadata。
+
+建议在 NPU DSV4 后端启用 `use_captured_forward_metadata_for_breakable_cuda_graph`，实现：
+
+```python
+init_forward_metadata_for_breakable_cuda_graph_capture(forward_batch)
+prepare_forward_metadata_for_breakable_cuda_graph_replay(
+    capture_metadata, forward_batch, *, static_forward_batch=None
+)
+```
+
+capture 为图读取的字段分配固定存储并保活；replay 在图外规划当次数据，用 `copy_` / 原地填充刷新这些存储，随后将 active `forward_metadata` 指向对应 bucket 对象。可以建立临时 planning 对象，但不能让图仍读取旧地址、Python 却改指向新对象。
+
+需要覆盖的字段分两组：
+
+| 范围 | 必须建立稳定存储和更新规则的字段 |
+| --- | --- |
+| attention 核心 | `actual_seq_lengths_q_pa`、`actual_seq_lengths_kv`、`swa_page_table`、`c4_page_table`、`c128_page_table`、`kernel_metadata[c1a/c4a/c128a]`、`c4_topk_indices` |
+| compressor / indexer | `actual_seq_lengths_q`、`kernel_metadata[li_quant_metadata]`、`positions_cmp_padding_c4/c128`、`start_pos`、`seqused`、`c4_loc/c128_loc`、state block tables；SWA 写入相关 loc 也须保持正确绑定 |
+
+现有 decode 实现值得复用：`_init_dsv4_graph_buffers`、`_copy_page_table_into_graph`、`_copy_1d_with_zero_tail`、`_refresh_graph_kernel_metadata` 已有固定页表、固定长度 metadata 和原地更新的做法。
+
+但不能直接调用 decode 的整套初始化：`_init_dsv4_graph_metadata` / `_build_dsv4_graph_replay_ctx` 假设每请求一个 token，或固定数量的 speculative token，且 Q 的前缀和在该图形状下不变。prefill 每次请求数、每请求 Q 长度、prefix 长度都会变化，需要独立的 prefill 初始化 / 刷新逻辑和缓存命名空间，避免与 decode 的 `graph_metadata[bs]` 混用。
+
+**4. 图容量需要同时约束 token 轴和请求轴**
+
+基线定位：`prefill_cuda_graph_runner.py:1639` 的 capture dummy batch 用最少请求拼出 token bucket；固定 request slots 的分支目前用于 FULL。
+
+例如同为 128 个 token，capture 可以是 `[128]`，真实请求却可以是 `[64, 64]`。前者 `cu=[0,128]`，后者 `cu=[0,64,128]`。仅固定 token 数不能固定 `cu`、页表第一维和 state table 第一维。
+
+必须选择并实现一种请求轴策略：固定 `B_capacity`，或者把请求数 bucket 纳入图的 variant。固定容量方案还需要：
+
+- 固定 `cu` 的 `B_capacity+1` 个元素和页表的 `B_capacity` 行，并定义空 request slot 的合法表示。
+- 为 context / page-table 宽度设置上限；超出请求数、上下文、压缩容量的 batch 应在 replay admission 阶段回退。
+- 设置与实际容量一致的 `prefill_cuda_graph_max_batch_size`，使 DP 的 replay 选择也遵循这一约束。
+- 每次清掉无效页表列、未使用的请求行、top-k 和 loc 尾部，验证“大 batch → 小 batch”不会读取上一轮残留。
+- 如果算子不接受零长度 dummy request，需要单独设计合法 dummy 请求及隔离存储，不能仅填零后假定安全。
+
+**5. c4 top-k 必须连接到同一份图内数据流**
+
+基线定位：`ascend_dsv4_backend.py:893-923` 的 indexer 将输出赋给 `self.forward_metadata.c4_topk_indices`；`:2193` 的 attention 从中读取。
+
+indexer 与 attention 都在图内，需要固定 `[T_bucket, index_topk]` 的数据流。可以由 indexer 的捕获输出直接连接 attention，也可以用图内 `copy_` 写入预分配的稳定 top-k buffer；只有实际需要时才增加 `out` 接口。有效行以外填 `-1`，同流按程序顺序消费；多流必须有明确的依赖。
+
+capture 时一次 Python 赋值本身并非必然错误：只要该输出和 attention 输入已经形成同一条捕获的数据流，每次 replay 都会产生新内容。需要避免的是后续更换 metadata / top-k 存储，却没有更新图绑定；也不能依赖 replay 时再执行 Python 属性赋值。
+
+主流路径应使用 fused quantized lightning indexer。BF16 fallback 包含按请求循环、从 tensor 转 Python 整数和动态 top-k 宽度，不应直接宣称可用于通用 prefill 图。
+
+**6. compressor 全入图需要改为“固定容量 + 有效数量”**
+
+基线定位：`ascend_dsv4_backend.py:245-332, 442-534, 554-634`。
+
+当前 metadata 在图外按 live batch 计算；这一步的 `.cpu().tolist()` 可以暂时保留在 replay 前，后续再用已有 CPU 长度镜像消除重复 D2H。真正的捕获约束是后续 kernel 所读地址、shape 和分支不能随 batch 改变。
+
+设压缩比例为 r，每请求本次 prefix 和 extend 长度为 p_i、e_i，本次实际新增压缩块数为：
+
+```text
+N_r = sum(floor((p_i + e_i) / r) - floor(p_i / r))
+```
+
+它受 prefix 的余数和请求划分影响，不仅由总 token 数决定。当前 `cmp_kv[:loc.numel()]` 把这个数量固化成 capture 的切片长度，必须改造。
+
+需要完成：
+
+- 依据实际 compressor ABI，为每个 bucket 固定输出 / RoPE / loc 容量。当前 TH 形态的容量公式是 `min(T, T // r + B)`，不能将此容量与实际有效块数 `N_r` 混为一谈。
+- 统一 X、cu、RoPE 和输出容量的语义。真实 X=64、bucket=128 时，沿用 live RoPE 17 行而图录制的 X 是 128 行，会再次出现 17/33 的口径冲突；改成全容量后仍需验证 kernel 是否支持 `cu[-1] < X.shape[0]`。
+- epilog 使用固定 shape 和设备侧有效性信息，不再按 live `loc.numel()` 动态切输出或通过 boolean indexing 改变形状。
+- `out_cache_loc_dsv4` 的 c4/c128 loc 按本次真实 bundle 刷新到固定存储；padding 写入只能指向已确认隔离的 dummy / padding 存储，不能污染真实 KV。
+- A3 的 explicit state table 宽度按可重放的最大输入容量固定，并用 dummy state loc 填尾；A5 使用 request-bank cycle table，不能套用 A3 的二维 table。
+- 除 KV epilog 外，还要保护 compressor 的 `state_cache` 写入。warmup / capture 使用的 bank 和状态需要隔离或恢复；“KV loc 设 0”并不自动保护 state。
+- 在 capture 前准备好 Hadamard、融合权重视图和 RoPE cache，避免惰性初始化改变捕获路径。
+
+`d9564f9499` 对 capture 缺 bundle 时补零 loc 的修复可用作启动准备的参考，但全入图时仍要按固定输出容量设计，不能只复制其 live 长度的占位数组。
+
+进一步核查本地 `sgl-kernel-npu` 的 A5 compressor：
+
+- `op_kernel/arch35/compressor_tools.h:74, 88, 98` 从设备读 `seqused`、`start_pos` 和相邻 `cu_seqlens`；分别表达有效 token 数、全局起点和请求输入容量。
+- `op_kernel/arch35/compressor_kernel.h:246` 同时计算容量对应的 `tcNum` 和有效数量对应的 `compressedTcNum`；后者正是上面的新增压缩块公式。
+- host 的 `op_host/compressor.cpp:65` 根据 X 的 shape 和 cu 的元素数量分配输出容量；`op_host/arch35/compressor_tiling.cpp:935` 检查 RoPE 与这一容量一致。
+
+这为“固定 shape、动态设备 metadata”提供了源码依据，不能直接断言 compressor 必须留在图外或必须重写内核。实现时应分别核对 compressor 输入容量的 cu 与 attention/indexer 实际 Q 长度的 cu；必要时拆成两个图内固定存储，避免复用同一字段却要求相反的尾部语义。仍需实际验证 padded T / dummy request / idle 在部署算子中的行为；本地算子版本不能替代实际绑定实现的证明。
+
+**7. graph.update 是条件需求，不是 DSV4 的必选前置改造**
+
+基线定位：`hardware_backend/npu/graph_runner/npu_cudagraph_backend.py:435, 484-517`。
+
+现有 decode backend 虽然开启 `auto_dispatch_capture=True`，但普通 DSV4 replay 默认跳过 host-length 的 `replay_with_input_update`；动态信息由稳定 tensor metadata 表达。这说明 prefill 应先复用 tensor metadata 路径，而不是预先断言必须改 torch_npu 或创建一种新 graph backend。
+
+本地 torch_npu（检查时 HEAD 为 `286bee5fc1`）中：
+
+- `torch_npu/npu/graphs.py:655` 要求 `auto_dispatch_capture=True` 才允许 `NPUGraph.update`。
+- `graphs.py:456` 仅对有 handler 的算子创建 dispatch records。
+- 本地内置 handler 列表未包含这里使用的 DSV4 sparse attention / compressor / quant lightning indexer；扩展包或部署版本是否另外注册，需要核查实际环境。
+- BCG 的每段用裸 capture，不会自动进入 `graph_dispatch_mode`，也没有逐段 update 的 replay 协议。
+
+如果目标版本的算子把动态长度 / tiling 计算结果固化到 host launch 参数，仅刷新 device tensor 不能改变它们，届时才需要补：每段 dispatch capture、算子 handler、稳定输出和 workspace、按实际算子出现顺序对应的 update payload、update / replay 流依赖。也可以明确使用底层 task-group update 协议；不能只给 segment 设一个布尔开关。
+
+Ascend 官方机制说明可交叉参考：[NPUGraph](https://github.com/Ascend/pytorch/blob/master/docs/zh/developer_notes/npugraph.md)、[handler 自定义接口](https://github.com/Ascend/op-plugin/blob/master/docs/zh/custom_APIs/torch_npu-npu/torch_npu-npu_npugraph_handlers.md)。实际决策以部署版本和单算子实验为准。
+
+补充检查了工作区 `sgl-kernel-npu` 当前源码（HEAD `e2dec25`），该版本不等同于基线部署依赖：`csrc/utils/ge_helper.h` 有 graph capture 的 tiling cache，要求同 shape / dtype / optional inputs / attrs 先 warmup；其容量、tiling 地址保活和 workspace 大小也需要验证。这提供了可捕获实现的线索，不能代替对 `torch.ops.custom.npu_*` / `torch.ops.npu.compressor` 实际绑定实现的核对。
+
+**8. 并行、padding 与 admission 需要一起验收**
+
+- DP 的 idle rank 仍参与 MoE 通信，但没有真实 attention / cache 写入。capture 的非 idle Python 分支不会在 replay 自动切换，必须让 device metadata / mask 或独立 graph variant 表达 idle；非法零长度 metadata 的 kernel 不能直接启动。
+- 核对 `T_global`、rank-local T、bucket T 和 cu 末项的关系。`global_num_token_non_padded_cpu` 不能不加分析地当成任意 TP / CP 配置下的本地行数。
+- 多流验证 Q 准备、indexer compressor 写 cache、lightning indexer 读 cache、attention 读 top-k 的先后关系，以及 segment 结束的 fork / join。
+- 基线 `layers/cp/bcg/__init__.py` 的组合表没有 DSV4，不能只添加名字后宣称支持；CP 的 local/full metadata 切换目前包含重新绑定，须另外适配。首版应明确拒绝尚未验证的 CP / TBO 组合。
+- sparse attention 可能只写有效 query 行，padding 输出应确定化，避免未初始化值传播到后续量化和 MoE。
+
+**9. 全链路的固定容量协议与代码落点**
+
+建议每个 prefill 图维护独立状态对象，容量由 `T_capacity`、`B_capacity`、context/page-table 宽度决定，必要时通过 ShapeKey variant 区分请求数。r=4/128 的压缩容量 `C_capacity[r]` 必须匹配目标算子的实际输出 shape。
+
+| 状态 | capture 时固定 | replay 前刷新 | 图内行为 |
+| --- | --- | --- | --- |
+| X / positions | bucket shape 与地址 | 输入有效行及 padding | Q/KV/indexer/compressor 均读取固定形状 |
+| 请求与长度 | cu、seqused、start_pos、req/state table 的 shape 与地址 | 本次输入布局、实际有效数、prefix、request bank | 内核从设备读取长度和 state 映射 |
+| 压缩输出 / RoPE | `C_capacity[r]`，与 X/B 容量一致 | 固定长度的压缩 positions，尾部合法填充 | compressor、RoPE、Hadamard / 量化以固定 shape 执行 |
+| 写回 loc / 有效 mask | `[C_capacity[r]]` | 真实 `N_r` 个新增 loc，其余按协议标记无效 | 固定形状的 epilog / scatter；无效行不得写真实 cache |
+| indexer top-k | `[T_capacity, index_topk]` 数据流 | 必要的初始 sentinel | lightning indexer 写，sparse attention 读，padding 为 -1 |
+| kernel metadata / 页表 | 形状、地址、所有权 | 从本次 planning 结果原地复制，清理尾部 | 全链路只读稳定存储 |
+
+`N_r` 可以利用调度器已有的 CPU prefix/extend 长度在 replay 前计算，不必从 compressor 输出再同步回 host。图内使用固定 mask / loc 协议处理有效行，而不是按 `N_r` 做 Python 动态切片。对于内核未写满的输出容量，在量化和写回前用设备侧选择操作将无效行确定化；直接乘零不能清除 NaN。epilog 若无法忽略无效行，需扩展其 mask/有效数接口，或使用经验证安全的独立 dummy 存储，不能把重复 sentinel 写入的安全性当作既定事实。
+
+主要代码改动：
+
+1. `ascend_dsv4_backend.py`：实现 prefill captured-metadata hooks、容量与更新；图内主/indexer compressor、完整 epilog 与 fused indexer 数据流；分开 eager 和 graph 的形状处理，避免影响 decode。
+2. `models/deepseek_v4.py`：增加已适配后端的能力分发，绕过公共 sparse attention eager break；调用固定形状的 backend 路径。
+3. `prefill_cuda_graph_runner.py`：必要时支持 NPU BCG 的固定 request slots / variant 与容量 admission；复用现有 metadata 保存和刷新 hook。
+4. `dsv4_prefill_graph.py`：这些计算不再通过该文件的 eager wrapper 执行；回归时验证确实没有遗留调用。
+5. torch_npu / kernel 仓库：仅当目标算子的单算子验证暴露捕获、padding、epilog、tiling 或动态参数能力缺口时修改对应实现，三仓独立提交。
+
+**10. 实施顺序与验证矩阵**
+
+| 阶段 | 工作 | 验收重点 |
+| --- | --- | --- |
+| A | 单算子验证 C4A / C4Li / C128A compressor、量化和 epilog、fused lightning indexer、sparse attention 的 capture / replay | 固定容量下改变有效数、prefix、cu、页表与 state bank，确认实际算子能力和需补的 kernel 接口 |
+| B | 实现 prefill 固定状态与 replay 刷新，在单层串起完整 compressor → epilog → indexer → attention | 不留 eager 计算断点；确认数据流、缓存和 state 副作用正确 |
+| C | 集成模型能力分发与 runner 容量约束，覆盖 ratio 0/4/128 全模型 | 变 token/请求数/前缀的同图 replay 正确，后续 decode 正确 |
+| D | 扩展 DP idle、多流、attn-TP，再逐项处理 CP/TBO | 无非法写入、流依赖完整、通信顺序一致；性能收益由实测确认 |
+
+必要的测试应覆盖：
+
+1. 同图连续 replay 不同输入，改变 req id / 页表 / prefix，确认读取的是当次数据。
+2. 同一个 128-token bucket：128 行与 64 行、`[128]` 与 `[64,64]`，再测试“大 batch → 小 batch → 大 batch”。
+3. 压缩边界：3/4/5、127/128/129；前缀未对齐、无新压缩块、有新压缩块和多个 chunk。
+4. 不只比较最终 logits，还比较每类层 attention 输出、top-k、压缩 KV、量化 scale、state cache，并验证后续 decode。
+5. 在 metadata 刷新与 replay 间检查被图读取 tensor 的 `data_ptr` / shape / dtype 不变，尾部 sentinel 正确。
+6. A3 / A5 分别验证；多流开启与关闭分别验证；DP 下一个 rank idle 也要验证。
+7. 超过 request / token / context / compressed-capacity 上限时正确回退。
+8. profiler 区分 host metadata planning 和 graph replay；确认主 compressor、indexer compressor、量化与 epilog、lightning indexer、sparse attention 都位于捕获段中，DSV4 attention 链内没有 eager break。不能以启动成功或文件名含 full-capture 作为入图证明。
+
+实现主要落点是 `sglang` 的 NPU attention backend、公共模型的能力分发以及必要的 prefill runner 容量约束。只有单算子实验确认底层捕获 / 动态参数机制不足时，再分别修改 torch_npu 或对应 kernel 仓库。
