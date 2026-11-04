@@ -24,16 +24,42 @@ tiling freezes tokenSize at capture.
             out_a != out_b  ->  the op re-reads cu.  Full-graph prefill is viable.
             out_a == out_b  ->  tokenSize is frozen.  Needs CANN support.
 
-Usage (on the NPU host, inside the normal serving env):
+Usage (on the NPU host, inside the normal serving env)
+------------------------------------------------------
 
-    SGLANG_CU_REBIND_SPIKE=1 python -m sglang.launch_server ... \
-        --cuda-graph-backend-prefill breakable --cuda-graph-bs-prefill 128
+Prefill runs in a *scheduler subprocess*, and sglang starts it with
+``mp.set_start_method("spawn")`` (entrypoints/engine.py:2035). A spawned child
+is a fresh interpreter: it imports only what it needs, so importing this module
+in the parent -- or running ``python cu_rebind_spike.py`` on its own, which just
+installs the hook into a process that never builds a model -- probes nothing.
 
-Import this module from anywhere that runs before the first prefill (e.g. add
-``import cu_rebind_spike`` to a sitecustomize, or call install() from a
-breakpoint). It patches the compressor op, captures the first real call it
-sees, and reports. It does not change serving behaviour: the real call still
-runs, and the spike only adds its own extra graph.
+The hook has to be installed *inside the subprocess*. Pick one:
+
+A. sitecustomize (no source edits; every interpreter auto-imports it)::
+
+       mkdir -p /tmp/spike && cp cu_rebind_spike.py /tmp/spike/
+       cat > /tmp/spike/sitecustomize.py <<'EOF'
+       import os
+       if os.environ.get("SGLANG_CU_REBIND_SPIKE") == "1":
+           import cu_rebind_spike  # noqa: F401
+       EOF
+       export PYTHONPATH=/tmp/spike:$PYTHONPATH
+       export SGLANG_CU_REBIND_SPIKE=1
+       python -m sglang.launch_server ... \
+           --cuda-graph-backend-prefill breakable --cuda-graph-bs-prefill 128
+
+B. One line at the top of ``forward_compress`` in ascend_dsv4_backend.py::
+
+       import cu_rebind_spike  # noqa: F401   (with PYTHONPATH set as above)
+
+   Repeat imports are free -- the module installs once -- and this guarantees
+   the hook exists in whichever process actually reaches the compressor.
+
+Expect ``[cu-spike] installed`` once per process that loads the backend, then
+the probe output on the first prefill that calls a compressor.
+
+It does not change serving behaviour: the real call still runs, and the spike
+only adds its own extra graph afterwards.
 """
 
 from __future__ import annotations
@@ -44,6 +70,12 @@ import os
 import torch
 
 logger = logging.getLogger(__name__)
+# A spawned scheduler subprocess may configure logging after this import, or
+# filter this logger's name out. Print as well as log so the verdict cannot be
+# swallowed -- the probe runs once, so this costs nothing.
+def _say(msg, *a):
+    logger.warning(msg, *a)
+    print("[cu-spike] " + (msg % a if a else msg), flush=True)
 
 _RESULT_BANNER = "=" * 72
 
@@ -85,11 +117,11 @@ def _run_probe(op, args, kwargs) -> None:
     cu_full = cu.clone()
     cu_half = _halve_cu(cu_full)
 
-    logger.warning(
+    _say(
         "[cu-spike] cu_full=%s cu_half=%s", cu_full.tolist(), cu_half.tolist()
     )
     if torch.equal(cu_full, cu_half):
-        logger.warning("[cu-spike] ABORT: cu_half == cu_full, nothing to distinguish")
+        _say("ABORT: cu_half == cu_full, nothing to distinguish")
         return
 
     # Warm up twice so kernel load and any one-time setup happen before capture,
@@ -131,34 +163,34 @@ def _report(out_a, out_b, out_c, cu_full, cu_half) -> None:
     cut = max(1, rows * n_half // max(n_full, 1))
     prefix_same = torch.equal(out_a[:cut], out_b[:cut])
 
-    logger.warning("%s", _RESULT_BANNER)
-    logger.warning("[cu-spike] out shape=%s rows=%d", tuple(out_a.shape), rows)
-    logger.warning("[cu-spike] cu[-1]: full=%d half=%d", n_full, n_half)
-    logger.warning("[cu-spike] replay(full) == replay(half) : %s", same_ab)
-    logger.warning("[cu-spike] replay(full) == replay(full)': %s  (want True)", same_ac)
-    logger.warning("[cu-spike] common prefix [:%d] equal    : %s", cut, prefix_same)
+    _say("%s", _RESULT_BANNER)
+    _say("out shape=%s rows=%d", tuple(out_a.shape), rows)
+    _say("cu[-1]: full=%d half=%d", n_full, n_half)
+    _say("replay(full) == replay(half) : %s", same_ab)
+    _say("replay(full) == replay(full)': %s  (want True)", same_ac)
+    _say("common prefix [:%d] equal    : %s", cut, prefix_same)
 
     if not same_ac:
-        logger.warning(
+        _say(
             "[cu-spike] INCONCLUSIVE: two replays with identical cu disagree, so "
             "something other than cu is varying (state cache carry-over is the "
             "likely cause -- the compressor mutates state_cache in place). Re-run "
             "with a c128 layer, or snapshot/restore state_cache around each replay."
         )
     elif same_ab:
-        logger.warning(
+        _say(
             "[cu-spike] NEGATIVE: output did not change when cu changed. tokenSize "
             "is frozen at capture. Full-graph prefill needs CANN support; this run "
             "is the minimal repro to hand over."
         )
     else:
-        logger.warning(
+        _say(
             "[cu-spike] POSITIVE: a captured compressor re-reads cu_seqlens at "
             "replay. Full-graph prefill is viable -- proceed with the captured-"
             "metadata contract (CUDA deepseek_v4_backend.py:3239/3342 as the "
             "blueprint)."
         )
-    logger.warning("%s", _RESULT_BANNER)
+    _say("%s", _RESULT_BANNER)
 
 
 def install() -> None:
@@ -207,7 +239,7 @@ def install() -> None:
     # `torch.ops.custom.compressor` / `torch.ops.npu.compressor` and Python
     # resolves `torch` from module globals first.
     mod.torch = _ShadowTorch(real_torch=mod.torch, ops=_OpsProxy())
-    logger.warning("[cu-spike] installed; probing the first compressor call")
+    _say("installed; probing the first compressor call")
 
 
 class _ShadowTorch:
@@ -226,8 +258,29 @@ class _ShadowTorch:
         return getattr(self.__dict__["_real"], name)
 
 
-if os.environ.get("SGLANG_CU_REBIND_SPIKE") == "1":
+_INSTALLED = False
+
+
+def _install_once() -> None:
+    global _INSTALLED
+    if _INSTALLED:
+        return
+    _INSTALLED = True
     try:
         install()
     except Exception:
         logger.exception("[cu-spike] install failed")
+
+
+if os.environ.get("SGLANG_CU_REBIND_SPIKE") == "1":
+    _install_once()
+
+
+if __name__ == "__main__":
+    # Running this file directly only installs the hook into a process that
+    # never builds a model, so say so instead of looking like a successful run.
+    print(__doc__)
+    raise SystemExit(
+        "cu_rebind_spike is not a standalone script: it must be imported inside "
+        "the process that runs prefill. See the usage notes above."
+    )

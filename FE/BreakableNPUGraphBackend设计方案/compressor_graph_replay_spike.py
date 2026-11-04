@@ -2,13 +2,14 @@
 
 Run in the NPU serving environment, using its actual operator registration:
 
-    python compressor_graph_replay_spike.py --kernel-repo /path/to/sgl-kernel-npu \
+    python compressor_graph_replay_spike.py \
         --variant c4li --op npu.compressor --report c4li.json
 
-For an operator registered by an additional module, pass --import-module MODULE.
-Select the same op namespace and registration modules as the serving process.
-Only two CPU fixture builders are extracted from the kernel checkout; its test
-module is not imported and its operator/device initialization does not run.
+Missing npu.compressor is registered by importing sgl_kernel_npu; missing
+custom.compressor is registered by importing custom_ops. Override these imports
+with --import-module MODULE when serving uses another registration module.
+Inputs are built in. Optionally pass --kernel-repo REAL_CHECKOUT to use its two
+CPU fixture builders instead; its test module is not imported.
 
 Each case resets state before BOTH eager and replay. Only valid output rows are
 compared; the entire state cache is compared. No conclusion is drawn from two
@@ -22,6 +23,7 @@ import argparse
 import ast
 import importlib
 import json
+import math
 import subprocess
 import traceback
 from dataclasses import asdict, dataclass
@@ -79,6 +81,87 @@ def load_fixture_builders(repo: Path, torch, arch35: bool):
     return namespace["_make_inputs"], namespace["_build_explicit_state_loc_table"]
 
 
+def explicit_state_layout(start_pos, capacities, block_size, coff, ratio):
+    """A3 cache_mode=2: one physical bank per request and one dummy bank."""
+    batch = len(start_pos)
+    history = coff * ratio
+    width = history + max(max(capacities, default=0), 1)
+    dummy = batch * block_size
+    table = [[dummy] * width for _ in range(batch)]
+    for request, (start, capacity) in enumerate(zip(start_pos, capacities)):
+        for column in range(history + capacity):
+            position = start - history + column
+            if position >= 0:
+                table[request][column] = request * block_size + position % block_size
+    return table, batch + 1, dummy
+
+
+def builtin_fixture_builders(torch, arch35):
+    """Synthetic eager-vs-replay inputs, using the serving state-table ABIs."""
+    def build_table(starts, capacities, block_size, coff, ratio, banks_per_batch=1):
+        if banks_per_batch != 1:
+            raise ValueError("Built-in fixtures use one bank per request")
+        table, banks, dummy = explicit_state_layout(starts, capacities, block_size, coff, ratio)
+        return torch.tensor(table, dtype=torch.int32), banks, dummy
+
+    def make_inputs(starts, seq_len, coff, ratio, head_dim, hidden, cache_mode,
+                    layout, dtype, batch, block_size, ring_size=None):
+        if cache_mode != 2 or layout != "TH" or len(starts) != batch:
+            raise ValueError("Built-in fixtures require TH, cache_mode=2, and one start per request")
+        generator = torch.Generator().manual_seed(20260813)
+        width = coff * head_dim
+
+        def normal(*shape, scale=0.02, target_dtype=dtype):
+            return (torch.randn(*shape, generator=generator) * scale).to(target_dtype)
+
+        state_block_size = ring_size or max(block_size, coff * ratio + seq_len - 1, 1)
+        banks = batch if arch35 else batch + 1
+        return {
+            "x": normal(batch * seq_len, hidden),
+            "wkv": normal(width, hidden),
+            "wgate": normal(width, hidden),
+            "ape": normal(ratio, width, scale=0.01, target_dtype=torch.float32),
+            "norm_weight": normal(head_dim, target_dtype=torch.float32) + 1.0,
+            "state_cache": normal(banks, state_block_size, 2 * width, scale=0.01, target_dtype=torch.float32),
+        }
+
+    return make_inputs, build_table
+
+
+def resolve_operator(torch, requested, modules, report):
+    namespace, operator = requested.split(".")
+
+    def lookup():
+        packet = getattr(getattr(torch.ops, namespace), operator, None)
+        return getattr(packet, "default", None) if packet is not None else None
+
+    loaded = []
+    report["registration_modules"] = loaded
+    if not modules and lookup() is None:
+        modules = ["sgl_kernel_npu" if namespace == "npu" else "custom_ops"]
+    for name in modules:
+        try:
+            module = importlib.import_module(name)
+        except Exception as error:
+            raise RuntimeError(
+                f"Cannot import {name!r}, required to register {requested}: {error}. "
+                "Run in the same environment as serving. Use --import-module MODULE "
+                "if serving registers this operator through another module."
+            ) from error
+        loaded.append({"name": name, "file": str(getattr(module, "__file__", "unknown"))})
+    op = lookup()
+    if op is None:
+        available = [f"{ns}.compressor" for ns in ("npu", "custom")
+                     if getattr(getattr(torch.ops, ns), "compressor", None) is not None]
+        raise RuntimeError(
+            f"{requested} is not registered after imports {[m['name'] for m in loaded]}. "
+            f"Registered compressor namespaces: {available or 'none'}. "
+            "Check the installed kernel build and the operator used by serving. "
+            "No capture or replay has run."
+        )
+    return op
+
+
 def make_payload(torch, case, base, table_builder, tokens, ratio, coff, arch35):
     capacity = min(tokens, tokens // ratio + 2)
     payload = {
@@ -125,29 +208,34 @@ def write_report(path, report):
 
 def run(options, report):
     import torch
+
+    report["stage"] = "registration"
+    op = resolve_operator(torch, options.op, options.import_module, report)
     import torch_npu
 
     torch.npu.set_device(options.device)
-    for name in options.import_module:
-        importlib.import_module(name)
+    torch_npu.npu.set_compile_mode(jit_compile=False)
     device = f"npu:{options.device}"
     device_name = torch.npu.get_device_name(options.device)
     arch35 = "950" in device_name.lower()
-    namespace, operator = options.op.split(".")
-    op = getattr(getattr(torch.ops, namespace), operator).default
     report["environment"] = {
         "torch": torch.__version__, "torch_npu": getattr(torch_npu, "__version__", "unknown"),
         "device": device_name, "op": options.op, "schema": str(op._schema),
-        "imports": options.import_module, "capture_api": options.capture_api,
-        "kernel_repo": str(options.kernel_repo.resolve()),
+        "imports": report["registration_modules"], "capture_api": options.capture_api,
+        "kernel_repo": str(options.kernel_repo.resolve()) if options.kernel_repo else None,
+        "fixtures": "kernel_checkout" if options.kernel_repo else "builtin",
     }
-    try:
-        revision = subprocess.run(["git", "-C", str(options.kernel_repo), "rev-parse", "HEAD"], capture_output=True, text=True, check=False)
-        report["environment"]["fixture_revision"] = revision.stdout.strip() or "unknown"
-    except OSError:
-        report["environment"]["fixture_revision"] = "unknown"
+    if options.kernel_repo:
+        try:
+            revision = subprocess.run(["git", "-C", str(options.kernel_repo), "rev-parse", "HEAD"], capture_output=True, text=True, check=False)
+            report["environment"]["fixture_revision"] = revision.stdout.strip() or "unknown"
+        except OSError:
+            report["environment"]["fixture_revision"] = "unknown"
     print(json.dumps(report["environment"]), flush=True)
-    make_inputs, table_builder = load_fixture_builders(options.kernel_repo, torch, arch35)
+    if options.kernel_repo:
+        make_inputs, table_builder = load_fixture_builders(options.kernel_repo, torch, arch35)
+    else:
+        make_inputs, table_builder = builtin_fixture_builders(torch, arch35)
     ratio, coff, head_dim = VARIANTS[options.variant]
     cases = make_cases(options.tokens, ratio)
     base = make_inputs([0, 0], options.tokens, coff, ratio, head_dim, options.hidden, 2, "TH", torch.bfloat16, 2, 16, ring_size=coff * ratio if arch35 else None)
@@ -215,7 +303,6 @@ def run(options, report):
             result = {**asdict(case), "valid_output_rows": valid, "output_ok": output_ok, "state_ok": state_ok,
                       "output_max_abs_error": output_error, "state_max_abs_error": state_error}
             # Store non-finite error diagnostics without writing invalid JSON.
-            import math
             for name in ("output_max_abs_error", "state_max_abs_error"):
                 if not math.isfinite(result[name]):
                     result[name] = str(result[name])
@@ -229,10 +316,10 @@ def run(options, report):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--kernel-repo", type=Path, help="Fixture source checkout; not a replacement for installed operator code")
+    parser.add_argument("--kernel-repo", type=Path, help="Optional real fixture checkout; omit to use built-in inputs")
     parser.add_argument("--variant", choices=VARIANTS, default="c4li")
     parser.add_argument("--op", choices=("npu.compressor", "custom.compressor"), help="Exact namespace used by serving")
-    parser.add_argument("--import-module", action="append", default=[], help="Additional serving registration module; repeatable")
+    parser.add_argument("--import-module", action="append", default=[], help="Override registration imports; repeatable. Defaults: npu -> sgl_kernel_npu, custom -> custom_ops")
     parser.add_argument("--tokens", type=int, default=256)
     parser.add_argument("--hidden", type=int, default=1024)
     parser.add_argument("--device", type=int, default=0)
@@ -251,8 +338,13 @@ def main():
         ratio = VARIANTS[options.variant][0]
         print(json.dumps([{**asdict(case), "valid_output_rows": case.compressed_rows(ratio)} for case in make_cases(options.tokens, ratio)], indent=2))
         return 0
-    if options.kernel_repo is None or options.op is None:
-        parser.error("NPU runs require --kernel-repo and --op")
+    if options.op is None:
+        parser.error("NPU runs require --op")
+    if options.kernel_repo is not None:
+        options.kernel_repo = options.kernel_repo.expanduser().resolve()
+        fixture = options.kernel_repo / "tests/python/sgl_kernel_npu/test_compressor.py"
+        if not fixture.is_file():
+            parser.error(f"Fixture source does not exist: {fixture}. Omit --kernel-repo to use built-in inputs.")
     report = {"variant": options.variant, "tokens": options.tokens, "hidden": options.hidden,
               "tolerances": {"atol": options.atol, "state_atol": options.state_atol, "rtol": options.rtol},
               "passed": False, "stage": "initialization", "cases": []}

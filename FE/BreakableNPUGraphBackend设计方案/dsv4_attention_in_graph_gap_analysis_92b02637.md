@@ -207,15 +207,16 @@ Ascend 官方机制说明可交叉参考：[NPUGraph](https://github.com/Ascend/
 
 **11. 下一步：先取得可信的动态 replay 结果**
 
-第一项可执行工作是运行同目录的 [compressor_graph_replay_spike.py](compressor_graph_replay_spike.py)，先验证三种 compressor 的固定容量协议。脚本复用本地 kernel 测试的两个 CPU fixture builder，直接调用安装环境的实际算子；不导入整个测试模块，不加载模型权重。
+第一项可执行工作是运行同目录的 [compressor_graph_replay_spike.py](compressor_graph_replay_spike.py)，先验证三种 compressor 的固定容量协议。脚本内置符合 A3/A5 state-table ABI 的合成输入，直接调用安装环境的实际算子；不加载模型权重。需要复用某个 kernel checkout 的 CPU fixture 时，可额外传入 `--kernel-repo` 的真实路径。
 
 ```bash
 python compressor_graph_replay_spike.py \
-  --kernel-repo /path/to/sgl-kernel-npu \
   --variant c4li --op npu.compressor --report c4li.json
 ```
 
-算子命名空间和注册模块必须与服务一致。基线 SGLang 的 A3 路径选 `npu.compressor`，A5 路径选 `custom.compressor`；若注册需要额外导入，使用 `--import-module MODULE`。kernel checkout 仅提供 fixture 源码，其 HEAD 不代表实际运行的二进制；脚本记录 torch/torch_npu 版本、设备、算子 schema 与 fixture 版本，定位结果时还应保留服务依赖版本。
+算子命名空间和注册模块必须与服务一致。基线 SGLang 的 A3 路径选 `npu.compressor`，A5 路径选 `custom.compressor`。脚本在算子缺失时分别默认导入 `sgl_kernel_npu` / `custom_ops`；可用 `--import-module MODULE` 显式覆盖注册导入。注册完成后才初始化设备，并与服务一致设置 `jit_compile=False`。如果模块存在但目标算子仍缺失，报告注册阶段错误及实际可用的 compressor 命名空间，不进入 capture。
+
+`--kernel-repo` 已改为可选；若使用，脚本在导入 NPU 库之前检查真实路径，不接受直接照抄 `/path/to/...` 的占位路径。checkout 仅提供 fixture 源码，其 HEAD 不代表实际运行的二进制；脚本记录 torch/torch_npu 版本、设备、注册模块路径、算子 schema 与可选 fixture 版本，定位结果时还应保留服务依赖版本。
 
 先运行 C4Li，再把 `--variant` 分别改为 `c4a`、`c128a`；每次新进程运行。默认 token 容量 256、请求槽数 2、hidden 1024，A5 使用 `coff * ratio` 的小 ring。默认使用与 P1 segment 相同的裸 capture API，不调用 `graph.update()`；可用 `--capture-api context` 定位 capture API 差异。
 
