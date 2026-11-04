@@ -3,7 +3,7 @@
 分析基线：`sglang` 的 `92b02637f7732b570fe21ef03810182e4d75ef40`。
 范围：`DeepseekV4AscendAttnBackend` 支持的 ratio 0 / 4 / 128，讨论 prefill；不把 V4.1 的 ratio 1 / 2 纳入已有能力。
 用户明确要求：主 compressor、indexer 内部 compressor、indexer 和 sparse attention 全部进入图；图外只保留 replay 前的 metadata planning / 原地刷新。单算子实验可以拆开进行，最终实现不保留这些计算的 eager 断点。
-方法：源码静态分析，未运行 NPU capture / replay 或精度、性能测试。
+方法：源码静态分析，并结合用户提供的 NPU 实测日志；各项验证范围和结果见第 12 节。本地 Windows 环境未运行 NPU 测试。
 
 **1. 结论与基线边界**
 
@@ -116,7 +116,7 @@ N_r = sum(floor((p_i + e_i) / r) - floor(p_i / r))
 需要完成：
 
 - 依据实际 compressor ABI，为每个 bucket 固定输出 / RoPE / loc 容量。当前 TH 形态的容量公式是 `min(T, T // r + B)`，不能将此容量与实际有效块数 `N_r` 混为一谈。
-- 统一 X、cu、RoPE 和输出容量的语义。真实 X=64、bucket=128 时，沿用 live RoPE 17 行而图录制的 X 是 128 行，会再次出现 17/33 的口径冲突；改成全容量后仍需验证 kernel 是否支持 `cu[-1] < X.shape[0]`。
+- 统一 X、cu、RoPE 和输出容量的语义。真实 X=64、bucket=128 时，沿用 live RoPE 17 行而图录制的 X 是 128 行，会再次出现 17/33 的口径冲突。第 12 节已验证特定 A3 环境的 C4Li / C4A / C128A 支持 `cu[-1] < X.shape[0]`；其他形状 / 环境仍需验证。
 - epilog 使用固定 shape 和设备侧有效性信息，不再按 live `loc.numel()` 动态切输出或通过 boolean indexing 改变形状。
 - `out_cache_loc_dsv4` 的 c4/c128 loc 按本次真实 bundle 刷新到固定存储；padding 写入只能指向已确认隔离的 dummy / padding 存储，不能污染真实 KV。
 - A3 的 explicit state table 宽度按可重放的最大输入容量固定，并用 dummy state loc 填尾；A5 使用 request-bank cycle table，不能套用 A3 的二维 table。
@@ -235,4 +235,73 @@ python compressor_graph_replay_spike.py \
 
 `passed=true` 表示相对于同一算子的 eager 结果满足 replay 一致性；后续仍要对照 kernel reference / 模型精度，并验证连续 chunk 的状态累积。全链路最终验收要求 compressor、量化、epilog、indexer、attention 均在图内。
 
-本地已完成脚本语法/CLI 和三种 variant 的 case 矩阵校验；当前 Windows 环境没有 torch / torch_npu，尚无 NPU 运行结果。
+本地已完成脚本语法/CLI 和三种 variant 的 case 矩阵校验；当前 Windows 环境没有 torch / torch_npu。用户提供的 NPU 结果记录在下一节。
+
+**12. 实测记录：A3 三种 compressor 动态 replay 已通过**
+
+证据来源：用户于 2026-11-04 提供的完整终端输出，运行命令为：
+
+```bash
+python compressor_graph_replay_spike.py \
+  --variant c4li --op npu.compressor --report c4li.json
+python compressor_graph_replay_spike.py \
+  --variant c4a --op npu.compressor --report c4a.json
+python compressor_graph_replay_spike.py \
+  --variant c128a --op npu.compressor --report c128a.json
+```
+
+| 项目 | 实测配置 |
+| --- | --- |
+| 设备 | `Ascend910_9362`，脚本采用 A3 explicit state table |
+| PyTorch / torch_npu | `2.10.0+cpu` / `2.10.0.post6` |
+| 算子 | `npu.compressor`，导入安装环境的 `sgl_kernel_npu` 注册 |
+| 输入 | 内置合成输入；T capacity=256、B slots=2、hidden=1024 |
+| 压缩配置 | C4Li / C4A / C128A，参数见下表 |
+| 捕获 | `raw`，不启用自动 dispatch capture，不调用 `graph.update()` |
+| 比较方式 | 每个 case 先恢复相同初始 state，对照 eager 的有效输出和完整 state |
+
+三种 variant 各 9 次、合计 27 次 replay 的 `output_ok`、`state_ok` 全为 true，两项最大绝对误差均为 0：
+
+| variant | ratio | coff | head_dim | 固定输出容量 | cases | 输出 / state 最大误差 |
+| --- | --- | --- | --- | --- | --- | --- |
+| C4Li | 4 | 2 | 128 | 66 | 9 | 0 / 0 |
+| C4A | 4 | 2 | 512 | 66 | 9 | 0 / 0 |
+| C128A | 128 | 1 | 512 | 4 | 9 | 0 / 0 |
+
+| case | capacities | used | start_pos（ratio 4） | C4Li / C4A 有效行 | C128A 有效行 |
+| --- | --- | --- | --- | --- | --- |
+| baseline | [128,128] | [128,128] | [0,0] | 64 | 2 |
+| less_used | [128,128] | [64,32] | [1,3] | 24 | 1 |
+| cu_repartition | [192,64] | [192,64] | [3,3] | 64 | 2 |
+| cu_short_total | [64,64] | [64,64] | [0,3] | 32 | 1 |
+| one_request | [256,0] | [128,0] | [3,0] | 32 | 1 |
+| cross_boundary | [128,128] | [1,1] | [3,7] | 2 | 2 |
+| no_new_blocks | [128,128] | [1,1] | [0,0] | 0 | 0 |
+| idle | [0,0] | [0,0] | [0,0] | 0 | 0 |
+| baseline（恢复） | [128,128] | [128,128] | [0,0] | 64 | 2 |
+
+C128A 的相应边界起点为 127 / 255；完整 case 参数由脚本的 ratio 驱动。
+
+这份结果支持的结论：在该设备、安装版本及测试形状下，三种 compressor 使用固定 shape / 地址时，可以通过原地修改 cu、seqused、start_pos 和 RoPE 内容正确重放；包括 cu 末项小于 X 容量、逻辑单请求、无新压缩块和 idle。对这些 case，不需要通过图任务更新动态长度，因此当前适配可以继续沿稳定设备 metadata 的路径推进。
+
+尚未覆盖：其他形状、设备/安装版本、连续 chunk 的状态累积、量化和 KV/scale epilog、fused lightning indexer、sparse attention、完整模型精度与性能。零有效输出的两个 case 仅以完整 state 一致性作为比较依据，不表示 padding 输出已经清零。
+
+**13. 下一项验证：固定容量 compressor 输出与图内 epilog**
+
+脚本已增加 A3 专用 `--with-epilog` 模式。下一步在同一服务环境运行：
+
+```bash
+python compressor_graph_replay_spike.py --variant c4li --op npu.compressor --with-epilog --report c4li_epilog.json
+python compressor_graph_replay_spike.py --variant c4a --op npu.compressor --with-epilog --report c4a_epilog.json
+python compressor_graph_replay_spike.py --variant c128a --op npu.compressor --with-epilog --report c128a_epilog.json
+```
+
+图内同时捕获 compressor 与后处理：C4Li 使用 Hadamard → int8 动态量化 → K/FP16 scale scatter；C4A/C128A 使用 BF16 cache 写入。每个 case 在图外刷新固定长度的有效 mask 与 loc；图内不按真实数量切片，也不通过 Python 分支跳过零行。
+
+实验将无效输出行强制替换为 NaN，再通过设备侧 `where` 选成零，检验清理方案不依赖未写行内容。无效行写入独立且互不重复的 scratch slot；真实 KV 区域与 scratch 区域不重叠。eager 对照只处理有效行，因此比较整个真实 cache 区域可以覆盖有效写回和 guard/历史位置不被误写；cache 内容要求精确相同，scale 使用报告中的数值容差，并检查 scratch 为有限值。
+
+验收在原 `output_ok` / `state_ok` 上增加 `cache_ok`、`scale_ok`、`scratch_finite`，所有项通过才设置 `passed=true`。该模式本地仅完成代码和静态检查，尚无 NPU 实测结果。
+
+这块 scratch 仅是实验中的隔离设计，生产 allocator 尚未因该脚本获得额外槽位。落主仓时必须显式预留相应空间，或提供固定形状的 masked write；不能直接把实验 loc 指向真实请求槽，也不能默认重复写 slot 0 在所有 epilog 中都安全。
+
+通过后固定完整的输出/写回容量协议，实现 NPU prefill captured-metadata hooks，并在单层完整图接入 fused indexer/top-k 与 sparse attention，再扩展到模型 replay。

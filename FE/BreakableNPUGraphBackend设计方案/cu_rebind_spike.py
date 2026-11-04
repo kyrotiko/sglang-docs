@@ -33,30 +33,33 @@ is a fresh interpreter: it imports only what it needs, so importing this module
 in the parent -- or running ``python cu_rebind_spike.py`` on its own, which just
 installs the hook into a process that never builds a model -- probes nothing.
 
-The hook has to be installed *inside the subprocess*. Pick one:
+The hook has to be installed *inside the subprocess*, and late enough that
+torch_npu is up. Add one line at the top of ``forward_compress`` in
+ascend_dsv4_backend.py -- the method this spike probes, so by definition it
+runs in the right process at the right time::
 
-A. sitecustomize (no source edits; every interpreter auto-imports it)::
+    # in forward_compress, first line of the body
+    import cu_rebind_spike  # noqa: F401
 
-       mkdir -p /tmp/spike && cp cu_rebind_spike.py /tmp/spike/
-       cat > /tmp/spike/sitecustomize.py <<'EOF'
-       import os
-       if os.environ.get("SGLANG_CU_REBIND_SPIKE") == "1":
-           import cu_rebind_spike  # noqa: F401
-       EOF
-       export PYTHONPATH=/tmp/spike:$PYTHONPATH
-       export SGLANG_CU_REBIND_SPIKE=1
-       python -m sglang.launch_server ... \
-           --cuda-graph-backend-prefill breakable --cuda-graph-bs-prefill 128
+Then::
 
-B. One line at the top of ``forward_compress`` in ascend_dsv4_backend.py::
+    cp cu_rebind_spike.py /tmp/spike/
+    export PYTHONPATH=/tmp/spike:$PYTHONPATH
+    python -m sglang.launch_server ... \
+        --cuda-graph-backend-prefill breakable --cuda-graph-bs-prefill 128
 
-       import cu_rebind_spike  # noqa: F401   (with PYTHONPATH set as above)
+Repeat imports cost nothing (sys.modules hit, and the install is idempotent),
+so leaving it in the hot path for the length of one experiment is fine.
 
-   Repeat imports are free -- the module installs once -- and this guarantees
-   the hook exists in whichever process actually reaches the compressor.
+SGLANG_CU_REBIND_SPIKE is *not* needed with this route: reaching the import
+means you want the probe. The env var only exists for the sitecustomize route,
+which is a trap here -- sitecustomize is imported during interpreter startup,
+far before torch_npu is initialised, and it would pay that cost in every python
+process in the environment.
 
-Expect ``[cu-spike] installed`` once per process that loads the backend, then
-the probe output on the first prefill that calls a compressor.
+Expect one ``installed`` line per process that reaches a compressor, then the
+probe output on the first such call. With DP16, every rank prints; each line
+carries its pid, so grep a single pid to read one rank's verdict.
 
 It does not change serving behaviour: the real call still runs, and the spike
 only adds its own extra graph afterwards.
@@ -70,12 +73,16 @@ import os
 import torch
 
 logger = logging.getLogger(__name__)
-# A spawned scheduler subprocess may configure logging after this import, or
-# filter this logger's name out. Print as well as log so the verdict cannot be
-# swallowed -- the probe runs once, so this costs nothing.
+
+
 def _say(msg, *a):
-    logger.warning(msg, *a)
-    print("[cu-spike] " + (msg % a if a else msg), flush=True)
+    """Print the verdict, tagged with the pid.
+
+    print rather than logging: a spawned scheduler may configure logging after
+    this import, and with DP16 every rank probes, so the pid is what makes a
+    line attributable (grep one pid to read a single rank's result).
+    """
+    print(f"[cu-spike pid={os.getpid()}] " + (msg % a if a else msg), flush=True)
 
 _RESULT_BANNER = "=" * 72
 
@@ -272,7 +279,9 @@ def _install_once() -> None:
         logger.exception("[cu-spike] install failed")
 
 
-if os.environ.get("SGLANG_CU_REBIND_SPIKE") == "1":
+if __name__ != "__main__":
+    # Importing this module IS the request to probe: the only sane import site
+    # is inside the process that runs the compressor (see the usage notes).
     _install_once()
 
 
