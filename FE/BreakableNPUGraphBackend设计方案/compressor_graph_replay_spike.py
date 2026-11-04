@@ -23,6 +23,9 @@ private scratch slots, never shared real cache slots. The eager reference writes
 only valid rows; all real cache rows, including untouched guards, are compared.
 This scratch reservation is experimental; a serving allocator must explicitly
 provide equivalent isolation or use a masked write kernel.
+
+Use --inspect-attention-ops --report attention_ops.json to inspect registration
+and schemas for the next indexer/attention probe. It does not capture a graph.
 """
 
 from __future__ import annotations
@@ -39,6 +42,21 @@ from pathlib import Path
 
 
 VARIANTS = {"c4li": (4, 2, 128), "c4a": (4, 2, 512), "c128a": (128, 1, 512)}
+A3_ATTENTION_OPS = (
+    "custom.npu_quant_lightning_indexer_metadata",
+    "custom.npu_quant_lightning_indexer",
+    "custom.npu_sparse_attn_sharedkv_metadata",
+    "custom.npu_sparse_attn_sharedkv",
+)
+OTHER_ATTENTION_OPS = (
+    "npu.compressor",
+    "custom.compressor",
+    "npu.lightning_indexer",
+    "npu.sparse_attn_sharedkv_metadata_host",
+    "npu.sparse_attn_sharedkv",
+    "custom.npu_kv_quant_sparse_attn_sharedkv_metadata",
+    "custom.npu_kv_quant_sparse_attn_sharedkv",
+)
 
 
 @dataclass(frozen=True)
@@ -168,6 +186,40 @@ def resolve_operator(torch, requested, modules, report):
             "No capture or replay has run."
         )
     return op
+
+
+def registered_attention_schemas(torch):
+    schemas = {}
+    for qualified in (*A3_ATTENTION_OPS, *OTHER_ATTENTION_OPS):
+        namespace, name = qualified.split(".")
+        packet = getattr(getattr(torch.ops, namespace), name, None)
+        default = getattr(packet, "default", None) if packet is not None else None
+        schema = getattr(default, "_schema", None) if default is not None else None
+        schemas[qualified] = str(schema) if schema is not None else None
+    return schemas
+
+
+def inspect_attention_ops(options):
+    import torch
+
+    inspection = {"stage": "inspect_attention_ops", "capture_started": False,
+                  "torch": torch.__version__, "imports": []}
+    for name in options.import_module or ["custom_ops", "sgl_kernel_npu"]:
+        try:
+            module = importlib.import_module(name)
+            inspection["imports"].append({"name": name, "file": str(getattr(module, "__file__", "unknown"))})
+        except Exception as error:
+            inspection["imports"].append({"name": name, "error": f"{type(error).__name__}: {error}"})
+    try:
+        import torch_npu
+
+        inspection["torch_npu"] = getattr(torch_npu, "__version__", "unknown")
+        inspection["device"] = torch.npu.get_device_name(options.device)
+    except Exception as error:
+        inspection["device_error"] = f"{type(error).__name__}: {error}"
+    inspection["schemas"] = registered_attention_schemas(torch)
+    inspection["a3_required_ops_registered"] = all(inspection["schemas"][name] is not None for name in A3_ATTENTION_OPS)
+    return inspection
 
 
 def make_payload(torch, case, base, table_builder, tokens, ratio, coff, arch35):
@@ -452,6 +504,7 @@ def main():
     parser.add_argument("--rtol", type=float, default=0.01)
     parser.add_argument("--report", type=Path)
     parser.add_argument("--list-cases", action="store_true", help="Print the case matrix without importing torch")
+    parser.add_argument("--inspect-attention-ops", action="store_true", help="Inspect custom indexer/sparse-attention registration and schemas; no --op, fixtures, or capture required")
     options = parser.parse_args()
     if options.tokens < 256 or options.tokens % 128:
         parser.error("--tokens must be >= 256 and a multiple of 128")
@@ -460,6 +513,18 @@ def main():
     if options.list_cases:
         ratio = VARIANTS[options.variant][0]
         print(json.dumps([{**asdict(case), "valid_output_rows": case.compressed_rows(ratio)} for case in make_cases(options.tokens, ratio)], indent=2))
+        return 0
+    if options.inspect_attention_ops:
+        try:
+            inspection = inspect_attention_ops(options)
+        except Exception as error:
+            inspection = {"stage": "inspect_attention_ops", "capture_started": False,
+                          "error": f"{type(error).__name__}: {error}"}
+            write_report(options.report, inspection)
+            print(json.dumps(inspection, indent=2), flush=True)
+            return 2
+        write_report(options.report, inspection)
+        print(json.dumps(inspection, indent=2), flush=True)
         return 0
     if options.op is None:
         parser.error("NPU runs require --op")

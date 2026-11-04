@@ -284,11 +284,11 @@ C128A 的相应边界起点为 127 / 255；完整 case 参数由脚本的 ratio 
 
 这份结果支持的结论：在该设备、安装版本及测试形状下，三种 compressor 使用固定 shape / 地址时，可以通过原地修改 cu、seqused、start_pos 和 RoPE 内容正确重放；包括 cu 末项小于 X 容量、逻辑单请求、无新压缩块和 idle。对这些 case，不需要通过图任务更新动态长度，因此当前适配可以继续沿稳定设备 metadata 的路径推进。
 
-尚未覆盖：其他形状、设备/安装版本、连续 chunk 的状态累积、量化和 KV/scale epilog、fused lightning indexer、sparse attention、完整模型精度与性能。零有效输出的两个 case 仅以完整 state 一致性作为比较依据，不表示 padding 输出已经清零。
+这一轮单算子测试未覆盖 epilog；其后续实测见第 13 节。仍未覆盖其他形状、设备/安装版本、连续 chunk 的状态累积、fused lightning indexer、sparse attention、完整模型精度与性能。单算子零有效输出的两个 case 仅以完整 state 一致性作为比较依据，不表示 padding 输出已经清零。
 
-**13. 下一项验证：固定容量 compressor 输出与图内 epilog**
+**13. 实测记录：A3 compressor 与图内 epilog 全部通过**
 
-脚本已增加 A3 专用 `--with-epilog` 模式。下一步在同一服务环境运行：
+用户于 2026-11-04 在同一环境完成三种 variant 的 `--with-epilog` 验证，对应命令为：
 
 ```bash
 python compressor_graph_replay_spike.py --variant c4li --op npu.compressor --with-epilog --report c4li_epilog.json
@@ -300,8 +300,30 @@ python compressor_graph_replay_spike.py --variant c128a --op npu.compressor --wi
 
 实验将无效输出行强制替换为 NaN，再通过设备侧 `where` 选成零，检验清理方案不依赖未写行内容。无效行写入独立且互不重复的 scratch slot；真实 KV 区域与 scratch 区域不重叠。eager 对照只处理有效行，因此比较整个真实 cache 区域可以覆盖有效写回和 guard/历史位置不被误写；cache 内容要求精确相同，scale 使用报告中的数值容差，并检查 scratch 为有限值。
 
-验收在原 `output_ok` / `state_ok` 上增加 `cache_ok`、`scale_ok`、`scratch_finite`，所有项通过才设置 `passed=true`。该模式本地仅完成代码和静态检查，尚无 NPU 实测结果。
+验收在原 `output_ok` / `state_ok` 上增加 `cache_ok`、`scale_ok`、`scratch_finite`，所有项通过才设置 `passed=true`。三种 variant 各 9 个 case 全部通过：
+
+| variant | 捕获的后处理 | 输出 / state / 真实 cache 最大误差 | scale 最大误差 | scratch |
+| --- | --- | --- | --- | --- |
+| C4Li | Hadamard、int8 动态量化、K 和 FP16 scale scatter | 0 / 0 / 0 | 0 | 所有 case 为有限值 |
+| C4A | BF16 cache 写入 | 0 / 0 / 0 | 不适用（无 scale buffer） | 所有 case 为有限值 |
+| C128A | BF16 cache 写入 | 0 / 0 / 0 | 不适用（无 scale buffer） | 所有 case 为有限值 |
+
+证据为用户贴出的三次终端输出。后两次命令复用了 `--report c4li_epilog.json`，服务器该文件最终只保留 C128A；本节根据三次终端日志记录结果，不将其误当成三个独立保存的 JSON 文件。后续不同 variant 使用不同报告名。
+
+结合第 12 节，共有 54 次 case 执行通过：compressor 单独捕获 27 次，compressor 与 epilog 同图捕获 27 次。这支持当前 A3 配置采用固定输出容量、设备 mask 和隔离 scratch 写入，不需要为已覆盖的 compressor/epilog 增加 `graph.update()`。
 
 这块 scratch 仅是实验中的隔离设计，生产 allocator 尚未因该脚本获得额外槽位。落主仓时必须显式预留相应空间，或提供固定形状的 masked write；不能直接把实验 loc 指向真实请求槽，也不能默认重复写 slot 0 在所有 epilog 中都安全。
 
-通过后固定完整的输出/写回容量协议，实现 NPU prefill captured-metadata hooks，并在单层完整图接入 fused indexer/top-k 与 sparse attention，再扩展到模型 replay。
+**14. 下一项：确认 fused indexer / sparse attention 的实际接口**
+
+compressor/epilog 已验证，接下来不再重复这一轮测试。基线 SGLang 的 A3 路径使用 `custom.npu_quant_lightning_indexer`、`custom.npu_sparse_attn_sharedkv`，以及各自的 metadata 算子；它们和 `npu.compressor` 的注册来源不同。先在服务器查询：
+
+```bash
+python compressor_graph_replay_spike.py --inspect-attention-ops --report attention_ops.json
+```
+
+查询模式独立导入 `custom_ops` / `sgl_kernel_npu`，记录各模块实际路径或导入错误，并输出四个必需算子和相关替代绑定的 schema；不创建或捕获图。查询成功只表示完成检查，图执行能力仍未验证。
+
+拿到接口后构造单层完整图，复用已验证的 compressor 与 epilog：indexer 的 query/KV 长度、page table、kernel metadata 使用固定存储并在 replay 前原地刷新；图内完成 Q/weights/量化、lightning top-k 和 sparse attention，比较 top-k、有效 attention 输出、cache 和 state。metadata planning 可以留在图外，四个模型计算环节均进入捕获段。
+
+生产实现随后落到 NPU prefill captured-metadata hooks、固定 request/context 容量和模型能力分发；同时明确解决前述 scratch 预留或 masked write 的 allocator 契约，再扩展到模型 replay。
