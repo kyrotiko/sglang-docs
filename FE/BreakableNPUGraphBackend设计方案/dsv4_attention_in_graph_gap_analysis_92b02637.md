@@ -314,7 +314,7 @@ python compressor_graph_replay_spike.py --variant c128a --op npu.compressor --wi
 
 这块 scratch 仅是实验中的隔离设计，生产 allocator 尚未因该脚本获得额外槽位。落主仓时必须显式预留相应空间，或提供固定形状的 masked write；不能直接把实验 loc 指向真实请求槽，也不能默认重复写 slot 0 在所有 epilog 中都安全。
 
-**14. 下一项：确认 fused indexer / sparse attention 的实际接口**
+**14. 实测接口：fused indexer / sparse attention 注册齐全**
 
 compressor/epilog 已验证，接下来不再重复这一轮测试。基线 SGLang 的 A3 路径使用 `custom.npu_quant_lightning_indexer`、`custom.npu_sparse_attn_sharedkv`，以及各自的 metadata 算子；它们和 `npu.compressor` 的注册来源不同。先在服务器查询：
 
@@ -324,6 +324,45 @@ python compressor_graph_replay_spike.py --inspect-attention-ops --report attenti
 
 查询模式独立导入 `custom_ops` / `sgl_kernel_npu`，记录各模块实际路径或导入错误，并输出四个必需算子和相关替代绑定的 schema；不创建或捕获图。查询成功只表示完成检查，图执行能力仍未验证。
 
-拿到接口后构造单层完整图，复用已验证的 compressor 与 epilog：indexer 的 query/KV 长度、page table、kernel metadata 使用固定存储并在 replay 前原地刷新；图内完成 Q/weights/量化、lightning top-k 和 sparse attention，比较 top-k、有效 attention 输出、cache 和 state。metadata planning 可以留在图外，四个模型计算环节均进入捕获段。
+用户于 2026-11-04 提供查询结果：同一 `Ascend910_9362` / torch `2.10.0+cpu` / torch_npu `2.10.0.post6` 环境中，`a3_required_ops_registered=true`，四个 `custom` 必需算子均存在。`custom_ops`、`sgl_kernel_npu` 的路径分别是当前 Python 3.12 site-packages 中的对应包。
+
+| 算子 | 查询确认的接口要点 |
+| --- | --- |
+| `custom.npu_quant_lightning_indexer_metadata` | 必需 num_heads_q/num_heads_k/head_dim/query_quant_mode/key_quant_mode；query/KV 长度为可选 Tensor；返回 Tensor |
+| `custom.npu_quant_lightning_indexer` | query/key/weights、Q/K dequant scale 为 Tensor；长度、page table、metadata 为 Tensor；返回 `(Tensor, Tensor)` |
+| `custom.npu_sparse_attn_sharedkv_metadata` | 必需 num_heads_q/num_heads_kv/head_dim；cu、seqused 为 Tensor；支持 has_ori_kv/has_cmp_kv/cmp_topk/cmp_ratio；返回 Tensor |
+| `custom.npu_sparse_attn_sharedkv` | Q、原始/压缩 KV、sparse indices、页表、长度、sinks 和 metadata 为 Tensor；返回 `(Tensor, Tensor)` |
+
+这与基线 A3 backend 的调用相符，因此下一步直接用这些绑定构造完整链路，不切换为 `npu.lightning_indexer` 的 BF16 路径。注册与 schema 结果不等同于 capture/replay 结果。
+
+**15. C4 单层完整链路验证脚本**
+
+新增 [dsv4_c4_attention_graph_spike.py](dsv4_c4_attention_graph_spike.py)。将它与最新 `compressor_graph_replay_spike.py` 放在服务器同一目录后运行：
+
+```bash
+python dsv4_c4_attention_graph_spike.py --report c4_chain.json
+```
+
+脚本使用同一张裸 NPUGraph 捕获：C4A 主 compressor、C4Li indexer compressor、两个 epilog、合成 Q/KV/weights 投影与 norm/RoPE、indexer Q Hadamard/量化、quant lightning indexer、固定 top-k buffer 交接，以及 sparse attention。每次 replay 前只做固定输入和 metadata 的规划、复制及测试状态恢复，不调用 `graph.update()`。
+
+默认配置：X capacity=256、query capacity=258、固定两个 request slot，hidden=1024、attention heads=64、indexer heads=64、top-k=512、SWA page=128 / compressed page=32、已有 prefix=2048。Q/KV/weights 使用 rank-128 合成投影，不加载 checkpoint；该实验验证算子链 replay 一致性，不声称等价于完整模型计算。
+
+compressor 的 cu 描述 X 的输入容量；attention/indexer 的 query 则按真实行打包，分别保留 cu 与 gather/restore buffer，避免把两种长度口径强行复用。每个无有效 query 的请求槽使用一个 dummy query，因此 query buffer 额外预留两个位置；dummy 请求只读取隔离的零 page，最终按设备 mask 和 restore 索引恢复为 X capacity 的输出。所有无效 cache 写入使用独立 scratch，页表不包含这些 scratch page。
+
+indexer query/KV 长度、SWA/压缩页表及两份 kernel metadata 均为固定地址。metadata 算子在图外针对本次 batch 生成临时结果，再 `copy_` 到固定的 int32[1024] buffer。页表绑定会随 case 改变，历史 BF16 KV 各 page 使用不同内容，增强对错误页表/旧 metadata 的识别能力。
+
+eager 对照使用相同算子和相同初始 cache/state，但只写真实有效行；graph 通过固定容量和 mask 写回。先在 capture 前保存全部九个 eager 参考，再预热和捕获 baseline；capture 后只进行 metadata planning、固定 buffer 更新和 replay，不再调用核心算子的 eager 路径，防止 eager 调用更新隐藏 launch/tiling cache 而影响测量。验收比较：
+
+- `attention_ok`：恢复到原 X 布局后的输出，默认 atol=0.001、rtol=0.01。
+- `topk_set_ok`：每个 query 的 top-k 集合精确一致；额外报告 `topk_exact_ok`，区分集合相同但顺序不同的情况。
+- `main_state_ok` / `index_state_ok`：两套完整 compressor state。
+- `main_cache_ok` / `index_cache_ok` / `swa_cache_ok`：整个真实 cache 区域精确一致，包括未写入的 guard/历史位置。
+- `index_scale_ok`、`padding_output_zero`、`scratch_finite`。
+
+九个 case 继续覆盖有效长度、请求划分、cu 总长度、压缩边界、逻辑单请求、无新块、idle 和恢复 baseline。所有 case 必需检查均通过才设置 `passed=true`。状态与 cache 每次都恢复，连续 chunk 的累积另行验证。
+
+本地通过 Python 3.10 语法/CLI 检查，以及五项布局检查，覆盖 T=256/512、prefix=128/2048/8192、page=64/128 下的页表与物理 loc、scratch 隔离、Q gather/restore，以及第一个 request slot 为空而第二个占满的情形。本地没有 torch / torch_npu，尚无这个完整链路的 NPU 运行结果。
+
+该脚本目前只覆盖 C4 层；ratio 0 / 128 的 attention、模型权重精度、真实 allocator、连续 chunk、TP/DP/CP 与多流仍需后续验证。
 
 生产实现随后落到 NPU prefill captured-metadata hooks、固定 request/context 容量和模型能力分发；同时明确解决前述 scratch 预留或 masked write 的 allocator 契约，再扩展到模型 replay。
