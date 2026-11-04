@@ -204,3 +204,34 @@ Ascend 官方机制说明可交叉参考：[NPUGraph](https://github.com/Ascend/
 8. profiler 区分 host metadata planning 和 graph replay；确认主 compressor、indexer compressor、量化与 epilog、lightning indexer、sparse attention 都位于捕获段中，DSV4 attention 链内没有 eager break。不能以启动成功或文件名含 full-capture 作为入图证明。
 
 实现主要落点是 `sglang` 的 NPU attention backend、公共模型的能力分发以及必要的 prefill runner 容量约束。只有单算子实验确认底层捕获 / 动态参数机制不足时，再分别修改 torch_npu 或对应 kernel 仓库。
+
+**11. 下一步：先取得可信的动态 replay 结果**
+
+第一项可执行工作是运行同目录的 [compressor_graph_replay_spike.py](compressor_graph_replay_spike.py)，先验证三种 compressor 的固定容量协议。脚本复用本地 kernel 测试的两个 CPU fixture builder，直接调用安装环境的实际算子；不导入整个测试模块，不加载模型权重。
+
+```bash
+python compressor_graph_replay_spike.py \
+  --kernel-repo /path/to/sgl-kernel-npu \
+  --variant c4li --op npu.compressor --report c4li.json
+```
+
+算子命名空间和注册模块必须与服务一致。基线 SGLang 的 A3 路径选 `npu.compressor`，A5 路径选 `custom.compressor`；若注册需要额外导入，使用 `--import-module MODULE`。kernel checkout 仅提供 fixture 源码，其 HEAD 不代表实际运行的二进制；脚本记录 torch/torch_npu 版本、设备、算子 schema 与 fixture 版本，定位结果时还应保留服务依赖版本。
+
+先运行 C4Li，再把 `--variant` 分别改为 `c4a`、`c128a`；每次新进程运行。默认 token 容量 256、请求槽数 2、hidden 1024，A5 使用 `coff * ratio` 的小 ring。默认使用与 P1 segment 相同的裸 capture API，不调用 `graph.update()`；可用 `--capture-api context` 定位 capture API 差异。
+
+验证方法：每个 case 从同一个初始 state 分别执行 eager 和 graph，比较真实新增压缩块对应的有效输出，以及完整 state cache。cases 覆盖有效长度缩短、cu 请求划分改变、cu 末项小于 X 容量、单请求、跨压缩边界、无新块、idle，最后回到初始 case；所有图外输入 buffer 的地址、shape、dtype 保持不变。
+
+原有 `cu_rebind_spike.py` 用不同 cu 的两次输出是否相等推断参数是否固化，这个判据不足：无效输出行可能保留旧值，kernel 可能读 `seqused` 限制输出，state 又会跨调用累积；单独修改 cu 还可能使 `seqused` 超过该请求容量。新脚本不改动该文件，改用每个 case 对照 eager 的判定。
+
+结果决定后续动作：
+
+| 结果 | 后续动作 |
+| --- | --- |
+| 三种 variant 全部 `passed=true`，有效输出和 state 均匹配 | 固化已验证的 T/B/cu/seqused 协议；实现 prefill metadata hooks，并在单层中连接图内 epilog、fused indexer 与 attention |
+| 某种布局 eager 已报错 | 先确认该布局是否违反算子 ABI，调整 dummy/capacity 表达或加 variant；不能由此认定 graph 固化了参数 |
+| eager 正常、graph 对照失败 | 用报告定位是 cu、有效数量还是 state 映射引入的差异，缩小成单算子 repro，再决定补底层协议或图任务更新 |
+| raw capture 失败、context capture 成功 | 先定位 segment capture 的流、warmup、tiling 生命周期差异 |
+
+`passed=true` 表示相对于同一算子的 eager 结果满足 replay 一致性；后续仍要对照 kernel reference / 模型精度，并验证连续 chunk 的状态累积。全链路最终验收要求 compressor、量化、epilog、indexer、attention 均在图内。
+
+本地已完成脚本语法/CLI 和三种 variant 的 case 矩阵校验；当前 Windows 环境没有 torch / torch_npu，尚无 NPU 运行结果。
