@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>为什么调小 bucket 救不了 16× 放大</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --line: #2a2f3a;
+    --text: #e6e9ef;
+    --muted: #8b93a7;
+    --eager: #2dd4bf;
+    --graph: #f59e0b;
+    --empty: #232833;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 28px 64px;
+    background: var(--bg); color: var(--text);
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: .2px; }
+  .lede { color: var(--muted); margin: 0 0 32px; font-size: 15px; }
+  .lede b { color: var(--text); font-weight: 600; }
+
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 820px) { .panels { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px 18px 14px;
+  }
+  .panel h2 { font-size: 15px; margin: 0 0 2px; font-weight: 600; }
+  .panel .sub { color: var(--muted); font-size: 12.5px; margin: 0 0 16px; }
+  .panel.eager h2 { color: var(--eager); }
+  .panel.graph h2 { color: var(--graph); }
+
+  .rack { display: flex; align-items: flex-end; gap: 5px; height: 190px; margin-bottom: 10px; }
+  .bar {
+    flex: 1; border-radius: 3px 3px 0 0; position: relative;
+    transition: height .18s ease, background .18s ease;
+    min-height: 2px;
+  }
+  .bar.empty { background: var(--empty); height: 2px !important; }
+  .bar.eager { background: var(--eager); }
+  .bar.graph { background: var(--graph); }
+  .ranks { display: flex; gap: 5px; margin-bottom: 14px; }
+  .ranks span { flex: 1; text-align: center; font-size: 10px; color: var(--muted); }
+
+  .readout { font-size: 13px; color: var(--muted); }
+  .readout b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .readout .big { font-size: 19px; display: block; margin-top: 4px; color: var(--text); font-weight: 600; }
+  .panel.eager .big { color: var(--eager); }
+  .panel.graph .big { color: var(--graph); }
+
+  .controls {
+    margin-top: 22px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 22px;
+  }
+  @media (max-width: 820px) { .controls { grid-template-columns: 1fr; } }
+  .ctl label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .ctl label b { color: var(--text); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: #6ea8fe; }
+
+  .verdict {
+    margin-top: 18px; padding: 16px 18px; border-radius: 12px;
+    background: linear-gradient(90deg, rgba(110,168,254,.12), rgba(110,168,254,.03));
+    border: 1px solid rgba(110,168,254,.28);
+    font-size: 15px;
+  }
+  .verdict .n { font-size: 30px; font-weight: 700; color: #6ea8fe; font-variant-numeric: tabular-nums; }
+  .verdict code { background: #0b0d12; padding: 2px 6px; border-radius: 5px; font-size: 13px; }
+  .formula {
+    margin-top: 14px; background: #0b0d12; border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px; color: #b9c2d6; white-space: pre;
+  }
+  .formula em { color: #f59e0b; font-style: normal; }
+  .formula i { color: #2dd4bf; font-style: normal; }
+  .note { color: var(--muted); font-size: 13px; margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>为什么把 bucket 调小救不了 16× 放大</h1>
+  <p class="lede">
+    开图后 runner 会强制 <b>MAX_LEN</b>：把 16 个 DP rank 全部对齐到同一个 bucket。
+    allgather 再把这个形状乘以 <b>rank 数</b>。所以放大器是 <b>rank 的个数</b>，
+    不是 bucket 的大小。
+  </p>
+
+  <div class="panels">
+    <div class="panel eager">
+      <h2>关图 · SUM_LEN</h2>
+      <p class="sub">每个 rank 跑自己的真实 token；空转的 rank 贡献 0 行</p>
+      <div class="rack" id="rack-eager"></div>
+      <div class="ranks" id="ranks-eager"></div>
+      <p class="readout">
+        MoE 处理行数 = Σ 真实 token
+        <span class="big" id="eager-total"></span>
+      </p>
+    </div>
+
+    <div class="panel graph">
+      <h2>开图 · MAX_LEN</h2>
+      <p class="sub">所有 rank 被 pad 到同一个 bucket，空转的也要跑满</p>
+      <div class="rack" id="rack-graph"></div>
+      <div class="ranks" id="ranks-graph"></div>
+      <p class="readout">
+        MoE 处理行数 = 16 × bucket
+        <span class="big" id="graph-total"></span>
+      </p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="ctl">
+      <label>每个 rank 的 bucket<b id="bucket-val">2048</b></label>
+      <input type="range" id="bucket" min="512" max="4096" step="512" value="2048">
+    </div>
+    <div class="ctl">
+      <label>同时有活的 rank 数<b id="busy-val">2</b></label>
+      <input type="range" id="busy" min="1" max="16" step="1" value="2">
+    </div>
+  </div>
+
+  <div class="verdict">
+    开图 / 关图 的 MoE 计算量倍数：<span class="n" id="ratio"></span>
+    <div class="formula" id="formula"></div>
+    <p class="note" id="hint"></p>
+  </div>
+</div>
+
+<script>
+  const RANKS = 16;
+  const bucketEl = document.getElementById("bucket");
+  const busyEl = document.getElementById("busy");
+  const bucketVal = document.getElementById("bucket-val");
+  const busyVal = document.getElementById("busy-val");
+  const rackEager = document.getElementById("rack-eager");
+  const rackGraph = document.getElementById("rack-graph");
+  const ranksEager = document.getElementById("ranks-eager");
+  const ranksGraph = document.getElementById("ranks-graph");
+  const eagerTotal = document.getElementById("eager-total");
+  const graphTotal = document.getElementById("graph-total");
+  const ratioEl = document.getElementById("ratio");
+  const formulaEl = document.getElementById("formula");
+  const hintEl = document.getElementById("hint");
+
+  const fmt = (n) => n.toLocaleString("en-US");
+
+  function buildRacks() {
+    for (const rack of [rackEager, rackGraph]) {
+      rack.innerHTML = "";
+      for (let i = 0; i < RANKS; i++) {
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        rack.appendChild(bar);
+      }
+    }
+    for (const labels of [ranksEager, ranksGraph]) {
+      labels.innerHTML = "";
+      for (let i = 0; i < RANKS; i++) {
+        const s = document.createElement("span");
+        s.textContent = i;
+        labels.appendChild(s);
+      }
+    }
+  }
+
+  function render() {
+    const bucket = Number(bucketEl.value);
+    const busy = Number(busyEl.value);
+    bucketVal.textContent = fmt(bucket);
+    busyVal.textContent = busy;
+
+    // 忙的 rank 用满桶（最常见的情况：batch 就是满的）
+    const eagerPerRank = bucket;
+
+    const eagerBars = rackEager.children;
+    const graphBars = rackGraph.children;
+    for (let i = 0; i < RANKS; i++) {
+      const active = i < busy;
+      eagerBars[i].className = "bar " + (active ? "eager" : "empty");
+      eagerBars[i].style.height = active ? "100%" : "2px";
+      graphBars[i].className = "bar graph";
+      graphBars[i].style.height = "100%";
+    }
+
+    const eager = busy * eagerPerRank;
+    const graph = RANKS * bucket;
+
+    eagerTotal.textContent = fmt(eager) + " 行";
+    graphTotal.textContent = fmt(graph) + " 行";
+
+    const ratio = graph / eager;
+    ratioEl.textContent = ratio.toFixed(2) + "×";
+    formulaEl.innerHTML =
+      "倍数 = <em>16 × bucket</em> / Σ真实\n" +
+      "     = <em>16 × " + fmt(bucket) + "</em> / (" + busy + " × " + fmt(eagerPerRank) + ")\n" +
+      "     = 16 / " + busy + " = <em>" + ratio.toFixed(2) + "×</em>\n\n" +
+      "bucket 在分子分母里<b>约掉了</b> —— 它只决定绝对量，不决定倍数。";
+
+    hintEl.textContent =
+      busy === RANKS
+        ? "16 个 rank 全忙时倍数是 1.00×：padding 是精确的，图不亏也不赚（实测还快 2%）。"
+        : "只要有空转的 rank，倍数 = 16 / 忙的 rank 数；调小 bucket 只是让两边一起变小。";
+  }
+
+  bucketEl.addEventListener("input", render);
+  busyEl.addEventListener("input", render);
+  buildRacks();
+  render();
+</script>
+</body>
+</html>
