@@ -284,7 +284,7 @@ C128A 的相应边界起点为 127 / 255；完整 case 参数由脚本的 ratio 
 
 这份结果支持的结论：在该设备、安装版本及测试形状下，三种 compressor 使用固定 shape / 地址时，可以通过原地修改 cu、seqused、start_pos 和 RoPE 内容正确重放；包括 cu 末项小于 X 容量、逻辑单请求、无新压缩块和 idle。对这些 case，不需要通过图任务更新动态长度，因此当前适配可以继续沿稳定设备 metadata 的路径推进。
 
-这一轮单算子测试未覆盖 epilog；其后续实测见第 13 节。仍未覆盖其他形状、设备/安装版本、连续 chunk 的状态累积、fused lightning indexer、sparse attention、完整模型精度与性能。单算子零有效输出的两个 case 仅以完整 state 一致性作为比较依据，不表示 padding 输出已经清零。
+这一轮单算子测试未覆盖 epilog；其后续实测见第 13 节。C4 fused indexer 与 sparse attention 的后续同图实测见第 16 节。仍未覆盖其他形状、设备/安装版本、连续 chunk 的状态累积、完整模型精度与性能。单算子零有效输出的两个 case 仅以完整 state 一致性作为比较依据，不表示 padding 输出已经清零。
 
 **13. 实测记录：A3 compressor 与图内 epilog 全部通过**
 
@@ -361,8 +361,61 @@ eager 对照使用相同算子和相同初始 cache/state，但只写真实有�
 
 九个 case 继续覆盖有效长度、请求划分、cu 总长度、压缩边界、逻辑单请求、无新块、idle 和恢复 baseline。所有 case 必需检查均通过才设置 `passed=true`。状态与 cache 每次都恢复，连续 chunk 的累积另行验证。
 
-本地通过 Python 3.10 语法/CLI 检查，以及五项布局检查，覆盖 T=256/512、prefix=128/2048/8192、page=64/128 下的页表与物理 loc、scratch 隔离、Q gather/restore，以及第一个 request slot 为空而第二个占满的情形。本地没有 torch / torch_npu，尚无这个完整链路的 NPU 运行结果。
+本地通过 Python 3.10 语法/CLI 检查，以及五项布局检查，覆盖 T=256/512、prefix=128/2048/8192、page=64/128 下的页表与物理 loc、scratch 隔离、Q gather/restore，以及第一个 request slot 为空而第二个占满的情形。本地没有 torch / torch_npu；用户提供的完整链路 NPU 运行结果见第 16 节。
 
 该脚本目前只覆盖 C4 层；ratio 0 / 128 的 attention、模型权重精度、真实 allocator、连续 chunk、TP/DP/CP 与多流仍需后续验证。
 
 生产实现随后落到 NPU prefill captured-metadata hooks、固定 request/context 容量和模型能力分发；同时明确解决前述 scratch 预留或 masked write 的 allocator 契约，再扩展到模型 replay。
+
+**16. 实测记录：A3 C4 单层完整链路通过**
+
+证据来源：用户于 2026-11-04 提供的完整终端日志，`dsv4_c4_attention_graph_spike.py --report c4_chain.json` 最终输出 `passed=true, stage=complete, cases=9`。
+
+环境沿用前述 `Ascend910_9362`、torch `2.10.0+cpu`、torch_npu `2.10.0.post6` 和安装环境的 `custom_ops` / `sgl_kernel_npu`。测试参数为 X capacity=256、query capacity=258、request slots=2、prefix=2048、top-k=512、hidden=1024、attention/indexer heads=64，SWA page=128、C4 page=32。
+
+| 检查项 | 九个 case 的实测结果 |
+| --- | --- |
+| `attention_ok` | 全部 true，最大绝对误差均为 0 |
+| `topk_set_ok` / `topk_exact_ok` | 全部 true，top-k 集合与顺序都一致 |
+| `main_state_ok` / `index_state_ok` | 全部 true，两套 state 的最大绝对误差均为 0 |
+| `main_cache_ok` / `index_cache_ok` / `swa_cache_ok` | 全部 true，真实区域最大绝对误差均为 0 |
+| `index_scale_ok` | 全部 true，最大绝对误差均为 0 |
+| `padding_output_zero` / `scratch_finite` | 全部 true |
+
+通过的 case 为 baseline、less_used、cu_repartition、cu_short_total、one_request、cross_boundary、no_new_blocks、idle，以及恢复 baseline。九份 eager 参考全部在 capture 前生成；capture 后仅更新输入/metadata 并 replay，没有再执行核心算子的 eager 路径，也没有 `graph.update()`。
+
+由此确认：在这个 A3 安装环境和测试形状下，主/indexer compressor、epilog、fused quantized indexer 与 sparse attention 可以处于同一张裸 NPUGraph 中，并通过固定地址 metadata 响应请求长度、页表和有效行数的变化。此前设计中“这些计算必须作为 eager break”的限制属于旧 metadata 生命周期和形状协议，不能当成已验证的算子能力限制。
+
+**环境初始化复现记录。** 用户第一次运行在 indexer metadata 生成阶段报 `aclnnQuantLightningIndexerMetadata` / `GetWorkspaceSize` 找不到，尚未进入图捕获。随后在同一 shell 执行以下环境脚本，再启动新的 Python 进程，原命令完整通过：
+
+```bash
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/nnal/atb/set_env.sh
+source /usr/local/Ascend/ascend-toolkit/latest/opp/vendors/customize/bin/set_env.bash
+source /usr/local/Ascend/ascend-toolkit/latest/opp/vendors/custom_transformer/bin/set_env.bash
+python dsv4_c4_attention_graph_spike.py --report c4_chain.json
+```
+
+这里记录的是该服务器成功使用的环境组合，未分别验证四个 source 的必要性，也未将 CPU governor / sysctl 性能设置作为符号解析的前提。schema 注册只说明 wrapper 存在，实际执行还要求 ACLNN 库与 vendor 路径已加载；环境变化后使用新的 Python 进程运行。
+
+脚本随后只增加了报告改进：保存相关库路径环境变量，并将构造 buffer/metadata 的失败阶段标为 `buffer_and_metadata_initialization`，避免误写成 registration。计算、捕获与比较逻辑未因这次通过结果而改变。
+
+累计已有 63 次 case 执行通过（27 compressor、27 compressor+epilog、9 C4 完整链路）。这仍是合成输入的 capture/replay 一致性证据，尚不等于 checkpoint 精度、生产 allocator 和完整模型已经通过；ratio 0/128 的 attention、连续 chunk、真实权重量化、并行与多流也不在本次结论中。
+
+**17. 下一阶段：主仓集成的具体落点**
+
+算子能力验证已经足以开始 A3 C4 的主仓适配。继续沿用 P1 的 `BreakableNPUGraphBackend`，首版采用单流；当前证据没有要求为这条 C4 路径新增 `graph.update()` 或修改 torch_npu。
+
+| 顺序 | 主仓改动 | 必须形成的契约 |
+| --- | --- | --- |
+| 1 | 在 NPU 专属模块定义 per-bucket prefill graph state，并实现两个 captured-metadata hook | 固定 T/B/context/C4/C128 容量，强引用保活；replay 原地刷新，超容量提前回退 |
+| 2 | 明确 KV pool / allocator 的 dummy read page 与 scratch write 区域 | 槽位被显式预留且不分配给请求；SWA、主压缩 KV、indexer K/scale 都覆盖；不能照抄 spike 的私有 loc 到真实 pool |
+| 3 | 改造 NPU compressor / indexer / sparse attention 的图内路径 | 压缩容量 cu 与 query cu 分开；固定 shape 的 mask/loc、Q/weights pack、top-k 交接、attention 输出 restore；不按 live 数量做 Python 切片 |
+| 4 | 模型按后端能力分发 | `models/deepseek_v4.py` 对已适配的 NPU prefill 路径绕过公共 attention eager break；NPU source 入口也不再经过 `bcg_dsv4_*` 断点 |
+| 5 | 真实模型验收与扩展 | 先覆盖 C4 的真实权重、prefix hit、连续 chunk 和后续 decode，再覆盖 ratio 0/128、DP idle 与并行组合 |
+
+第 1 项直接使用 runner 现成的 `init_forward_metadata_for_breakable_cuda_graph_capture` / `prepare_forward_metadata_for_breakable_cuda_graph_replay`；在 `ascend_dsv4_backend.py` 里为 prefill 单独规划，复用 decode 的 copy/清尾工具，不复用其每请求一个 token 的假设。每张图的固定 metadata 对象由 runner 保留。
+
+第 3 项接真实模型时可以保留原来 bucket 大小的投影：在 indexer 的 fused 调用前，对已经计算出的 Q 和 weights 做固定形状 pack；在 sparse attention 前 pack 主 Q，输出通过 restore 索引返回原 token 布局。两路 compressor 继续读原 X capacity，避免把 prototype 的 query 额外容量传给 compressor。SWA 写回 loc 的 padding 协议也需要同步适配。
+
+首个可评审改动应围绕 graph state、metadata hooks 和容量检查展开；allocator 隔离与图内执行路径接齐后，才打开模型能力分发，进入整模 eager/graph 对照。验收还应确认 profiler 中这四段模型计算都处于 captured segment 内，并测量启动时间、常驻显存和实际 prefill 延迟。

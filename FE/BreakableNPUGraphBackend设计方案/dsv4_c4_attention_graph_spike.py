@@ -25,6 +25,7 @@ import argparse
 import importlib
 import json
 import math
+import os
 import traceback
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -387,12 +388,17 @@ def run(options, report):
                              "hidden": options.hidden, "heads": options.heads,
                              "metadata_planning": "outside_graph_in_place_refresh",
                              "oracle_schedule": "all_references_before_capture",
-                             "dummy_queries": "one_per_inactive_request"}
-    print(json.dumps({key: value for key, value in report["environment"].items() if key != "schemas"}), flush=True)
+                             "dummy_queries": "one_per_inactive_request",
+                             "opapi_environment": {name: os.environ.get(name) for name in (
+                                 "LD_LIBRARY_PATH", "ASCEND_CUSTOM_OPP_PATH", "ASCEND_HOME_PATH", "ASCEND_OPP_PATH")}}
+    print(json.dumps({key: value for key, value in report["environment"].items()
+                      if key not in ("schemas", "opapi_environment")}), flush=True)
     max_pages = math.ceil((options.prefix + options.tokens + 256) / options.page_size)
     cases = [common.Case(c.name, c.capacities, c.used, tuple(options.prefix + p for p in c.starts), c.seed)
              for c in common.make_cases(options.tokens, 4)]
     layouts = [build_layout(case, options.tokens, options.page_size, max_pages) for case in cases]
+    report["stage"] = "buffer_and_metadata_initialization"
+    common.write_report(options.report, report)
     chain = C4Chain(torch, torch_npu, options, device, layouts)
     stream = torch.npu.Stream()
     stream.wait_stream(torch.npu.current_stream())
