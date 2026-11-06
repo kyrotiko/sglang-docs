@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Compare per-token prompt logprobs between two server runs.
 
-Used to check a numerically sensitive kernel change (for example the
-ascend_ops expert-output dtype switch): launch the server twice with only the
-environment variable differing, dump logprobs from each, then diff them.  The
-server has to be restarted between the two dumps; the flag is read at startup.
+Used to check a numerically sensitive kernel change: launch the server twice
+with only the env flag or the code under test differing, dump logprobs from
+each, then diff them.  The server has to be restarted between the two dumps,
+because a flag read at startup is baked into the captured graphs.
 
-    # run A: baseline
-    SGLANG_NPU_ASCEND_OPS_FP16_GMM_OUT=0 python compare_logprobs.py dump --out a.json
-    # run B: the change under test
-    SGLANG_NPU_ASCEND_OPS_FP16_GMM_OUT=1 python compare_logprobs.py dump --out b.json
+    # run A: baseline server
+    python compare_logprobs.py dump --out a.json
+    # run B: restart with the change under test, then
+    python compare_logprobs.py dump --out b.json
 
     python compare_logprobs.py diff a.json b.json
 
