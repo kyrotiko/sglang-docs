@@ -3,17 +3,23 @@
 
 Used to check a numerically sensitive kernel change (for example the
 ascend_ops expert-output dtype switch): launch the server twice with only the
-environment variable differing, dump logprobs from each, then diff them.
+environment variable differing, dump logprobs from each, then diff them.  The
+server has to be restarted between the two dumps; the flag is read at startup.
 
-    # run A: new path (default)
-    python compare_logprobs.py dump --url http://127.0.0.1:30000 --out a.json
-    # run B: SGLANG_ASCEND_OPS_FP32_EXPERT_OUT=1
-    python compare_logprobs.py dump --url http://127.0.0.1:30000 --out b.json
+    # run A: baseline
+    SGLANG_NPU_ASCEND_OPS_FP16_GMM_OUT=0 python compare_logprobs.py dump --out a.json
+    # run B: the change under test
+    SGLANG_NPU_ASCEND_OPS_FP16_GMM_OUT=1 python compare_logprobs.py dump --out b.json
 
     python compare_logprobs.py diff a.json b.json
 
 Greedy decoding plus ``echo`` makes the prompt token logprobs the probe: any
 divergence inside prefill shows up there before it reaches the sampled text.
+The long prompt drives a real chunked-prefill step, so the MoE finalize runs at
+a realistic capacity instead of a handful of rows.
+
+If the server dies compiling the prompt-logprob kernel, set
+``SGLANG_ENABLE_FAST_INPUT_LOGPROBS=0``.
 """
 
 from __future__ import annotations
@@ -33,6 +39,17 @@ PROMPTS = [
     "Q: What is the boiling point of water at sea level?\nA:",
     "List three prime numbers greater than 100:",
 ]
+
+# Reaches the chunked-prefill path with a full bucket, so the finalize runs at
+# the capacity the benchmark actually uses rather than on a dozen rows.
+PROMPTS.append(
+    (
+        "The mixture-of-experts layer routes each token to a small subset of "
+        "experts, so the parameter count grows without a matching increase in "
+        "per-token compute. "
+    )
+    * 40
+)
 
 
 def dump(url: str, model: str, out: str) -> None:
