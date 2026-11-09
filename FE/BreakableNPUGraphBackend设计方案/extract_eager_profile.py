@@ -230,20 +230,31 @@ def norm_model(value):
 SHAPE_GROUP = re.compile(r"[\[\(\{]([^\]\)\}]*)[\]\)\}]")
 
 
+def parse_dims(raw):
+    dims = []
+    for token in re.split(r"[,\s]+", raw.strip()):
+        if not token:
+            continue
+        try:
+            dims.append(int(token))
+        except ValueError:
+            pass
+    return dims
+
+
 def shape_groups(value):
-    groups = []
-    for raw in SHAPE_GROUP.findall(value or ""):
-        dims = []
-        for token in re.split(r"[,\s]+", raw.strip()):
-            if not token:
-                continue
-            try:
-                dims.append(int(token))
-            except ValueError:
-                pass
-        if dims:
-            groups.append(dims)
-    return groups
+    text = (value or "").strip()
+    groups = [parse_dims(raw) for raw in SHAPE_GROUP.findall(text)]
+    groups = [group for group in groups if group]
+    if groups:
+        return groups
+    # Ascend also exports shapes as "196608,4096;16,4096,4096", tensors
+    # separated by semicolons with no brackets.
+    if ";" in text:
+        return [
+            group for group in (parse_dims(raw) for raw in text.split(";")) if group
+        ]
+    return []
 
 
 def first_dim(value):
@@ -534,6 +545,67 @@ def json_preview(value, depth=0, max_depth=3, max_items=30):
     return value
 
 
+def comm_kind(name):
+    lower = name.lower()
+    if "allgather" in lower:
+        return "AllGather"
+    if "reducescatter" in lower:
+        return "ReduceScatter"
+    if "allreduce" in lower:
+        return "AllReduce"
+    if "send" in lower or "recv" in lower:
+        return "SendRecv"
+    return "Other"
+
+
+def time_in_ms(info, *needles):
+    for key, value in info.items():
+        lower = str(key).lower()
+        if not any(needle in lower for needle in needles):
+            continue
+        number = to_float(value)
+        if number is None:
+            continue
+        if "(ms)" in lower:
+            return number
+        if "(us)" in lower:
+            return number / 1000.0
+        return number
+    return None
+
+
+def parse_comm_info(info):
+    if not isinstance(info, dict):
+        return None
+    elapse = time_in_ms(info, "elapse", "duration")
+    if elapse is None:
+        return None
+    return {
+        "elapse": elapse,
+        "wait": time_in_ms(info, "wait", "sync") or 0.0,
+        "transit": time_in_ms(info, "transit", "bandwidth") or 0.0,
+        "idle": time_in_ms(info, "idle") or 0.0,
+    }
+
+
+def comm_instances(data):
+    records = []
+    total = None
+    for name, value in data.items():
+        if not isinstance(value, dict):
+            continue
+        parsed = parse_comm_info(value.get("Communication Time Info"))
+        if parsed is None:
+            continue
+        entry = {"name": str(name), **parsed}
+        if "total" in str(name).lower():
+            total = entry
+            continue
+        entry["kind"] = comm_kind(str(name))
+        records.append(entry)
+    return records, total
+
+
 def walk_comm_records(value, path, records):
     if isinstance(value, dict):
         lower = {str(key).lower(): key for key in value}
@@ -549,40 +621,57 @@ def walk_comm_records(value, path, records):
         wait = find("wait", "sync")
         transit = find("transit", "bandwidth")
         idle = find("idle")
-        record_count = find("count", "calls", "number")
-        numeric = [
-            item
-            for item in (elapse, wait, transit, idle)
-            if isinstance(item, (int, float)) and not isinstance(item, bool)
-        ]
         label = find("name", "type", "collective", "opname", "op")
-        if numeric and (isinstance(label, str) or len(numeric) >= 2):
+        if isinstance(elapse, (int, float)) and not isinstance(elapse, bool):
             if not isinstance(label, str) or not label:
-                label = " / ".join(path[-2:]) or "record"
-            record = records.setdefault(
-                label,
-                {"count": 0, "elapse": 0.0, "wait": 0.0, "transit": 0.0, "idle": 0.0},
+                label = path[-1] if path else "record"
+            records.append(
+                {
+                    "name": str(label),
+                    "kind": comm_kind(str(label)),
+                    "elapse": float(elapse),
+                    "wait": float(wait) if isinstance(wait, (int, float)) else 0.0,
+                    "transit": float(transit)
+                    if isinstance(transit, (int, float))
+                    else 0.0,
+                    "idle": float(idle) if isinstance(idle, (int, float)) else 0.0,
+                }
             )
-            if isinstance(record_count, (int, float)) and not isinstance(
-                record_count, bool
-            ):
-                record["count"] += int(record_count)
-            else:
-                record["count"] += 1
-            for key, item in (
-                ("elapse", elapse),
-                ("wait", wait),
-                ("transit", transit),
-                ("idle", idle),
-            ):
-                if isinstance(item, (int, float)) and not isinstance(item, bool):
-                    record[key] += item
             return
         for key, item in value.items():
             walk_comm_records(item, path + [str(key)], records)
     elif isinstance(value, list):
         for index, item in enumerate(value):
             walk_comm_records(item, path + [str(index)], records)
+
+
+def summarize_comm(records, total):
+    groups = {}
+    for record in records:
+        group = groups.setdefault(
+            record["kind"],
+            {
+                "count": 0,
+                "elapse": 0.0,
+                "wait": 0.0,
+                "transit": 0.0,
+                "idle": 0.0,
+                "values": [],
+            },
+        )
+        group["count"] += 1
+        group["elapse"] += record["elapse"]
+        group["wait"] += record["wait"]
+        group["transit"] += record["transit"]
+        group["idle"] += record["idle"]
+        group["values"].append(record["elapse"])
+    for group in groups.values():
+        values = group.pop("values")
+        group["avg_ms"] = group["elapse"] / group["count"] if group["count"] else 0.0
+        group["p90_ms"] = percentile(values, 0.9) if values else 0.0
+        group["max_ms"] = max(values) if values else 0.0
+    top = sorted(records, key=lambda record: record["elapse"], reverse=True)[:12]
+    return groups, top
 
 
 def analyze_communication(path):
@@ -593,12 +682,21 @@ def analyze_communication(path):
             data = json.load(handle)
     except (OSError, json.JSONDecodeError) as error:
         return {"path": str(path), "error": str(error)}
-    records = {}
-    walk_comm_records(data, [], records)
+    records, total = comm_instances(data)
+    schema = "instances"
+    if not records:
+        records = []
+        walk_comm_records(data, [], records)
+        schema = "generic"
+    groups, top = summarize_comm(records, total)
     return {
         "path": str(path),
         "preview": json_preview(data),
-        "records": records,
+        "schema": schema,
+        "instance_count": len(records),
+        "groups": groups,
+        "total": total,
+        "top_instances": top,
     }
 
 
@@ -1264,27 +1362,57 @@ def build_report(
     elif "error" in comm:
         add(f"  ERROR: {comm['error']}")
     else:
+        add(
+            f"  schema={comm['schema']} instances={comm['instance_count']} "
+            "(values normalized to ms from the key unit)"
+        )
         fmt_table(
             lines,
-            ("record", "count", "elapse_ms", "wait_ms", "transit", "idle_ms"),
+            (
+                "kind",
+                "count",
+                "elapse_ms",
+                "wait_ms",
+                "transit_ms",
+                "idle_ms",
+                "avg_ms",
+                "p90_ms",
+                "max_ms",
+            ),
             [
                 (
-                    name,
+                    kind,
                     entry["count"],
-                    f"{entry['elapse'] / 1000.0:.3f}",
-                    f"{entry['wait'] / 1000.0:.3f}",
+                    f"{entry['elapse']:.3f}",
+                    f"{entry['wait']:.3f}",
                     f"{entry['transit']:.3f}",
-                    f"{entry['idle'] / 1000.0:.3f}",
+                    f"{entry['idle']:.3f}",
+                    f"{entry['avg_ms']:.3f}",
+                    f"{entry['p90_ms']:.3f}",
+                    f"{entry['max_ms']:.3f}",
                 )
-                for name, entry in sorted(
-                    comm["records"].items(),
+                for kind, entry in sorted(
+                    comm["groups"].items(),
                     key=lambda item: item[1]["elapse"],
                     reverse=True,
-                )[:40]
+                )
             ],
-            (46, 8, 12, 12, 12, 12),
+            (14, 8, 12, 12, 12, 12, 10, 10, 10),
         )
-        if not comm["records"]:
+        if comm["total"] is not None:
+            total = comm["total"]
+            add(
+                f"  reported total: {total['name']} elapse={total['elapse']:.3f} ms "
+                f"wait={total['wait']:.3f} ms transit={total['transit']:.3f} ms "
+                f"idle={total['idle']:.3f} ms"
+            )
+        add("  top instances:")
+        for record in comm["top_instances"]:
+            add(
+                f"    {record['elapse']:10.3f} ms  wait={record['wait']:8.3f} ms  "
+                f"{record['name'][:90]}"
+            )
+        if not comm["groups"]:
             add("  no timing records recognized; see raw copy and schema preview")
     add()
 
