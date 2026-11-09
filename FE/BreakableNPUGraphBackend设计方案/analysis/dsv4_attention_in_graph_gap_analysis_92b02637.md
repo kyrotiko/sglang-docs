@@ -207,7 +207,7 @@ Ascend 官方机制说明可交叉参考：[NPUGraph](https://github.com/Ascend/
 
 **11. 下一步：先取得可信的动态 replay 结果**
 
-第一项可执行工作是运行同目录的 [compressor_graph_replay_spike.py](compressor_graph_replay_spike.py)，先验证三种 compressor 的固定容量协议。脚本内置符合 A3/A5 state-table ABI 的合成输入，直接调用安装环境的实际算子；不加载模型权重。需要复用某个 kernel checkout 的 CPU fixture 时，可额外传入 `--kernel-repo` 的真实路径。
+第一项可执行工作是运行 `scripts/spikes/` 下的 [compressor_graph_replay_spike.py](../scripts/spikes/compressor_graph_replay_spike.py)，先验证三种 compressor 的固定容量协议。脚本内置符合 A3/A5 state-table ABI 的合成输入，直接调用安装环境的实际算子；不加载模型权重。需要复用某个 kernel checkout 的 CPU fixture 时，可额外传入 `--kernel-repo` 的真实路径。
 
 ```bash
 python compressor_graph_replay_spike.py \
@@ -337,7 +337,7 @@ python compressor_graph_replay_spike.py --inspect-attention-ops --report attenti
 
 **15. C4 单层完整链路验证脚本**
 
-新增 [dsv4_c4_attention_graph_spike.py](dsv4_c4_attention_graph_spike.py)。将它与最新 `compressor_graph_replay_spike.py` 放在服务器同一目录后运行：
+新增 [dsv4_c4_attention_graph_spike.py](../scripts/spikes/dsv4_c4_attention_graph_spike.py)。将它与最新 `compressor_graph_replay_spike.py` 放在服务器同一目录后运行：
 
 ```bash
 python dsv4_c4_attention_graph_spike.py --report c4_chain.json

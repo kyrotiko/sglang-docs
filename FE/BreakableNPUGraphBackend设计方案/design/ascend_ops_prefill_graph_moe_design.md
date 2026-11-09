@@ -48,7 +48,7 @@
 
 ## 3. 实测基线
 
-`verify_ascend_ops_prefill_graph.py`（16 rank，纯 torch_npu 复刻 allgather 链）的结果：
+`scripts/verify/verify_ascend_ops_prefill_graph.py`（16 rank，纯 torch_npu 复刻 allgather 链）的结果：
 
 | bucket | gathered | routed | expert_output(fp32) | 峰值 |
 | --- | --- | --- | --- | --- |

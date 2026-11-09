@@ -156,9 +156,9 @@ prefill 单步成本 = 与 token 数近似成正比的部分 + 每步固定开�
 
 判别方法（拿到 server log 后即可执行）：
 
-- `compare_prefill_step_time.py --graph-log ... --eager-log ... --tokens-per-step <512|1024|2048>`：看整 chunk step 的中位数，确认逐 step 层面是否同样呈现 +7.9 / +1.3 / −6.8 ms 的趋势。
+- `scripts/profiling/compare_prefill_step_time.py --graph-log ... --eager-log ... --tokens-per-step <512|1024|2048>`：看整 chunk step 的中位数，确认逐 step 层面是否同样呈现 +7.9 / +1.3 / −6.8 ms 的趋势。
 - 统计日志中 `npu graph: True` 占全部 prefill step 的比例（覆盖率）。
-- `check_dp_padding_from_log.py`：看同一秒内活跃 DP rank 数与 `#new-token` 分布，排除零 token rank / 稀疏 step 的干扰。
+- `scripts/profiling/check_dp_padding_from_log.py`：看同一秒内活跃 DP rank 数与 `#new-token` 分布，排除零 token rank / 稀疏 step 的干扰。
 - 对 2048 组，额外统计每 step 的请求数（`#new-seq`）与 per-step 差值的关系，验证候选原因 3。
 
 ### 3.3 尾延迟与稳定性
@@ -214,7 +214,7 @@ chunk 变小、并发变小、输入变短三者同时发生。因此「图收�
 
 1. **受控 chunk 扫描（最高优先级）**：固定客户端（建议 closed-loop、cap 64、16k 输入），chunk 512 / 1024 / 2048 各 3–5 次，A B A B 交错跑；这一步决定「小 chunk 收益」能否成为可对外的主张。
 2. **或者固定 chunk = 512，扫并发 20 / 40 / 64**，分离并发与 chunk 的贡献。
-3. 提供三档的 server log 与服务端启动命令，跑 `compare_prefill_step_time.py` 与 `check_dp_padding_from_log.py`，确认覆盖率、逐 step 差值、每 step 请求数与图开销的关系，闭环 3.2 的归因。
+3. 提供三档的 server log 与服务端启动命令，跑 `scripts/profiling/compare_prefill_step_time.py` 与 `scripts/profiling/check_dp_padding_from_log.py`，确认覆盖率、逐 step 差值、每 step 请求数与图开销的关系，闭环 3.2 的归因。
 4. 若要把 512/rank 作为推荐配置，补一组同客户端的 512 vs 1024 vs 2048 绝对吞吐对比，量化「小 chunk 的绝对代价 + 图的补偿比例」。
 5. 可选：向下扫 256/rank，验证「越小越收益」的边界；注意 256 需要桶列表包含 256（padding factor 2 不允许 256 直接跳到 1024）。
 
@@ -246,10 +246,10 @@ chunk 变小、并发变小、输入变短三者同时发生。因此「图收�
 - 变化率 = 开图 3 次均值 / 不开图 3 次均值 − 1；延迟类为负数表示开图更快，吞吐为正数表示开图更快。
 - 等效单步时间 = 输入吞吐 /（DP 步 token 数），其中 DP 步 token 数 = 16 × 每 rank chunk；这是在饱和稳态下的近似，包含 padding 与队列效应，仅用于组内比较。
 - 吞吐与 TTFT 的关系验证见 2.4；对外的置信区间建议直接用 3 次运行的极差（本报告已给出每档的 min/max）。
-- 有 server log 时，更严格的逐 step 口径：
+- 有 server log 时，更严格的逐 step 口径（在 `BreakableNPUGraphBackend设计方案/` 下执行）：
 
 ```bash
-python3 compare_prefill_step_time.py \
+python3 scripts/profiling/compare_prefill_step_time.py \
     --graph-log  <开图 server.log...> \
     --eager-log  <不开图 server.log...> \
     --tokens-per-step 2048   # 或 1024 / 512

@@ -2,6 +2,8 @@
 
 **结论**：在小 chunk 低延迟 prefill 场景（每 rank 512，`chunked-prefill-size 8192`）开启 prefill 图后，**吞吐 +2.7%、平均 TTFT −2.7%、P99 TTFT −9.8%**；3 次开图运行全部优于 3 次不开图。中、大 chunk 场景基本持平（±1% 内），图的价值定位在 host-bound 的小 chunk 场景。
 
+> 技术详版：[dsv4_prefill_graph_gain_report.md](dsv4_prefill_graph_gain_report.md)。
+
 ## 1. 实测结果
 
 测试条件：DeepSeek-V4-Flash-0731-w8a8，TP16 / DP16 / EP16，ascend_ops allgather MoE；纯 prefill（输入 9k–16k token，输出 1 token）；每档开图 / 不开图各 3 次，无 profiler。

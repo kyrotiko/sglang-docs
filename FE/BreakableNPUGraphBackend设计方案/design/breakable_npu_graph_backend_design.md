@@ -282,7 +282,7 @@ if backend_name == Backend.BREAKABLE:
 ## 5. DSV4 Flash 怎么适配的
 
 本节讲设计。逐行代码讲解（改了什么、为什么）见
-[dsv4_prefill_graph_walkthrough.md](dsv4_prefill_graph_walkthrough.md)。
+[dsv4_prefill_graph_code_walkthrough.md](../analysis/dsv4_prefill_graph_code_walkthrough.md)。
 
 ### 5.1 一层 attention 怎么被切开
 
@@ -461,6 +461,6 @@ metadata**。NPU 的 compressor、lightning indexer 和 sparse attention 都依�
 
 ---
 
-本目录的 [v2](v2_spike_two_segments.py) / [v4](v4_weak_ref_spike.py) /
-[v8](v8_raw_capture_spike.py) 脚本是上述 NPUGraph 行为的真机探针，CANN 或 torch_npu
+`scripts/spikes/` 下的 [v2](../scripts/spikes/v2_spike_two_segments.py) / [v4](../scripts/spikes/v4_weak_ref_spike.py) /
+[v8](../scripts/spikes/v8_raw_capture_spike.py) 脚本是上述 NPUGraph 行为的真机探针，CANN 或 torch_npu
 升级后可以复跑确认。
