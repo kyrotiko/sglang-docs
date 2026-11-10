@@ -30,6 +30,7 @@ scripts/
 | --- | --- |
 | [dsv4_attention_in_graph_gap_analysis_92b02637.md](analysis/dsv4_attention_in_graph_gap_analysis_92b02637.md) | 基线 92b02637：DSV4 compressor/indexer/attention 全链路入图的差距分析 |
 | [dsv4_prefill_graph_code_walkthrough.md](analysis/dsv4_prefill_graph_code_walkthrough.md) | 当前分支（92b02637 之后）的代码逐段说明 |
+| [prefill_graph_4commits_code_walkthrough.md](analysis/prefill_graph_4commits_code_walkthrough.md) | main 基线上 4 个 commit 的逐文件代码修改说明（P1 wiring / DSV4 / ascend_ops / SUM_LEN fix） |
 | [dsv4_prefill_graph_gain_summary.md](analysis/dsv4_prefill_graph_gain_summary.md) | 收益汇报版（给领导/评审，一页） |
 | [dsv4_prefill_graph_gain_report.md](analysis/dsv4_prefill_graph_gain_report.md) | 收益技术详版：chunk 512/1024/2048 A/B、逐 step 分析、局限 |
 | [prefill_graph_padding_amplification.html](analysis/prefill_graph_padding_amplification.html) | padding 放大的可视化说明 |
