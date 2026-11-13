@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dsv4_prefill_graph.py 在干什么</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel2: #12151b;
+    --line: #2a2f3a;
+    --text: #e6e9ef;
+    --muted: #8b93a7;
+    --live: #2dd4bf;
+    --graph: #f59e0b;
+    --blue: #6ea8fe;
+    --dummy: #a78bfa;
+    --bad: #f87171;
+    --empty: #232833;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 28px 72px;
+    background: var(--bg); color: var(--text);
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.65; font-size: 14.5px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 27px; margin: 0 0 8px; letter-spacing: .2px; }
+  h2 { font-size: 19px; margin: 0 0 4px; }
+  h3 { font-size: 15px; margin: 0 0 8px; }
+  p { margin: 0 0 10px; }
+  code { font-family: var(--mono); background: #0b0d12; padding: 1.5px 6px; border-radius: 5px; font-size: 12.5px; color: #cdd6f4; }
+  .lede { color: var(--muted); margin: 0 0 14px; font-size: 15.5px; }
+  .lede b { color: var(--text); font-weight: 600; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 34px; }
+  .chip {
+    font-size: 12px; color: var(--muted); border: 1px solid var(--line);
+    background: var(--panel2); padding: 3px 10px; border-radius: 999px;
+  }
+  .chip b { color: var(--text); font-weight: 600; }
+  section { margin-bottom: 34px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 20px 22px;
+  }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+  .sec-head .no {
+    font-family: var(--mono); font-size: 12px; color: var(--blue);
+    border: 1px solid rgba(110,168,254,.35); background: rgba(110,168,254,.08);
+    padding: 1px 8px; border-radius: 6px;
+  }
+  .sec-head .sub { color: var(--muted); font-size: 13px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12.5px; }
+  .mono { font-family: var(--mono); }
+
+  /* ---------- 0. problem ---------- */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px 18px;
+  }
+  .card h3 { display: flex; align-items: center; justify-content: space-between; }
+  .tag {
+    font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted);
+  }
+  .tag.ok { color: var(--live); border-color: rgba(45,212,191,.35); background: rgba(45,212,191,.08); }
+  .tag.bad { color: var(--bad); border-color: rgba(248,113,113,.35); background: rgba(248,113,113,.08); }
+  .tag.warn { color: var(--graph); border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.08); }
+  .addrrow {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 12.5px;
+    padding: 9px 10px; border-radius: 8px; background: #0b0d12;
+    border: 1px solid var(--line); margin-bottom: 8px;
+  }
+  .addrrow .k { color: var(--muted); flex: 1; }
+  .addrrow .v { color: var(--text); font-variant-numeric: tabular-nums; }
+  .addrrow .v.new { color: var(--live); }
+  .addrrow .v.fix { color: var(--graph); }
+  .banner {
+    margin-top: 10px; font-size: 12.5px; padding: 9px 12px; border-radius: 8px;
+    border: 1px solid var(--line); color: var(--muted); background: rgba(255,255,255,.015);
+  }
+  .banner.bad { color: var(--bad); border-color: rgba(248,113,113,.3); background: rgba(248,113,113,.06); }
+  .banner.ok { color: var(--live); border-color: rgba(45,212,191,.3); background: rgba(45,212,191,.06); }
+  .btn {
+    font: inherit; font-size: 13px; color: var(--text); cursor: pointer;
+    background: #1d222c; border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 14px; transition: background .15s, border-color .15s;
+  }
+  .btn:hover { background: #242a36; border-color: #3a4150; }
+  .btn.on { background: rgba(110,168,254,.14); border-color: rgba(110,168,254,.5); color: #cfe1ff; }
+  .callout {
+    margin-top: 16px; padding: 14px 16px; border-radius: 10px;
+    background: linear-gradient(90deg, rgba(110,168,254,.10), rgba(110,168,254,.02));
+    border: 1px solid rgba(110,168,254,.28); font-size: 14px;
+  }
+  .callout b { color: #cfe1ff; }
+
+  /* ---------- 1. lifecycle ---------- */
+  .stepper { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .stepper .btn { font-family: var(--mono); font-size: 12.5px; }
+  .life { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: 18px; }
+  @media (max-width: 980px) { .life { grid-template-columns: 1fr; } }
+  .board {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px 16px;
+  }
+  .board .bh { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .board .bh .t { font-size: 13px; color: var(--muted); }
+  .board .bh .t b { color: var(--text); }
+  .board .bh .cap { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  @media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .tile {
+    position: relative; background: #0e1116; border: 1px solid var(--line);
+    border-radius: 9px; padding: 9px 10px 8px; min-height: 72px;
+    transition: border-color .2s, background .2s;
+  }
+  .tile .n { font-family: var(--mono); font-size: 11.5px; color: #dbe2ee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .s { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin: 1px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .d { font-size: 10.5px; color: #6f788c; margin-top: 5px; line-height: 1.35; }
+  .tile.locked { border-color: rgba(245,158,11,.5); }
+  .tile.locked::after {
+    content: "锁定"; position: absolute; top: 6px; right: 7px;
+    font-size: 9.5px; color: var(--graph); border: 1px solid rgba(245,158,11,.35);
+    border-radius: 4px; padding: 0 4px; line-height: 1.5;
+  }
+  .strip { display: flex; gap: 1px; height: 9px; }
+  .strip i { flex-basis: 0; border-radius: 2px; display: block; }
+  .seg.live { background: var(--live); }
+  .seg.zero { background: var(--empty); }
+  .seg.dummy { background: var(--dummy); }
+  .seg.hold { background: var(--graph); opacity: .55; }
+  .seg.alloc { background: transparent; border: 1px dashed #3a4150; }
+  .detail {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .detail h3 { color: #cfe1ff; font-size: 15.5px; margin-bottom: 10px; }
+  .detail ul { margin: 0 0 10px; padding-left: 18px; }
+  .detail li { margin-bottom: 6px; color: #c6ccd9; font-size: 13.5px; }
+  .detail li b { color: var(--text); }
+  .detail .warn { color: var(--graph); font-size: 12.5px; border-left: 2px solid rgba(245,158,11,.5); padding-left: 10px; margin-top: 10px; }
+  .detail .code { font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; background: #0b0d12; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: #b8c2d6; margin-top: 10px; overflow-x: auto; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: 11.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 16px; height: 8px; border-radius: 2px; display: inline-block; }
+
+  /* ---------- 2. copy helpers ---------- */
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .grid3 { grid-template-columns: 1fr; } }
+  .helper { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 15px 16px; }
+  .helper h3 { font-family: var(--mono); font-size: 13.5px; color: #cfe1ff; }
+  .helper .why { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .helper .why b { color: var(--text); }
+  .hstrip { display: flex; gap: 2px; height: 16px; margin: 10px 0 4px; }
+  .hstrip i { flex-basis: 0; border-radius: 3px; display: block; }
+  .hstrip i.repeat { background: #4b5567; }
+  .hlabels { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); font-family: var(--mono); }
+  .minigrid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; margin: 12px 0 6px; }
+  .minigrid i { aspect-ratio: 1.4; background: var(--empty); border-radius: 2px; display: block; }
+  .minigrid i.f { background: var(--live); }
+
+  /* ---------- 3. capacity ---------- */
+  .calc { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .calc { grid-template-columns: 1fr; } }
+  .ctl label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .ctl label b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--blue); }
+  .segbtns { display: flex; gap: 8px; }
+  .out { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .formula { font-family: var(--mono); font-size: 13px; color: #b8c2d6; background: #0b0d12; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; overflow-x: auto; white-space: nowrap; }
+  .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .nums div { background: #0e1116; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .nums span { display: block; font-size: 11px; color: var(--muted); }
+  .nums b { font-family: var(--mono); font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .nums .spare b { color: var(--graph); }
+  .nums .cap b { color: var(--live); }
+  .worked { margin-top: 20px; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .worked h3 { font-size: 14px; }
+  .tokaxis { display: grid; grid-template-columns: repeat(32, 1fr); gap: 2px; margin: 6px 0 4px; }
+  .tokaxis i { height: 22px; border-radius: 3px; display: block; background: var(--live); }
+  .tokaxis i.p { background: #5b6476; }
+  .rowaxis { display: grid; grid-template-columns: repeat(32, 1fr); gap: 2px; margin: 10px 0 4px; }
+  .rowaxis i { grid-column: span 4; height: 18px; border-radius: 3px; display: block; background: rgba(45,212,191,.75); }
+  .rowaxis i.last { background: var(--graph); }
+  .axislabels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .worked .note { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  .worked .note b { color: var(--text); }
+
+  /* ---------- 4. stage_topk ---------- */
+  .layers { display: flex; gap: 8px; overflow-x: auto; padding: 6px 2px 10px; }
+  .layer {
+    min-width: 118px; background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; font-size: 12px;
+  }
+  .layer .ln { font-family: var(--mono); color: var(--blue); margin-bottom: 4px; }
+  .layer .buf { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+  .layer.slot { border-style: dashed; border-color: rgba(245,158,11,.4); }
+  .layer.slot .ln { color: var(--graph); }
+  .arrowrow { color: var(--muted); font-size: 12px; margin: 6px 0 12px; }
+
+  /* ---------- 5. table ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px; }
+  td.mono, th.mono { font-family: var(--mono); font-size: 11.5px; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+  .dot.live { background: var(--live); } .dot.zero { background: var(--empty); }
+  .dot.dummy { background: var(--dummy); } .dot.hold { background: var(--graph); }
+  footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 16px; }
+  footer a { color: var(--blue); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>dsv4_prefill_graph.py 在干什么</h1>
+  <p class="lede">一句话：<b>把 DSV4 attention 的 metadata 做成“形状冻结、内容原地刷新”的固定缓冲区</b>，让 breakable prefill graph 在每次 replay 时还能读到新数据。</p>
+  <div class="chips">
+    <span class="chip"><b>337</b> 行</span>
+    <span class="chip">1 个类 <b>Dsv4PrefillGraphMetadata</b></span>
+    <span class="chip">3 个 copy helper + 1 个容量函数</span>
+    <span class="chip">只服务 <b>breakable prefill graph</b></span>
+  </div>
+
+  <!-- ================= 0. problem ================= -->
+  <section class="panel">
+    <div class="sec-head">
+      <span class="no">00</span>
+      <h2>矛盾：capture 冻结的是地址，不是数据</h2>
+      <span class="sub">先理解这一点，后面全是它的推论。</span>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>eager 路径<span class="tag ok">每步新建</span></h3>
+        <div class="addrrow"><span class="k">step 1 · fm.positions_cmp_padding_c4</span><span class="v new">0x7f10_a000</span></div>
+        <div class="addrrow"><span class="k">step 2 · fm.positions_cmp_padding_c4</span><span class="v new" id="eagerAddr">0x7f20_c800</span></div>
+        <div class="banner ok" id="eagerBanner">每一步都重新分配 tensor，kernel 拿到的是本步的入参 → 永远读到新数据。</div>
+      </div>
+      <div class="card">
+        <h3>prefill graph<span class="tag warn">地址冻结</span></h3>
+        <div class="addrrow"><span class="k">图里 kernel 绑定的地址</span><span class="v fix">0x7f10_a000</span></div>
+        <div class="addrrow"><span class="k">本步 Python 新建的 tensor</span><span class="v new" id="graphLiveAddr">0x7f10_a000</span></div>
+        <div class="banner ok" id="graphBanner">capture 时两者是同一块内存，图读它没问题。</div>
+      </div>
+    </div>
+    <div style="margin-top:14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <button class="btn" id="addrBtn">切到 step 2 ▶</button>
+      <span class="small muted" id="addrHint">看看 replay 时会发生什么</span>
+    </div>
+    <div class="callout">
+      <b>所以这个文件的核心不是“建新的”，而是“原地写”。</b>
+      capture 之前把 buffer 按上界一次性分配好、绑定给 kernel；之后每次 replay 只做 <code>copy_</code>。模块开头那句
+      <code>Nothing in this module may replace a tensor object after capture</code> 就是这个意思。
+    </div>
+  </section>
+
+  <!-- ================= 1. lifecycle ================= -->
+  <section class="panel">
+    <div class="sec-head">
+      <span class="no">01</span>
+      <h2>一个对象的生命周期</h2>
+      <span class="sub">点每一步，看它负责哪些 buffer、executive 细节是什么。</span>
+    </div>
+    <div class="stepper" id="stepper"></div>
+    <div class="life">
+      <div class="board">
+        <div class="bh">
+          <span class="t">Dsv4PrefillGraphMetadata 持有的固定 buffer <span class="mono">（max_reqs = 1）</span></span>
+          <span class="cap" id="boardCap">bucket 宽度 T_cap = 1024</span>
+        </div>
+        <div class="tiles" id="tiles"></div>
+        <div class="legend">
+          <span><i style="background:var(--live)"></i>live：本步真实数据</span>
+          <span><i style="background:var(--empty)"></i>zero：合法的空</span>
+          <span><i style="background:var(--dummy)"></i>dummy：dummy_state / 合法占位</span>
+          <span><i style="background:var(--graph);opacity:.55"></i>hold：不刷新，图自己写</span>
+        </div>
+      </div>
+      <div class="detail">
+        <h3 id="stepTitle"></h3>
+        <div id="stepBody"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. copy helpers ================= -->
+  <section class="panel">
+    <div class="sec-head">
+      <span class="no">02</span>
+      <h2>三种 copy 语义：为什么尾巴要清零 / 重复 / 报错</h2>
+      <span class="sub">replay 只做拷贝，但“多余的位置”必须仍然是合法值。</span>
+    </div>
+    <div class="grid3">
+      <div class="helper">
+        <h3>_copy_1d(dst, src)</h3>
+        <div class="hstrip">
+          <i class="seg live" style="flex:6"></i><i class="seg zero" style="flex:4"></i>
+        </div>
+        <div class="hlabels"><span>live 前缀</span><span>清零尾巴</span></div>
+        <div class="why">
+          用于 5 个标量向量和 <code>positions / locs</code>。<code>src=None</code> 时整段清零（capture 的 locs 就是这种情况）。
+          <b>尾巴必须是 0</b>：compressor 的 padding 行会照着零位置去算，不能留下一步的旧值。
+        </div>
+      </div>
+      <div class="helper">
+        <h3>_copy_cu(dst, src)</h3>
+        <div class="hstrip">
+          <i class="seg live" style="flex:5"></i><i class="repeat" style="flex:5"></i>
+        </div>
+        <div class="hlabels"><span>count = 1</span><span>重复最后一个值</span></div>
+        <div class="why">
+          用于 <code>actual_q / actual_q_pa</code> 这类 cu_seqlens。<b>多出来的请求槽必须描述“零长度请求”</b>，
+          不能复制 request 0 —— 否则会把第一个请求的 token 再算一遍。
+        </div>
+      </div>
+      <div class="helper">
+        <h3>_copy_table(dst, src)</h3>
+        <div class="minigrid">
+          <i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i>
+          <i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="why">
+          用于 3 张 page table。先把整表清零，再拷左上角；<b>live 比 captured 大直接 RuntimeError</b>。
+          这是整个文件里唯一会主动报“容量算小了”的地方。
+        </div>
+      </div>
+    </div>
+    <div class="callout" style="margin-top:16px;">
+      <b>共同点：live 之外的位置必须是“合法但无意义”的值。</b>
+      因为图是整段执行的 —— 多出来的行不会因为数据无效就停下来。
+    </div>
+  </section>
+
+  <!-- ================= 3. capacity ================= -->
+  <section class="panel">
+    <div class="sec-head">
+      <span class="no">03</span>
+      <h2>compress_capacity：压缩行的容量上界</h2>
+      <span class="sub">这个 buffer 同时也是 compressor 算子的行轴，所以不能小、也不能随便大。</span>
+    </div>
+    <div class="calc">
+      <div>
+        <div class="ctl">
+          <label>token 桶 T_cap <b id="tval">1024</b></label>
+          <input id="tslider" type="range" min="256" max="4096" step="256" value="1024">
+        </div>
+        <div class="ctl" style="margin-top:14px;">
+          <label>压缩比 ratio</label>
+          <div class="segbtns">
+            <button class="btn on" data-r="4">c4 · r = 4</button>
+            <button class="btn" data-r="128">c128 · r = 128</button>
+          </div>
+        </div>
+        <div class="callout" style="margin-top:16px;">
+          每 <code>ratio</code> 个 token 产出一条压缩行；一个 chunk 起点不对齐时，最多比 <code>⌊chunk/r⌋</code> 多出
+          <b>1 行</b>（跨块）。<code>max_reqs=1</code> 时这个余量就是 <code>+1</code>。
+        </div>
+      </div>
+      <div class="out">
+        <div class="formula" id="formula"></div>
+        <div class="nums">
+          <div><span>完整块 ⌊T/r⌋</span><b id="full">256</b></div>
+          <div class="spare"><span>边界余量 +B</span><b id="spare">+1</b></div>
+          <div class="cap"><span>容量 C_cap(r)</span><b id="cap">257</b></div>
+        </div>
+        <p class="small muted" style="margin:12px 0 0;">
+          取 <code>min(T, …)</code> 是因为行数不可能超过输入 token 数；bs 接近 T（大量 1-token 请求）时第一项会算松。
+        </p>
+      </div>
+    </div>
+
+    <div class="worked">
+      <h3>为什么“+1”：一个完整的例子</h3>
+      <p class="small muted" style="margin-bottom:10px;">bucket T = 32，ratio = 4，一个请求：prefix = 3，本 chunk = 29。</p>
+      <div class="tokaxis" id="tokaxis"></div>
+      <div class="axislabels"><span>0</span><span>prefix 3（灰）</span><span>chunk 29（青）</span><span>32</span></div>
+      <div class="rowaxis" id="rowaxis"></div>
+      <div class="axislabels"><span>压缩行：8 行</span><span>最后一行跨块 → 高亮</span></div>
+      <div class="note">
+        ⌊32/4⌋ − ⌊3/4⌋ = <b>8</b> 行；而 ⌊29/4⌋ = 7。差值 1 就是起点不对齐的代价。
+        容量公式用 t = chunk = 29 算：<code>min(29, 29//4 + 1) = 8</code>，正好等于真实行数 —— 上界是紧的。
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4. stage_topk ================= -->
+  <section class="panel">
+    <div class="sec-head">
+      <span class="no">04</span>
+      <h2>为什么要 stage_topk：eager 断点要按层取 buffer</h2>
+      <span class="sub">indexer 在图里，attention 留在断点；共享属性只记得最后一层。</span>
+    </div>
+    <p class="small muted">
+      capture 时每一层的 indexer 都在图内分配自己的输出张量（存储属于 graph pool）。attention 被切在 eager 断点，
+      replay 之后才执行。如果只写共享属性 <code>fm.c4_topk_indices</code>，它只能记住<b>最后一次赋值</b>（layer 号最大的那层）。
+    </p>
+    <div class="layers" id="layers"></div>
+    <p class="small muted" style="margin-top:10px;">
+      <code>stage_topk(layer_id, tensor)</code> 在 capture 时按层存引用；replay 时断点按层号取回自己那块 buffer。
+      dict 只存引用，不占额外显存，也不需要 refresh。
+    </p>
+  </section>
+
+  <!-- ================= 5. interfaces / constraints ================= -->
+  <section class="panel">
+    <div class="sec-head">
+      <span class="no">05</span>
+      <h2>它对外只暴露 3 个入口 + 1 个硬约束</h2>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>入口</h3>
+        <ul style="margin:0; padding-left:18px; font-size:13.5px; color:#c6ccd9;">
+          <li><code>allocate()</code> ← capture hook <code>init_forward_metadata_for_breakable_cuda_graph_capture</code></li>
+          <li><code>refresh()</code> ← replay hook <code>prepare_forward_metadata_for_breakable_cuda_graph_replay</code></li>
+          <li><code>stage_topk()</code> ← indexer 的 <code>_forward_indexer</code></li>
+        </ul>
+        <p class="small muted" style="margin-top:10px;">backend 通过 <code>use_captured_forward_metadata_for_breakable_cuda_graph</code> 打开这套路径，并把 <code>prefill_cuda_graph_max_batch_size</code> 设为 <code>MAX_PREFILL_GRAPH_REQS</code>。</p>
+      </div>
+      <div class="card">
+        <h3>硬约束<span class="tag warn">MAX_PREFILL_GRAPH_REQS = 1</span></h3>
+        <p class="small muted" style="margin:0;">
+          一次 replay 只接一个请求。多请求需要 fused indexer / sparse-attention 的 metadata 算子支持<b>零长度请求槽</b>，
+          目前未验证 —— 所以超过 1 个请求的 batch 直接走 eager。
+        </p>
+        <p class="small muted" style="margin:10px 0 0;">这也解释了为什么 <code>_copy_cu</code> 的尾巴是“重复最后一个值”：那是第 2、3… 个槽位的零长度请求语义。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ref table ================= -->
+  <section class="panel">
+    <div class="sec-head">
+      <span class="no">REF</span>
+      <h2>buffer 速查表</h2>
+      <span class="sub">B = 1，T = bucket 宽度，ctx = max_context_len。</span>
+    </div>
+    <table>
+      <thead>
+        <tr><th>buffer</th><th>shape</th><th>写入来源</th><th>多出来的部分</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="mono"><span class="dot live"></span>actual_q</td><td class="mono">[B] int32</td><td>live.actual_seq_lengths_q</td><td>无（B=1）</td></tr>
+        <tr><td class="mono"><span class="dot live"></span>actual_q_pa</td><td class="mono">[B+1] int32</td><td>live.actual_seq_lengths_q_pa</td><td>重复末值 → 零长度请求</td></tr>
+        <tr><td class="mono"><span class="dot live"></span>actual_kv / seqused / start_pos</td><td class="mono">[B] int32</td><td>live 对应字段</td><td>无（B=1）</td></tr>
+        <tr><td class="mono"><span class="dot live"></span>positions[4] / locs[4]</td><td class="mono">[C4] int64</td><td>live.positions_cmp_padding_c4 / c4_loc</td><td>清零</td></tr>
+        <tr><td class="mono"><span class="dot live"></span>positions[128] / locs[128]</td><td class="mono">[C128] int64</td><td>同上（ratio 128）</td><td>清零</td></tr>
+        <tr><td class="mono"><span class="dot live"></span>swa_page_table</td><td class="mono">[B, ⌈ctx/page⌉]</td><td>live.swa_page_table</td><td>整表清零后拷左上角</td></tr>
+        <tr><td class="mono"><span class="dot live"></span>c4_page_table</td><td class="mono">[B, ⌈ctx/page⌉]</td><td>live.c4_page_table</td><td>同上</td></tr>
+        <tr><td class="mono"><span class="dot live"></span>c128_page_table</td><td class="mono">[B, ⌈⌈ctx/128⌉/c128_page⌉]</td><td>live.c128_page_table</td><td>同上</td></tr>
+        <tr><td class="mono"><span class="dot live"></span>kernel_metadata ×4</td><td class="mono">[max(1024, seed)] int32</td><td>c1a / c4a / c128a / li_quant</td><td>清零</td></tr>
+        <tr><td class="mono"><span class="dot dummy"></span>state_tables[4]</td><td class="mono">[B, 8+T] int32</td><td>_refresh_state_tables 重建第 0 行</td><td>dummy_state_loc</td></tr>
+        <tr><td class="mono"><span class="dot dummy"></span>state_tables[128]</td><td class="mono">[B, 128+T] int32</td><td>同上（coff=1）</td><td>dummy_state_loc</td></tr>
+        <tr><td class="mono"><span class="dot hold"></span>topk_by_layer</td><td class="mono">dict[layer_id] → ref</td><td>capture 时 stage_topk 存引用</td><td>不 refresh，图自己写</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    源码：<code>python/sglang/srt/hardware_backend/npu/attention/dsv4_prefill_graph.py</code> ·
+    逐行说明见 <a href="prefill_graph_4commits_code_walkthrough.md">prefill_graph_4commits_code_walkthrough.md</a> §2 ·
+    收益数据见 <a href="dsv4_prefill_graph_gain_report.md">dsv4_prefill_graph_gain_report.md</a>。
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- 0. address toggle ---------- */
+  var addrStep = 1;
+  var btn = document.getElementById("addrBtn");
+  var eagerAddr = document.getElementById("eagerAddr");
+  var graphLive = document.getElementById("graphLiveAddr");
+  var eagerBanner = document.getElementById("eagerBanner");
+  var graphBanner = document.getElementById("graphBanner");
+  var hint = document.getElementById("addrHint");
+
+  function renderAddr() {
+    if (addrStep === 1) {
+      eagerAddr.textContent = "0x7f20_c800";
+      graphLive.textContent = "0x7f20_c800";
+      eagerBanner.className = "banner ok";
+      eagerBanner.textContent = "每一步都重新分配 tensor，kernel 拿到的是本步的入参 → 永远读到新数据。";
+      graphBanner.className = "banner bad";
+      graphBanner.textContent = "本步新建的 tensor 没有任何 kernel 在读：图仍然读 0x7f10_a000 → 读到 capture 时的旧数据。";
+      btn.textContent = "回到 step 1 ◀";
+      hint.textContent = "这就是为什么不能每步新建 metadata";
+    } else {
+      eagerAddr.textContent = "0x7f10_a000";
+      graphLive.textContent = "0x7f10_a000";
+      eagerBanner.className = "banner ok";
+      eagerBanner.textContent = "每一步都重新分配 tensor，kernel 拿到的是本步的入参 → 永远读到新数据。";
+      graphBanner.className = "banner ok";
+      graphBanner.textContent = "capture 时两者是同一块内存，图读它没问题。";
+      btn.textContent = "切到 step 2 ▶";
+      hint.textContent = "看看 replay 时会发生什么";
+    }
+  }
+  btn.addEventListener("click", function () {
+    addrStep = addrStep === 1 ? 2 : 1;
+    renderAddr();
+  });
+  renderAddr();
+
+  /* ---------- 1. lifecycle board ---------- */
+  var T_CAP = 1024;
+  var C4 = Math.min(T_CAP, Math.floor(T_CAP / 4) + 1);
+  var C128 = Math.min(T_CAP, Math.floor(T_CAP / 128) + 1);
+
+  var TILES = [
+    { k: "aq",     n: "actual_q",        s: "[1] int32",              d: "每请求 query 长度" },
+    { k: "aqpa",   n: "actual_q_pa",     s: "[2] int32",              d: "page 对齐 cu_seqlens" },
+    { k: "akv",    n: "actual_kv",       s: "[1] int32",              d: "KV 长度" },
+    { k: "seqused",n: "seqused",         s: "[1] int32",              d: "有效 token 数" },
+    { k: "start",  n: "start_pos",       s: "[1] int32",              d: "本 chunk 全局起点" },
+    { k: "pos4",   n: "positions[4]",    s: "[" + C4 + "] int64",    d: "c4 压缩行位置" },
+    { k: "loc4",   n: "locs[4]",         s: "[" + C4 + "] int64",    d: "c4 压缩 KV 落点" },
+    { k: "pos128", n: "positions[128]",  s: "[" + C128 + "] int64",  d: "c128 压缩行位置" },
+    { k: "loc128", n: "locs[128]",       s: "[" + C128 + "] int64",  d: "c128 压缩 KV 落点" },
+    { k: "swa",    n: "swa_page_table",  s: "[1, ⌈ctx/page⌉]",       d: "滑动窗口分页表" },
+    { k: "c4t",    n: "c4_page_table",   s: "[1, ⌈ctx/page⌉]",       d: "c4 分页表" },
+    { k: "c128t",  n: "c128_page_table", s: "[1, ⌈ctx/128/page⌉]",   d: "c128 分页表" },
+    { k: "km",     n: "kernel_metadata×4", s: "[≥1024] int32",       d: "c1a/c4a/c128a/li_quant" },
+    { k: "st4",    n: "state_tables[4]", s: "[1, 8+T] int32",        d: "状态块表（dummy 填充）" },
+    { k: "st128",  n: "state_tables[128]", s: "[1, 128+T] int32",    d: "状态块表（dummy 填充）" },
+    { k: "topk",   n: "topk_by_layer",   s: "dict[layer] → ref",     d: "每层 indexer 输出" }
+  ];
+
+  var ALLOC = { alloc: 1 };
+  var CAPTURE = {
+    aq: [["live",1]], aqpa: [["live",1]], akv: [["live",1]], seqused: [["live",1]], start: [["live",1]],
+    pos4: [["live",1]], loc4: [["zero",1]], pos128: [["live",1]], loc128: [["zero",1]],
+    swa: [["live",1]], c4t: [["live",1]], c128t: [["live",1]], km: [["live",1]],
+    st4: [["dummy",1]], st128: [["dummy",1]], topk: [["live",1]]
+  };
+  var REPLAY = {
+    aq: [["live",1]], aqpa: [["live",1]], akv: [["live",1]], seqused: [["live",1]], start: [["live",1]],
+    pos4: [["live",0.6],["zero",0.4]], loc4: [["live",0.6],["zero",0.4]],
+    pos128: [["live",0.8],["zero",0.2]], loc128: [["live",0.8],["zero",0.2]],
+    swa: [["live",0.7],["zero",0.3]], c4t: [["live",0.7],["zero",0.3]], c128t: [["live",0.7],["zero",0.3]],
+    km: [["live",0.7],["zero",0.3]],
+    st4: [["dummy",0.8],["live",0.2]], st128: [["dummy",0.8],["live",0.2]],
+    topk: [["hold",1]]
+  };
+  var IDLE = {
+    aq: [["dummy",1]], aqpa: [["dummy",1]], akv: [["dummy",1]], seqused: [["zero",1]], start: [["zero",1]],
+    pos4: [["zero",1]], loc4: [["zero",1]], pos128: [["zero",1]], loc128: [["zero",1]],
+    swa: [["zero",1]], c4t: [["zero",1]], c128t: [["zero",1]], km: [["dummy",1]],
+    st4: [["dummy",1]], st128: [["dummy",1]], topk: [["hold",1]]
+  };
+
+  var STEPS = [
+    {
+      btn: "① allocate",
+      view: CAPTURE, lock: false,
+      title: "capture 前：分配 + capture fill + bind",
+      body:
+        '<p>调用点：<code>init_forward_metadata_for_breakable_cuda_graph_capture</code>。</p>' +
+        '<ul>' +
+        '<li><b>seed</b>：这个 bucket 的 dummy batch 先用 eager 路径算出的 metadata；<b>num_tokens</b>：bucket 宽度。</li>' +
+        '<li>每个 ratio 算 <code>C = compress_capacity(T, r, 1)</code>，一次性分配 positions / locs；page table 按 max_context_len 分配。</li>' +
+        '<li><code>state_tables</code> 按 <code>history + T</code> 分配（c4 有 overlap，history = 2·r），整表填 <code>dummy_state_loc</code>。</li>' +
+        '<li><code>allocate()</code> 内部立刻做一次 <code>fill(forward_batch=None)</code>：把 seed 的值抄进来；locs 因为没有 live 来源，保持全零。</li>' +
+        '<li>最后 <code>_bind(seed)</code>：seed 的每个字段改指向这些 buffer，并挂上 <code>dsv4_prefill_graph_state</code>。</li>' +
+        '</ul>' +
+        '<p class="warn">capture 之后再也不能换 tensor 对象，所以能想到的东西必须在这里全部分配完。</p>'
+    },
+    {
+      btn: "② capture",
+      view: CAPTURE, lock: true,
+      title: "capture：kernel 把地址烧进图",
+      body:
+        '<p>capture 的 forward 用 dummy batch 跑一遍。模型代码访问 <code>fm.positions_cmp_padding_c4</code> 等字段，读到的就是这些固定 buffer。</p>' +
+        '<ul>' +
+        '<li>每个 kernel 把张量地址拷进图；从这一刻起，图只认这些地址。</li>' +
+        '<li>compressor 的写会进保留槽 / 池，不碰真实请求状态。</li>' +
+        '<li><code>stage_topk</code> 在这一阶段把每层 indexer 的输出对象存进 <code>topk_by_layer</code>。</li>' +
+        '</ul>' +
+        '<p class="warn">capture 期间写进 buffer 的内容是 dummy；真正的内容要等 replay 前的 refresh。</p>'
+    },
+    {
+      btn: "③ replay：refresh",
+      view: REPLAY, lock: false,
+      title: "replay 前：原地刷新内容",
+      body:
+        '<p>调用点：<code>prepare_forward_metadata_for_breakable_cuda_graph_replay</code>。</p>' +
+        '<ul>' +
+        '<li>先 <code>init_forward_metadata</code> 建一份普通的 live eager metadata。</li>' +
+        '<li><code>state.refresh(live, batch)</code> → <code>fill</code>：标量、positions、locs、page table、kernel metadata 全部 <code>copy_</code> 进原地址；尾部清零。</li>' +
+        '<li><code>_refresh_state_tables</code>：用 <code>req_pool_indices / start_pos / cu_seqlens / seqused</code> 重建第 0 行的 state block table，整表先填 dummy。</li>' +
+        '<li>本 rank 没有 token 时走 idle 分支（见 ⑤）。</li>' +
+        '<li>最后 <code>self.forward_metadata = capture_metadata</code> —— 后续 eager 断点读的也是这份。</li>' +
+        '</ul>'
+    },
+    {
+      btn: "④ replay：执行",
+      view: REPLAY, lock: true,
+      title: "replay：图内一行 Python 都不跑",
+      body:
+        '<p><code>graph.replay()</code> 执行的是 capture 时录下的算子序列。所有输入就是 ③ 写好的 buffer 内容。</p>' +
+        '<ul>' +
+        '<li>不需要重新算 metadata，也不需要重新分配 —— 这正是它能跑得快的原因。</li>' +
+        '<li>attention 留在 eager 断点，replay 之后执行，读同一个 metadata 对象，看到的是刷新后的值。</li>' +
+        '</ul>' +
+        '<p class="warn">这就是“形状冻结、内容刷新”的落点：图管执行，Python 只管喂数据。</p>'
+    },
+    {
+      btn: "⑤ idle rank",
+      view: IDLE, lock: false,
+      title: "idle rank：给图一组合法的假输入",
+      body:
+        '<p>当 <code>forward_mode.is_idle()</code> 或 <code>global_num_token_non_padded_cpu == 0</code> 时，本 rank 没有真实 token，但图仍然整段执行。</p>' +
+        '<ul>' +
+        '<li><code>_fill_idle</code>：<code>actual_q = 1</code>、<code>actual_kv = 1</code>、<code>actual_q_pa = [0,…,1]</code>、<code>seqused = 0</code>。</li>' +
+        '<li>positions / locs / page table 全清零；state table 全部填 dummy。</li>' +
+        '<li>kernel metadata 用这组值重建，保证算子拿到的是合法输入而不是上一步残留。</li>' +
+        '</ul>' +
+        '<p class="warn">不读也不写任何真实请求状态。</p>'
+    }
+  ];
+
+  var tilesEl = document.getElementById("tiles");
+  var stepperEl = document.getElementById("stepper");
+  var titleEl = document.getElementById("stepTitle");
+  var bodyEl = document.getElementById("stepBody");
+  var boardCap = document.getElementById("boardCap");
+  boardCap.textContent = "bucket 宽度 T_cap = " + T_CAP + " · C4 = " + C4 + " 行 · C128 = " + C128 + " 行";
+
+  TILES.forEach(function (t) {
+    var d = document.createElement("div");
+    d.className = "tile";
+    d.id = "tile-" + t.k;
+    d.innerHTML =
+      '<div class="n">' + t.n + '</div>' +
+      '<div class="s">' + t.s + '</div>' +
+      '<div class="strip" id="strip-' + t.k + '"></div>' +
+      '<div class="d">' + t.d + '</div>';
+    tilesEl.appendChild(d);
+  });
+
+  function segView(segs) {
+    return segs.map(function (s) {
+      return '<i class="seg ' + s[0] + '" style="flex:' + s[1] + '"></i>';
+    }).join("");
+  }
+
+  var active = 0;
+  function renderStep(i) {
+    active = i;
+    var st = STEPS[i];
+    Array.prototype.forEach.call(stepperEl.children, function (b, j) {
+      b.className = "btn" + (j === i ? " on" : "");
+    });
+    TILES.forEach(function (t) {
+      var tile = document.getElementById("tile-" + t.k);
+      var strip = document.getElementById("strip-" + t.k);
+      var segs = st.view[t.k] || [["alloc",1]];
+      strip.innerHTML = segView(segs);
+      tile.className = "tile" + (st.lock ? " locked" : "");
+    });
+    titleEl.textContent = st.title;
+    bodyEl.innerHTML = st.body;
+  }
+
+  STEPS.forEach(function (s, i) {
+    var b = document.createElement("button");
+    b.className = "btn";
+    b.textContent = s.btn;
+    b.addEventListener("click", function () { renderStep(i); });
+    stepperEl.appendChild(b);
+  });
+  renderStep(0);
+
+  /* ---------- 3. capacity calculator ---------- */
+  var slider = document.getElementById("tslider");
+  var tval = document.getElementById("tval");
+  var formula = document.getElementById("formula");
+  var fullEl = document.getElementById("full");
+  var spareEl = document.getElementById("spare");
+  var capEl = document.getElementById("cap");
+  var ratio = 4;
+
+  function renderCalc() {
+    var T = parseInt(slider.value, 10);
+    var full = Math.floor(T / ratio);
+    var cap = Math.min(T, full + 1);
+    tval.textContent = T;
+    fullEl.textContent = full;
+    spareEl.textContent = "+1";
+    capEl.textContent = cap;
+    formula.innerHTML =
+      "C = min(" + T + ", " + T + " // " + ratio + " + 1)<br>" +
+      "&nbsp;&nbsp;= min(" + T + ", " + (full + 1) + ") = <span style='color:var(--live)'>" + cap + "</span>";
+  }
+  slider.addEventListener("input", renderCalc);
+  Array.prototype.forEach.call(document.querySelectorAll("[data-r]"), function (b) {
+    b.addEventListener("click", function () {
+      ratio = parseInt(b.getAttribute("data-r"), 10);
+      Array.prototype.forEach.call(document.querySelectorAll("[data-r]"), function (x) {
+        x.className = "btn" + (x === b ? " on" : "");
+      });
+      renderCalc();
+    });
+  });
+  renderCalc();
+
+  /* worked example: 32 tokens, prefix 3, chunk 29, r=4 */
+  var tokaxis = document.getElementById("tokaxis");
+  for (var i = 0; i < 32; i++) {
+    var c = document.createElement("i");
+    if (i < 3) c.className = "p";
+    tokaxis.appendChild(c);
+  }
+  var rowaxis = document.getElementById("rowaxis");
+  for (var r = 0; r < 8; r++) {
+    var cell = document.createElement("i");
+    if (r === 7) cell.className = "last";
+    rowaxis.appendChild(cell);
+  }
+
+  /* ---------- 4. stage_topk layers ---------- */
+  var layers = document.getElementById("layers");
+  [0, 1, 2, 3, 4].forEach(function (l) {
+    var d = document.createElement("div");
+    d.className = "layer";
+    d.innerHTML =
+      '<div class="ln">layer ' + l + '</div>' +
+      '<div class="buf">buffer_' + l + '（图池）</div>' +
+      '<div class="buf">capture: stage_topk</div>' +
+      '<div class="buf">replay: 断点按层取</div>';
+    layers.appendChild(d);
+  });
+  var shared = document.createElement("div");
+  shared.className = "layer slot";
+  shared.innerHTML =
+    '<div class="ln">fm.c4_topk_indices</div>' +
+    '<div class="buf">只有一个槽位</div>' +
+    '<div class="buf">capture 时被逐层覆盖</div>' +
+    '<div class="buf">→ 只记得最后一层</div>';
+  layers.appendChild(shared);
+})();
+</script>
+</body>
+</html>

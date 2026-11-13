@@ -184,6 +184,9 @@ graph_cls = torch.xpu.XPUGraph if _is_xpu else torch.cuda.CUDAGraph
 
 ## 2. commit 2：DSV4 attention / compressor 入图（`e834d6fa61`）
 
+> 可视化版（交互图解 `dsv4_prefill_graph.py` 的地址冻结、生命周期、copy 语义、容量上界）：
+> [dsv4_prefill_graph_explainer.html](dsv4_prefill_graph_explainer.html)
+
 ### 2.1 整体数据流
 
 ```

@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SGLang 推理执行模型：rank 之间到底同步还是异步</title>
+<style>
+:root{
+  --ink:#1f2937; --muted:#6b7280; --line:#d1d5db; --bg:#fafafa;
+  --sync:#c2410c; --syncl:#fff7ed;
+  --async:#2563eb; --asyncl:#eff6ff;
+  --indep:#15803d; --indepl:#f0fdf4;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:#222;line-height:1.6}
+header{padding:14px 24px;background:var(--ink);color:#fff}
+header h1{margin:0;font-size:19px}
+header p{margin:4px 0 0;font-size:13px;color:#cbd5e1}
+nav.steps{display:flex;flex-wrap:wrap;gap:6px;padding:10px 24px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+nav.steps button{border:1px solid #bbb;background:#fff;border-radius:4px;padding:4px 11px;cursor:pointer;font-size:13px}
+nav.steps button[aria-current="step"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+main{padding:16px 24px;max-width:1320px}
+h2{margin:4px 0 10px;font-size:19px}
+h3{font-size:15px;margin:16px 0 6px}
+h4{font-size:14px;margin:12px 0 4px}
+p{margin:6px 0}
+code{background:#eef;padding:0 4px;border-radius:3px;font-size:12.5px;font-family:Consolas,monospace}
+pre{background:#0f172a;color:#e2e8f0;padding:10px 14px;border-radius:6px;overflow-x:auto;font-size:12.5px;line-height:1.5}
+pre code{background:none;color:inherit;padding:0}
+.note{font-size:13px;color:var(--muted)}
+.hero{background:#fff;border-left:5px solid var(--ink);padding:10px 16px;margin:8px 0 14px;font-size:14px}
+.hero b{color:#111}
+.hl-sync{color:var(--sync);font-weight:600}
+.hl-async{color:var(--async);font-weight:600}
+.hl-indep{color:var(--indep);font-weight:600}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:10px 0}
+.card{background:#fff;border:1px solid var(--line);border-top:4px solid var(--ink);border-radius:6px;padding:10px 14px}
+.card.blue{border-top-color:var(--async)}
+.card.orange{border-top-color:var(--sync)}
+.card.green{border-top-color:var(--indep)}
+.card h3{margin:2px 0 6px}
+.card p{font-size:13.5px;margin:5px 0}
+.card ul{margin:4px 0 2px 18px;padding:0;font-size:13.5px}
+.card li{margin:2px 0}
+.badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:4px;border:1px solid transparent;vertical-align:1px}
+.badge.async{background:var(--asyncl);color:var(--async);border-color:#bfdbfe}
+.badge.sync{background:var(--syncl);color:var(--sync);border-color:#fed7aa}
+.badge.indep{background:var(--indepl);color:var(--indep);border-color:#bbf7d0}
+table.cmp{border-collapse:collapse;font-size:13.5px;margin:8px 0;width:100%}
+table.cmp td,table.cmp th{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+table.cmp th{background:#f3f4f6;white-space:nowrap}
+table.cmp tr:nth-child(even) td{background:#fcfcfd}
+.topo{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;margin:10px 0}
+.trow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;justify-content:center;margin:8px 0}
+.node{cursor:pointer;background:#fff;border:2px solid #94a3b8;border-radius:8px;padding:8px 12px;min-width:150px;font-size:13px;transition:box-shadow .15s}
+.node b{display:block;font-size:13.5px;color:#0f172a}
+.node small{display:block;font-size:11px;color:var(--muted);font-family:Consolas,monospace}
+.node:hover{box-shadow:0 0 0 3px #e2e8f0}
+.node.sel{box-shadow:0 0 0 3px #f59e0b;border-color:#f59e0b}
+.node.client{border-color:var(--async)}
+.node.sched{border-color:var(--sync)}
+.node.model{border-color:var(--indep)}
+.node.detok{border-color:#7e22ce}
+.node.dpc{border-color:#0891b2}
+.arrowcol{display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;color:var(--muted);min-width:70px}
+.arrowcol .a{font-size:20px;line-height:1;color:#94a3b8}
+.group{border:2px dashed #cbd5e1;border-radius:10px;padding:10px 12px 12px;background:#f8fafc}
+.group h4{margin:0 0 8px;font-size:12.5px;color:var(--muted);font-weight:600}
+.ranks{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:860px){.split{grid-template-columns:1fr}}
+.info{background:#fff8e1;border:1px solid #e8c86a;border-radius:6px;padding:8px 12px;margin:8px 0;min-height:54px;font-size:13.5px}
+.stepper{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;margin:10px 0;min-height:230px}
+.stephead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.stepnum{width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.stepbody{font-size:14px}
+.stepbody ul{margin:6px 0 0 20px;padding:0}
+.stepnav{display:flex;gap:8px;margin-top:10px;align-items:center}
+.stepnav button{padding:5px 14px;font-size:13px;cursor:pointer;background:#fff;border:1px solid #888;border-radius:4px}
+.stepnav button:disabled{opacity:.4;cursor:default}
+.tl{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px;margin:10px 0;overflow-x:auto}
+.lane{display:flex;align-items:center;margin:4px 0;min-width:760px}
+.lname{width:140px;flex:none;text-align:right;padding-right:10px;font-size:12px;font-family:Consolas,monospace;color:#334155}
+.lblocks{display:flex;gap:2px;flex:1;min-width:560px}
+.blk{height:30px;border-radius:4px;border:1px solid rgba(0,0,0,.2);font-size:11px;display:flex;align-items:center;justify-content:center;color:#fff;white-space:nowrap;padding:0 6px}
+.blk.cpu{background:#7e22ce}
+.blk.gpu{background:#2563eb}
+.blk.io{background:#0891b2}
+.blk.sample{background:#15803d}
+.blk.sync{background:var(--sync)}
+.blk.idle{background:#e5e7eb;color:#666;border-style:dashed}
+.blk span{overflow:hidden;text-overflow:ellipsis}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.bar button{padding:5px 14px;font-size:13px;cursor:pointer;background:#fff;border:1px solid #888;border-radius:4px}
+.bar button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.rlane{display:flex;align-items:center;margin:3px 0}
+.rname{width:46px;flex:none;font-family:Consolas,monospace;font-size:12px;color:#334155;text-align:right;padding-right:8px}
+.rsegs{display:flex;gap:2px;flex:1}
+.seg{height:24px;border-radius:3px;font-size:10px;color:#fff;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;border:1px solid rgba(0,0,0,.15)}
+.seg.c{background:#2563eb;flex:2.4}
+.seg.s{background:var(--sync);flex:1}
+.seg.now{outline:3px solid #f59e0b;outline-offset:1px}
+.scen{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;margin:10px 0;min-height:260px}
+.rankbox{display:inline-flex;align-items:center;justify-content:center;width:58px;height:40px;border-radius:6px;background:#e0f2fe;border:2px solid #0284c7;font-family:Consolas,monospace;font-size:12px;margin:3px}
+.rankbox.tp{background:#fff7ed;border-color:var(--sync)}
+.rankbox.ep{background:#f0fdf4;border-color:var(--indep)}
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}
+.flow .arr{font-size:20px;color:#94a3b8}
+.syncbar{background:var(--syncl);border:2px solid var(--sync);border-radius:6px;padding:5px 10px;font-size:13px;color:#7c2d12;margin:8px 0;text-align:center}
+.indepnote{background:var(--indepl);border:1px solid #86efac;border-radius:6px;padding:6px 10px;font-size:13px;color:#166534;margin:8px 0}
+details.faq{background:#fff;border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:8px 0}
+details.faq summary{cursor:pointer;font-weight:600;font-size:14px}
+details.faq p{font-size:13.5px;margin:8px 0 2px}
+.legend span{display:inline-flex;align-items:center;gap:5px;margin-right:14px;font-size:12.5px}
+.legend i{width:13px;height:13px;border-radius:3px;display:inline-block}
+.kv{font-family:Consolas,monospace;font-size:12.5px}
+button:focus-visible,summary:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>SGLang 推理执行模型：rank 之间到底是同步还是异步？</h1>
+  <p>从进程拓扑、请求生命周期、scheduler step，到 TP / DP / DP-attention / PP 的同步边界</p>
+</header>
+<nav class="steps" id="nav" aria-label="页面导航"></nav>
+<main>
+  <h2 id="title" tabindex="-1"></h2>
+  <div id="stage"></div>
+</main>
+
+<script>
+"use strict";
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let timer = null;
+function clearTimer(){ if (timer) { clearInterval(timer); timer = null; } }
+
+/* ============================================================
+   ① 结论：三层同步模型
+   ============================================================ */
+function overviewHTML(){
+  return `
+  <div class="hero">
+    <b>一句话：</b>前端是<span class="hl-async">真异步</span>的；
+    <span class="hl-sync">一个 TP 组内的模型执行是“软同步”</span>——没有每 step 的显式 barrier，
+    但每层的集合通信会把所有 rank 拉到同一进度；
+    <span class="hl-indep">DP 副本默认互相独立</span>，
+    只有开了 DP attention / EP MoE，才会在每个 step 的 MLP 边界对齐一次。
+  </div>
+
+  <div class="grid3">
+    <div class="card blue">
+      <h3>前端：真异步 <span class="badge async">async</span></h3>
+      <p>HTTP/OpenAI API、分词、流式返回、abort 都是异步事件循环。成百上千个请求可以同时在飞。</p>
+      <ul>
+        <li>TokenzierManager 用 asyncio 管请求生命周期</li>
+        <li>DetokenizerManager 独立进程，增量 detokenize</li>
+        <li>客户端流式收 token，不需要等整个序列生成完</li>
+      </ul>
+    </div>
+    <div class="card orange">
+      <h3>TP 组内：软同步 <span class="badge sync">soft sync</span></h3>
+      <p>一个模型的权重/attention 头被切到多张卡上，每层的 all-reduce / all-gather / all-to-all 必须所有 rank 参与。</p>
+      <ul>
+        <li><b>没有</b>每 step 的显式 <code>barrier()</code></li>
+        <li>先算完的 rank 会<b>阻塞在第一个集合通信</b>，等慢的 rank</li>
+        <li>所以 Python 可以短暂跑偏，但一进 forward 就被拉齐</li>
+      </ul>
+    </div>
+    <div class="card green">
+      <h3>DP 副本：默认独立 <span class="badge indep">independent</span></h3>
+      <p>每个 DP 副本有自己的 scheduler 进程、自己的 KV cache、自己的 batch，互不等待。</p>
+      <ul>
+        <li>DP controller 只负责把请求分给某个副本</li>
+        <li>副本之间没有集合通信（普通 DP）</li>
+        <li>开了 DP attention / EP MoE 后，才会每 step 同步一次元数据</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>同步等级速查</h3>
+  <table class="cmp">
+    <tr><th>范围</th><th>默认关系</th><th>同步点 / 异步点</th></tr>
+    <tr><td>客户端 ↔ 服务端</td><td><span class="badge async">异步</span></td><td>HTTP 并发、SSE 流式；服务端不阻塞等待单个请求完成</td></tr>
+    <tr><td>同一 batch 内的多个请求</td><td>同步推进</td><td>continuous batching：每个 decode step 每个请求各出 1 个 token，一起算</td></tr>
+    <tr><td>同一 TP 组的 rank</td><td><span class="badge sync">软同步</span></td><td>每层 collective 是事实上的 barrier；scheduler 决策被复制到每个 rank</td></tr>
+    <tr><td>TP 组的 scheduler 进程</td><td>复制 + 广播</td><td>tp_rank 0 收请求，广播给同组所有 rank；每个 rank 自己跑同一套调度代码</td></tr>
+    <tr><td>DP 副本（普通 DP）</td><td><span class="badge indep">独立</span></td><td>各自 scheduler / KV / batch；DP controller 负载均衡</td></tr>
+    <tr><td>DP attention + EP MoE</td><td><span class="badge sync">每 step 同步</span></td><td><code>prepare_mlp_sync_batch</code> 交换 token 数 / forward mode / graph 资格；MoE 层 all-to-all</td></tr>
+    <tr><td>PP 各 stage</td><td>流水线</td><td>stage 之间 p2p 传 proxy tensors；microbatch 错峰，不是锁步</td></tr>
+    <tr><td>单 rank 的 CPU 与 GPU</td><td><span class="badge async">重叠</span></td><td>overlap scheduler：CPU 调度下一批时，GPU 还在算当前批</td></tr>
+  </table>
+
+  <div class="note" style="margin-top:10px">
+    你看到的“rank 之间是同步的”，主要来自三件事：① TP 每层都有集合通信；② 每个 rank 的 scheduler 收到的是同一份请求列表、跑出同一个 batch；
+    ③ DP attention 每 step 做一次 MLP 同步。但它们都不是“进程之间共享内存/共享调度器”的同步，而是<b>协议上的对齐</b>。
+  </div>`;
+}
+
+/* ============================================================
+   ② 进程与通信拓扑
+   ============================================================ */
+const TOPO_INFO = {
+  client: ['客户端', '并发 HTTP / OpenAI API 请求；流式响应走 SSE。前后端之间完全异步。'],
+  tok: ['TokenizerManager', '主进程里的 asyncio 事件循环：解析请求、分词、维护请求状态、把 token 流式推回客户端。'],
+  dpc: ['DataParallelController', '只有 num_dp_ranks > 1 时才启动（engine.py:936）。按 round-robin / load-balance 把请求分给某个 DP 副本，自己不跑模型。'],
+  sched0: ['Scheduler (TP rank 0)', '每个 (pp_rank, tp_rank) 一个进程。rank 0 从 tokenizer 收请求，然后把整份请求列表广播给同组所有 TP rank。'],
+  schedN: ['Scheduler (TP rank 1..N)', '收到 rank 0 广播的同一份请求列表；自己跑同样的调度代码，得到同样的 batch。'],
+  model: ['ModelRunner', '每张卡上的权重分片 + forward。真正让 rank 对齐的是这一层里的 all-reduce / all-gather / all-to-all。'],
+  detok: ['DetokenizerManager', '独立进程：把 token id 增量 detokenize 成文本，再交回 TokenizerManager 推给客户端。'],
+};
+function topologyHTML(){
+  return `
+  <div class="note" style="margin-bottom:8px">点任意方框看它在代码里对应什么。箭头方向是请求/数据流，不是同步关系。</div>
+  <div class="topo" id="topo">
+    <div class="trow">
+      <div class="node client" data-k="client"><b>HTTP clients</b><small>async / SSE</small></div>
+      <div class="arrowcol"><span class="a">→</span><span>请求</span></div>
+      <div class="node client" data-k="tok"><b>TokenizerManager</b><small>asyncio, main proc</small></div>
+      <div class="arrowcol"><span class="a">⇄</span><span>ZMQ / IPC</span></div>
+      <div class="node dpc" data-k="dpc"><b>DataParallelController</b><small>only if dp_size &gt; 1</small></div>
+      <div class="arrowcol"><span class="a">→</span><span>选副本</span></div>
+      <div class="group" style="min-width:330px">
+        <h4>DP worker 0（一个 TP 组）</h4>
+        <div class="ranks">
+          <div class="node sched" data-k="sched0"><b>Scheduler TP0</b><small>recv + broadcast</small></div>
+          <div class="node sched" data-k="schedN"><b>Scheduler TP1..N</b><small>replicated loop</small></div>
+        </div>
+      </div>
+    </div>
+    <div class="trow" style="margin-top:2px">
+      <div style="width:150px"></div>
+      <div class="arrowcol"><span class="a">↓</span><span>broadcast 请求列表</span></div>
+      <div class="arrowcol"><span class="a">↓</span><span>同一份 requests</span></div>
+      <div class="arrowcol"><span class="a">↓</span><span></span></div>
+      <div class="group" style="min-width:330px">
+        <h4>每张卡上各有一个 ModelRunner</h4>
+        <div class="ranks">
+          <div class="node model" data-k="model"><b>ModelRunner GPU0</b><small>forward + collectives</small></div>
+          <div class="node model" data-k="model"><b>ModelRunner GPU1..N</b><small>forward + collectives</small></div>
+        </div>
+      </div>
+      <div class="arrowcol"><span class="a">→</span><span>token ids</span></div>
+      <div class="node detok" data-k="detok"><b>DetokenizerManager</b><small>separate proc</small></div>
+    </div>
+  </div>
+  <div class="info" id="topoInfo">点上面的方框查看说明。</div>
+
+  <h3>几个容易忽略的点</h3>
+  <div class="grid3">
+    <div class="card orange">
+      <h3>广播的是请求，不是 batch</h3>
+      <p><code>RequestReceiver.recv_requests</code> 在 tp_rank 0 收请求，然后把<b>整份请求列表</b>广播给同组所有 TP rank。每个 rank 自己跑 <code>get_next_batch_to_run</code>，因为输入和代码一样，算出来的 batch 也一样。</p>
+      <p class="note">所以不是“rank0 下令、其他 rank 听令”，而是“每个 rank 都有一份调度器，按同一份输入独立算”。</p>
+    </div>
+    <div class="card blue">
+      <h3>scheduler 进程数</h3>
+      <p>没有 DP controller 时，进程数是 <code>pp_size × tp_size</code>，每个 (pp, tp) rank 一个 scheduler 进程。有 DP controller 时，每个 DP worker 再各起一组。</p>
+    </div>
+    <div class="card green">
+      <h3>真正让 rank 对齐的层</h3>
+      <p>不是 scheduler，而是 ModelRunner 里的集合通信。scheduler 只负责让各 rank <b>算出同样的 batch</b>；forward 里的 collective 负责让它们<b>物理上等齐</b>。</p>
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   ③ 一次请求的一生
+   ============================================================ */
+const LIFE_STEPS = [
+  {
+    t: 'HTTP 请求到达', badge: 'async',
+    body: '客户端发一个 chat/completions 请求。TokenizerManager 的 asyncio 事件循环接住它，登记 rid、sampling 参数、stream 标志。',
+    more: ['这一步完全不碰 GPU，也不会等模型。', '成百上千个请求可以同时停留在这里。']
+  },
+  {
+    t: '分词 + 组 TokenizedGenerateReqInput', badge: 'async',
+    body: 'TokenizerManager 调 tokenizer 得到 input_ids，打包成 TokenizedGenerateReqInput，通过 ZMQ / IPC 发给 scheduler（dp_size > 1 时先发给 DP controller）。',
+    more: ['分词在 CPU 上做；大模型服务里这一步也常被缓存或多进程化。']
+  },
+  {
+    t: 'scheduler 收请求并广播', badge: 'sync',
+    body: 'tp_rank 0 的 RequestReceiver 从 socket 拉请求，然后通过 tp_group 的 CPU group 把整份请求列表广播给同组所有 TP rank。',
+    more: ['<code>request_receiver.py</code>：“Receive results at tp_rank = 0 and broadcast it to all other TP ranks.”', 'DP attention 模式下，work 请求只在 attn TP/CP 组内广播，control 请求从全局 rank 0 扇出。']
+  },
+  {
+    t: '入队 + 组 batch', badge: 'step',
+    body: '每个 rank 的 scheduler 把请求放进 waiting queue；<code>get_next_batch_to_run</code> 决定这一步跑 prefill（extend）、decode，还是 chunked prefill。',
+    more: ['prefill 优先；decode 请求在 running_batch 里持续累积。', 'batch 的组成、KV 槽位分配、chunk 切分都由同一套确定性代码算出，所以各 rank 一致。']
+  },
+  {
+    t: 'forward：层内集合通信', badge: 'sync',
+    body: '<code>ForwardBatch.init_new</code> → <code>model_runner.forward</code>。每一层里，attention 的 all-reduce、MoE 的 all-gather / all-to-all、TP 的 GEMM 分片，都会让 rank 在这里对齐。',
+    more: ['这是“看起来同步”的根源：一个 rank 跑快了，会在第一个 collective 上阻塞。', 'CUDA graph 模式下，replay 的也是同一组 collective。']
+  },
+  {
+    t: 'sampling', badge: 'sync',
+    body: '每个 rank 都拿到完整 logits（TP 的 LM head 输出已经 all-reduce 过），各自采样。所有 rank 的 random seed 相同、RNG 消耗序列相同，所以采出同一个 token。',
+    more: ['<code>scheduler.py</code> 启动时 <code>set_random_seed(self.random_seed)</code>；<code>tp_worker.py</code> 里 seed 还会在 rank 间 broadcast。', 'greedy 解码则完全无随机性。']
+  },
+  {
+    t: 'process_batch_result：追加 token、判停', badge: 'step',
+    body: '每个 rank 把新 token 追加到请求状态，更新 KV 长度，检查 stop 条件、max_tokens、abort。完成的请求进入输出路径。',
+    more: ['overlap scheduler 下，这一步会和处理上一批结果重叠。']
+  },
+  {
+    t: 'detokenize + 流式返回', badge: 'async',
+    body: 'scheduler 把 token id 发给 TokenizerManager；需要文本的请求转给 DetokenizerManager，增量 detokenize 后经 SSE 流式返回客户端。',
+    more: ['decode 阶段每步都可能推一个 chunk；客户端不需要等整段生成完。']
+  },
+  {
+    t: 'decode loop：每个 step 一个 token', badge: 'loop',
+    body: '回到 scheduler 循环：收新请求 → 组 decode batch → forward → sample → process。直到所有请求 finish。',
+    more: ['continuous batching：新请求可以在任意 step 加入，不用等当前 batch 全部结束。', '一个慢请求不会阻塞别的请求“开始”，但同一 decode batch 内的请求会一起推进。']
+  }
+];
+let lifeIdx = 0;
+function lifeHTML(){
+  const s = LIFE_STEPS[lifeIdx];
+  return `
+  <div class="note">跟着箭头走一遍：哪些步骤是异步的，哪些步骤会把 rank 拉齐。</div>
+  <div class="stepper">
+    <div class="stephead">
+      <span class="stepnum">${lifeIdx + 1}</span>
+      <b style="font-size:15px">${esc(s.t)}</b>
+      <span class="badge ${s.badge === 'async' ? 'async' : s.badge === 'sync' ? 'sync' : 'indep'}">${esc(s.badge)}</span>
+      <span class="note">第 ${lifeIdx + 1} / ${LIFE_STEPS.length} 步</span>
+    </div>
+    <div class="stepbody">
+      <p>${s.body}</p>
+      <ul>${s.more.map(x => '<li>' + x + '</li>').join('')}</ul>
+    </div>
+    <div class="stepnav">
+      <button id="lifePrev" ${lifeIdx === 0 ? 'disabled' : ''}>← 上一步</button>
+      <button id="lifeNext" ${lifeIdx === LIFE_STEPS.length - 1 ? 'disabled' : ''}>下一步 →</button>
+    </div>
+  </div>
+  <div class="grid3">
+    <div class="card blue"><h3>异步发生在这里</h3><p>HTTP 接入、分词、detokenize、流式返回、abort；以及单 rank 内的 CPU/GPU overlap。</p></div>
+    <div class="card orange"><h3>同步发生在这里</h3><p>forward 里的集合通信；sampling 的随机数一致性；DP attention 的每 step 元数据同步。</p></div>
+    <div class="card green"><h3>为什么不能全异步</h3><p>TP 把同一个矩阵切到多张卡上，单卡只有部分和；不做 collective 就没有完整结果。EP 同理。</p></div>
+  </div>`;
+}
+
+/* ============================================================
+   ④ 一个 scheduler step
+   ============================================================ */
+function block(cls, text, flex){
+  return `<div class="blk ${cls}" style="flex:${flex}"><span>${text}</span></div>`;
+}
+function timelineHTML(mode){
+  if (mode === 'normal') {
+    return `
+      <div class="lane"><div class="lname">CPU (scheduler)</div><div class="lblocks">
+        ${block('io','recv + broadcast',1.2)}
+        ${block('cpu','schedule batch',1.5)}
+        ${block('cpu','launch forward',1.2)}
+        ${block('idle','wait / sync',1.2)}
+        ${block('sample','sample',1)}
+        ${block('cpu','process result',1.5)}
+      </div></div>
+      <div class="lane"><div class="lname">GPU (rank 0)</div><div class="lblocks">
+        ${block('idle','idle',2.7)}
+        ${block('gpu','forward kernels（层内 collective）',3.6)}
+        ${block('idle','idle',1.3)}
+      </div></div>
+      <div class="note" style="margin-top:8px">normal 模式：CPU 发起 forward 后要等 GPU 结果回来，再进入下一轮。GPU 算的时候 CPU 基本闲着。</div>`;
+  }
+  return `
+      <div class="lane"><div class="lname">CPU step i</div><div class="lblocks">
+        ${block('cpu','schedule i',1.3)}
+        ${block('cpu','launch i',1)}
+        ${block('sample','process i-1 / sample',2)}
+      </div></div>
+      <div class="lane"><div class="lname">GPU step i</div><div class="lblocks">
+        ${block('idle','',1)}
+        ${block('gpu','forward i',2.3)}
+        ${block('gpu','forward i+1',2.3)}
+      </div></div>
+      <div class="lane"><div class="lname">CPU step i+1</div><div class="lblocks">
+        ${block('idle','',1)}
+        ${block('cpu','schedule i+1',1.1)}
+        ${block('cpu','launch i+1',0.9)}
+        ${block('sample','process i',1.3)}
+      </div></div>
+      <div class="note" style="margin-top:8px">overlap 模式：CPU 调度下一批时，GPU 还在算当前批。两批之间用 <code>result_queue</code> 传递结果；这是<b>单 rank 内</b>的 CPU/GPU 流水，不是 rank 间异步。</div>`;
+}
+const RANK_SEGS = [
+  ['c','attn 分片'], ['s','all-reduce'], ['c','MoE / GEMM'], ['s','all-gather'],
+  ['c','attn 分片'], ['s','all-reduce'], ['c','MoE / GEMM'], ['s','all-to-all'],
+  ['c','attn 分片'], ['s','all-reduce'], ['c','LM head'], ['s','sample 对齐']
+];
+let rankIdx = 0;
+function rankLanesHTML(){
+  return [0,1,2,3].map(r => `
+    <div class="rlane"><div class="rname">R${r}</div><div class="rsegs">
+      ${RANK_SEGS.map(([k,t],i) => `<div class="seg ${k}${i===rankIdx?' now':''}" title="${t}">${i===rankIdx?esc(t):''}</div>`).join('')}
+    </div></div>`).join('');
+}
+function stepHTML(){
+  return `
+  <h3>先看单 rank 的流水</h3>
+  <div class="bar">
+    <button id="tlNormal" aria-pressed="true">event_loop_normal</button>
+    <button id="tlOverlap" aria-pressed="false">event_loop_overlap</button>
+  </div>
+  <div class="tl" id="tl">${timelineHTML('normal')}</div>
+
+  <h3>再看 rank 之间：集合通信是隐式 barrier</h3>
+  <div class="note">下面 4 条 lane 是同一个 TP 组的 4 个 rank。点播放，橙色段就是某个 collective：所有 rank 必须到齐才能继续。</div>
+  <div class="bar">
+    <button id="rankPlay">▶ 播放</button>
+    <span class="note" id="rankTip">等待播放…</span>
+  </div>
+  <div class="tl" id="rankLanes">${rankLanesHTML()}</div>
+  <div class="info" id="rankInfo">
+    <b>要点：</b>rank 不需要每步 <code>barrier()</code>。先算完的 rank 会在下一个 collective 上阻塞，
+    这本身就是同步。也正因如此，每个 rank 必须以<b>相同的顺序</b>发起 collective——所以 scheduler 的 batch 决策必须一致。
+  </div>`;
+}
+
+/* ============================================================
+   ⑤ TP / DP / DP-attention / PP
+   ============================================================ */
+function scenarioHTML(kind){
+  if (kind === 'tp') {
+    return `
+      <div class="flow">
+        ${[0,1,2,3].map(r => `<span class="rankbox tp">R${r}</span>`).join('<span class="arr">⇄</span>')}
+      </div>
+      <div class="syncbar">每层：attention all-reduce ⇄ MoE all-gather / all-to-all ⇄ LM head all-reduce</div>
+      <p><b>一个 batch，四张卡一起算。</b>每个 rank 只有 1/4 的 attention 头 / 权重分片；单卡算出的只是部分和。不做 collective 就没有完整结果，所以它们天然被绑在同一进度上。</p>
+      <ul>
+        <li>scheduler 决策被复制到每个 rank：rank0 广播请求列表，每个 rank 自己算出同一个 batch。</li>
+        <li>没有显式 barrier；第一个 collective 就是同步点。</li>
+        <li>采样：所有 rank 用同一个 random seed，采出同一个 token。</li>
+      </ul>
+      <div class="indepnote">这一层是 <b>soft sync</b>：Python 可以短暂跑偏，但一进 forward 就被拉齐。</div>`;
+  }
+  if (kind === 'dp') {
+    return `
+      <div class="syncbar" style="background:#eff6ff;border-color:#2563eb;color:#1e3a8a">DataParallelController：按 round-robin / load-balance 把请求分给某个副本</div>
+      <div class="split">
+        <div class="group">
+          <h4>DP replica 0（TP=2）</h4>
+          <div class="ranks"><span class="rankbox tp">R0</span><span class="arr">⇄</span><span class="rankbox tp">R1</span></div>
+          <p class="note">自己的 scheduler、KV cache、batch</p>
+        </div>
+        <div class="group">
+          <h4>DP replica 1（TP=2）</h4>
+          <div class="ranks"><span class="rankbox tp">R2</span><span class="arr">⇄</span><span class="rankbox tp">R3</span></div>
+          <p class="note">自己的 scheduler、KV cache、batch</p>
+        </div>
+      </div>
+      <div class="indepnote">两个副本之间<b>没有</b>集合通信，也不共享调度器。一个副本的请求多、另一个空闲，是很正常的。</div>
+      <p>这是真正接近“异步”的情况：副本各跑各的，只有 DP controller 在前面做路由。</p>`;
+  }
+  if (kind === 'dpa') {
+    return `
+      <div class="syncbar">每 step 一次：<code>prepare_mlp_sync_batch</code> —— 交换 num_tokens / forward mode / CUDA graph 资格</div>
+      <div class="split">
+        <div class="group">
+          <h4>DP replica 0（attention DP）</h4>
+          <div class="ranks"><span class="rankbox tp">R0</span><span class="rankbox tp">R1</span></div>
+          <p class="note">自己的 attention batch</p>
+        </div>
+        <div class="group">
+          <h4>DP replica 1（attention DP）</h4>
+          <div class="ranks"><span class="rankbox ep">R2</span><span class="rankbox ep">R3</span></div>
+          <p class="note">自己的 attention batch</p>
+        </div>
+      </div>
+      <div class="syncbar" style="background:#f0fdf4;border-color:#15803d;color:#166534">MoE 层：all-to-all / all-gather 跨所有 rank（EP）</div>
+      <p><b>batch 不同，但 step 结构必须一致。</b>attention 是各 rank 自己算自己的请求；到了 MoE，token 要按专家重新分发，所有 rank 必须一起参与。</p>
+      <ul>
+        <li>同步内容：每个 rank 的 token 数、这步是 extend 还是 decode、能不能走 CUDA graph、padding 模式（MAX_LEN / SUM_LEN）。</li>
+        <li>没有 token 的 DP rank 会被“造”一个 idle batch，仍然参与 collective，避免其他 rank 死等。</li>
+        <li>所以 DP attention 下，DP 副本看起来也是同步的——但同步的是<b>元数据和 MoE 通信</b>，不是 batch 内容。</li>
+      </ul>`;
+  }
+  return `
+      <div class="flow">
+        <span class="rankbox ep">S0</span><span class="arr">→</span>
+        <span class="rankbox ep">S1</span><span class="arr">→</span>
+        <span class="rankbox ep">S2</span><span class="arr">→</span>
+        <span class="rankbox ep">S3</span>
+      </div>
+      <div class="syncbar" style="background:#f0fdf4;border-color:#15803d;color:#166534">stage 之间只传 proxy tensors（p2p），不是全组 barrier</div>
+      <div class="tl" style="margin-top:10px">
+        <div class="lane"><div class="lname">S0</div><div class="lblocks">${block('gpu','mb0 第1段',1.6)}${block('gpu','mb1 第1段',1.6)}${block('gpu','mb2 第1段',1.6)}</div></div>
+        <div class="lane"><div class="lname">S1</div><div class="lblocks">${block('idle','',1.6)}${block('gpu','mb0 第2段',1.6)}${block('gpu','mb1 第2段',1.6)}</div></div>
+        <div class="lane"><div class="lname">S2</div><div class="lblocks">${block('idle','',3.2)}${block('gpu','mb0 第3段',1.6)}</div></div>
+      </div>
+      <p><b>流水线，不是锁步。</b>stage 0 在跑 microbatch 1 时，stage 1 可能还在跑 microbatch 0。每个 stage 有自己的 scheduler loop，用 async send / sync recv 传递激活和请求。</p>
+      <ul>
+        <li>只有相邻 stage 之间有数据依赖，不是所有 rank 全组同步。</li>
+        <li>最后一段 stage 采样，结果沿链路传回。</li>
+      </ul>`;
+}
+let scenKind = 'tp';
+function scenariosHTML(){
+  return `
+  <div class="bar">
+    <button class="scenBtn" data-k="tp" aria-pressed="true">TP=4（单副本）</button>
+    <button class="scenBtn" data-k="dp" aria-pressed="false">DP=2, TP=2（普通 DP）</button>
+    <button class="scenBtn" data-k="dpa" aria-pressed="false">DP attention + EP MoE</button>
+    <button class="scenBtn" data-k="pp" aria-pressed="false">PP=4（流水线）</button>
+  </div>
+  <div class="scen" id="scen">${scenarioHTML(scenKind)}</div>
+  <div class="note">三种“同步”不是一回事：TP 是<b>每层</b>同步；DP attention 是<b>每 step 元数据</b>同步 + MoE 层同步；PP 是<b>相邻 stage</b> 的数据依赖。普通 DP 则完全独立。</div>`;
+}
+
+/* ============================================================
+   ⑥ 代码锚点 & 误区
+   ============================================================ */
+function codeHTML(){
+  return `
+  <h3>代码锚点（本仓库当前 main）</h3>
+  <table class="cmp">
+    <tr><th>位置</th><th>作用</th></tr>
+    <tr><td class="kv">engine.py:936</td><td><code>use_dp_controller = num_dp_ranks &gt; 1 or ep_join_mode == "scale"</code></td></tr>
+    <tr><td class="kv">engine.py:959</td><td>每个 (pp_rank, tp_rank) 启动一个 scheduler 进程</td></tr>
+    <tr><td class="kv">request_receiver.py:101</td><td>“在 tp_rank 0 收请求，广播给所有其他 TP rank”</td></tr>
+    <tr><td class="kv">request_receiver.py:225</td><td><code>broadcast_pyobj(...)</code>：请求列表经 TP CPU group 广播</td></tr>
+    <tr><td class="kv">scheduler.py:2132 / 2167</td><td><code>event_loop_normal</code> / <code>event_loop_overlap</code></td></tr>
+    <tr><td class="kv">scheduler.py:2270</td><td><code>ingest_requests</code>：收请求 + 处理输入</td></tr>
+    <tr><td class="kv">scheduler.py:4212</td><td><code>get_next_batch_to_run</code>：选 prefill / decode / chunk</td></tr>
+    <tr><td class="kv">scheduler.py:5220</td><td><code>run_batch</code> → <code>forward_batch_generation</code></td></tr>
+    <tr><td class="kv">tp_worker.py:623</td><td><code>TpModelWorker.forward_batch_generation</code></td></tr>
+    <tr><td class="kv">scheduler.py:1330</td><td><code>set_random_seed(self.random_seed)</code></td></tr>
+    <tr><td class="kv">tp_worker.py:373</td><td>random seed 在 rank 间 broadcast</td></tr>
+    <tr><td class="kv">dp_attn.py:586</td><td><code>prepare_mlp_sync_batch_raw</code>：每 step 交换 DP 元数据</td></tr>
+    <tr><td class="kv">dp_attention.py:154</td><td><code>DpPaddingMode</code>：MAX_LEN vs SUM_LEN</td></tr>
+    <tr><td class="kv">scheduler_pp_mixin.py:122</td><td><code>event_loop_pp</code>：PP 的 microbatch 流水</td></tr>
+    <tr><td class="kv">breakable_cuda_graph_backend.py:295</td><td><code>replay()</code>：整段图重放，Python 不参与</td></tr>
+  </table>
+
+  <h3>常见误区</h3>
+  <details class="faq" open>
+    <summary>“rank 之间是异步的”？</summary>
+    <p>要分三层看：<b>客户端/分词/流式返回</b>是异步的；<b>一个 TP 组内的模型执行</b>是软同步的；<b>DP 副本</b>默认独立，只有 DP attention/EP 才每 step 对齐元数据。把这三层混在一起，就会觉得“有时异步、有时同步”。</p>
+  </details>
+  <details class="faq">
+    <summary>为什么没有每 step 的 barrier，却看起来同步？</summary>
+    <p>因为 collective 本身就是 barrier。先算完的 rank 在第一个 all-reduce / all-gather 上阻塞，直到所有 rank 到齐。显式 <code>barrier()</code> 只在启动、capture、权重更新等少数地方出现，不在正常 step 里。</p>
+  </details>
+  <details class="faq">
+    <summary>overlap scheduler 不是让 rank 异步了吗？</summary>
+    <p>不是。overlap 是<b>单 rank 内</b> CPU 与 GPU 的重叠：CPU 在 GPU 算当前批时，提前调度下一批。rank 之间仍然被 forward 里的 collective 对齐。</p>
+  </details>
+  <details class="faq">
+    <summary>为什么每个 rank 都要跑一份 scheduler？</summary>
+    <p>因为 TP 的一个 step 里，所有 rank 必须发起<b>相同顺序</b>的 collective。让每个 rank 用同一份请求列表、同一套确定性代码独立算出同一个 batch，是最简单的保证方式；rank0 只负责收请求和广播。</p>
+  </details>
+  <details class="faq">
+    <summary>DP attention 下 batch 不一样，怎么还能同步？</summary>
+    <p>同步的不是 batch 内容，而是<b>step 的元数据</b>：每个 rank 有多少 token、这一步是 extend 还是 decode、能不能走 CUDA graph、padding 用 MAX_LEN 还是 SUM_LEN。MoE 层再把各 rank 的 token 按专家重新分发，所以所有 rank 必须一起参与。</p>
+  </details>
+  <details class="faq">
+    <summary>一个慢请求会拖住整个 batch 吗？</summary>
+    <p>不会拖住“别的请求开始”，但同一个 decode batch 里的请求是每步一起出一个 token 的。continuous batching 让新请求可以在任意 step 加入；finished 的请求会从 running_batch 里移除。</p>
+  </details>
+  <details class="faq">
+    <summary>CUDA graph 下 rank 怎么保证 replay 同一个 bucket？</summary>
+    <p>DP attention 的每 step 同步会交换 <code>can_run_decode_cuda_graph</code> / <code>can_run_prefill_cuda_graph</code> 等资格；所有 rank 对同一个 batch size bucket 达成一致后再 replay。Breakable prefill 图里，段内 Python 不执行，replay 的 collective 仍然按 capture 时的顺序重放。</p>
+  </details>
+  <div class="hero" style="margin-top:16px">
+    <b>最后用一句话记住：</b>异步在<b>请求接入和 CPU/GPU 流水</b>，同步在<b>模型层内的集合通信</b>；
+    TP 是“同一份活切开干”，所以必须同步；DP 是“各干各的活”，默认不同步；DP attention 是“各干各的活，但每步对一下表”。
+  </div>`;
+}
+
+/* ============================================================
+   导航
+   ============================================================ */
+const TABS = [
+  {id:'overview',  title:'① 结论：三层同步模型', render: overviewHTML, bind: null},
+  {id:'topology',  title:'② 进程与通信拓扑',     render: topologyHTML, bind: bindTopology},
+  {id:'life',      title:'③ 一次请求的一生',     render: lifeHTML,     bind: bindLife},
+  {id:'step',      title:'④ 一个 scheduler step',render: stepHTML,     bind: bindStep},
+  {id:'scenarios', title:'⑤ TP / DP / DP-attn / PP', render: scenariosHTML, bind: bindScenarios},
+  {id:'code',      title:'⑥ 代码锚点 & 误区',    render: codeHTML,     bind: null},
+];
+const nav = document.getElementById('nav');
+const stage = document.getElementById('stage');
+const titleEl = document.getElementById('title');
+let cur = 0;
+
+TABS.forEach((t, i) => {
+  const b = document.createElement('button');
+  b.textContent = t.title;
+  b.addEventListener('click', () => show(i));
+  nav.appendChild(b);
+});
+
+function show(i){
+  clearTimer();
+  cur = i;
+  [...nav.children].forEach((b, j) => b.setAttribute('aria-current', j === i ? 'step' : 'false'));
+  titleEl.textContent = TABS[i].title;
+  stage.innerHTML = TABS[i].render();
+  if (TABS[i].bind) TABS[i].bind();
+  titleEl.focus({preventScroll:true});
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function bindTopology(){
+  const info = document.getElementById('topoInfo');
+  document.querySelectorAll('#topo .node').forEach(n => {
+    n.addEventListener('click', () => {
+      document.querySelectorAll('#topo .node').forEach(x => x.classList.remove('sel'));
+      n.classList.add('sel');
+      const [name, desc] = TOPO_INFO[n.dataset.k] || ['?', ''];
+      info.innerHTML = `<b>${esc(name)}</b><br>${desc}`;
+    });
+  });
+  info.innerHTML = '点上面的方框查看说明。';
+}
+
+function bindLife(){
+  document.getElementById('lifePrev').addEventListener('click', () => { if (lifeIdx > 0) { lifeIdx--; stage.innerHTML = lifeHTML(); bindLife(); } });
+  document.getElementById('lifeNext').addEventListener('click', () => { if (lifeIdx < LIFE_STEPS.length - 1) { lifeIdx++; stage.innerHTML = lifeHTML(); bindLife(); } });
+}
+
+function bindStep(){
+  const tl = document.getElementById('tl');
+  const bN = document.getElementById('tlNormal');
+  const bO = document.getElementById('tlOverlap');
+  bN.addEventListener('click', () => { bN.setAttribute('aria-pressed','true'); bO.setAttribute('aria-pressed','false'); tl.innerHTML = timelineHTML('normal'); });
+  bO.addEventListener('click', () => { bO.setAttribute('aria-pressed','true'); bN.setAttribute('aria-pressed','false'); tl.innerHTML = timelineHTML('overlap'); });
+
+  const play = document.getElementById('rankPlay');
+  const tip = document.getElementById('rankTip');
+  const lanes = document.getElementById('rankLanes');
+  let playing = false;
+  const tick = () => {
+    lanes.innerHTML = rankLanesHTML();
+    const seg = RANK_SEGS[rankIdx];
+    tip.innerHTML = seg[0] === 's'
+      ? `<span class="badge sync">collective</span> ${esc(seg[1])}：先到的 rank 在这里等，所有 rank 到齐才继续`
+      : `<span class="badge indep">compute</span> ${esc(seg[1])}：各 rank 独立算自己那份`;
+    rankIdx = (rankIdx + 1) % RANK_SEGS.length;
+  };
+  const stop = () => { clearTimer(); playing = false; play.textContent = '▶ 播放'; };
+  play.addEventListener('click', () => {
+    if (playing) { stop(); return; }
+    clearTimer();
+    rankIdx = 0;
+    playing = true;
+    play.textContent = '■ 停止';
+    tick();
+    timer = setInterval(tick, 700);
+  });
+}
+
+function bindScenarios(){
+  document.querySelectorAll('.scenBtn').forEach(b => {
+    b.addEventListener('click', () => {
+      scenKind = b.dataset.k;
+      document.querySelectorAll('.scenBtn').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+      document.getElementById('scen').innerHTML = scenarioHTML(scenKind);
+    });
+  });
+}
+
+show(0);
+</script>
+</body>
+</html>
