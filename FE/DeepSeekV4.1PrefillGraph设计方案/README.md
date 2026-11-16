@@ -9,7 +9,7 @@
 - 迁移前版本：`3cc67a7544`；备份分支 `backup/dsv41-a5-before-prefill-graph-20261116`。
 - 来源：本地保存的 `prefill_graph_ascend_ops_on_main@15443a991f`；本轮 GitHub TLS/API 连接失败，尚未重新核对远端最新 HEAD。
 - 已保留的上游重构：`43d0ecf9e1` 的 device-neutral graph backend bases。
-- 日期：2026-11-16。迁移及 CPU 验证见下文索引；尚未运行 V4.1 A5 单算子、整模正确性或性能实验。
+- 日期：2026-11-16。首轮 A5 单卡证据已回传：[结果判读与原始证据](validation/a5-20261116-run1/findings.md)。window/c1/c2 attention 的图回放对照通过，独立 CPU 参考仍有差异；compressor/epilog API 及修订后的 QLI/QSLI 待补验证。整模正确性与性能未验证。
 
 **后续基于迁入后的框架和 scope 重构实现 V4.1 增量。** NPU backend 解析、NPUGraph segment、capture/replay 生命周期、V4 固定 metadata 和 MoE prefill scope 已进入开发分支；不再作为待重写的基础设施。
 
@@ -22,6 +22,7 @@
 | [实现方案与阶段划分](design/implementation_plan.md) | 基于迁入代码扩展 V4.1 metadata、source/candidate、Engram 和输出契约 |
 | [验收与验证计划](validation/acceptance_plan.md) | CPU 契约测试、A5 单算子与整模验证、性能 A/B、必要环境记录 |
 | [单文件 A5 验证脚本与运行说明](scripts/README.md) | 无需模型权重，13 组独立探针；自动输出 JSON、日志和证据包 |
+| [首轮 A5 事实与下一轮动作](validation/a5-20261116-run1/findings.md) | 原始证据、逐项失败归因、图回放与 CPU 参考区分、修订脚本重跑范围 |
 
 ## 目标行为
 

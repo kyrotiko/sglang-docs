@@ -1,0 +1,33 @@
+[geometry] start
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:13: FutureWarning: triton.language.extra.cann.extension.atan2 is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.atan2 instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.atan2")
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:35: FutureWarning: triton.language.extra.cann.extension.isfinited is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.isfinited instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.isfinited")
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:49: FutureWarning: triton.language.extra.cann.extension.finitef is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.finitef instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.finitef")
+[geometry] warmup
+/mnt/share/y00627667/repos/sglang/python/sglang/srt/hardware_backend/npu/attention/ascend_dsv4_backend.py:2130: UserWarning: Cannot create tensor with internal format while allow_internal_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:406.)
+  keep = ((positions % ratio) == (ratio - 1)) & (out_loc >= page_size)
+[geometry] capture_begin
+[geometry] capture_end
+[geometry] prepare:full_A
+[geometry] eager:full_A
+[geometry] replay:full_A
+[geometry] passed:full_A
+[geometry] prepare:short_B
+[geometry] eager:short_B
+[geometry] replay:short_B
+[geometry] passed:short_B
+[geometry] prepare:page_boundary_C
+[geometry] eager:page_boundary_C
+[geometry] replay:page_boundary_C
+[geometry] passed:page_boundary_C
+[geometry] prepare:different_prefix_D
+[geometry] eager:different_prefix_D
+[geometry] replay:different_prefix_D
+[geometry] passed:different_prefix_D
+[geometry] prepare:repeat_A
+[geometry] eager:repeat_A
+[geometry] replay:repeat_A
+[geometry] passed:repeat_A
+[geometry] complete

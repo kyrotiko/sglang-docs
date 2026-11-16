@@ -4,6 +4,8 @@
 
 用途：在当前 A5 **真实 serving 环境**中收集决定实现方向的算子、metadata、graph replay 和状态证据。预期主仓基线为 `dsv41-a5@5633d68b04`；版本不同时会在报告中记录实际 SHA/API，而不是自动切换到旧接口或 mock。
 
+当前脚本为 revision 2。首轮 [结果与原始证据](../validation/a5-20261116-run1/findings.md)已归档：三组 attention 的 graph/eager 全部 exact，CPU 参考另有差异。修订版修复了把 candidate block=8 混作 index PA page 的夹具错误，默认 index page=64，并将 capture、eager/replay 与 CPU reference 独立显示；原始失败不会被重写为通过。
+
 ## 在机器上运行
 
 进入已安装 torch_npu、sgl-kernel-npu 和 SGLang 的 A5 环境，使用单张 NPU：
@@ -33,13 +35,17 @@ dsv41-prefill-evidence/dsv41-prefill-evidence.tar.gz
 
 包中包含 `report.json`、`report.md`、每组探针的 `.json` 和完整 `.log`，以及运行脚本快照和 hash。父进程逐组输出状态；每组独立进程，超时或崩溃会保留已完成 case 和最后阶段，继续其他组。
 
-首次建议直接跑默认全套。若只需要重跑某组：
+首次运行可以选择默认全套。基于首轮回传，本次只需用新目录补跑四组：
 
 ```bash
 python verify_dsv41_prefill_graph.py \
-  --probes compressor,attention_r1,attention_r2 \
-  --output-dir ./dsv41-prefill-rerun
+  --sglang-root /path/to/sglang \
+  --probes environment,qli_c2,candidate_chain,attention_r0 \
+  --index-page-size 64 \
+  --output-dir ./dsv41-prefill-evidence-r2
 ```
+
+environment 会额外记录公开 compressor/epilog exports、签名/文档、auto 实现解析、npu/custom schema 和主仓实际索引页常量。若真实 serving 另有注册模块，用 `--import-module MODULE` 显式指定，可重复；不要凭旧 op 名猜模块，也不会默认加载某个模块来掩盖缺口。
 
 可用 `--list` 列出名称，`--help` 查看参数。
 
@@ -60,7 +66,7 @@ python verify_dsv41_prefill_graph.py \
 
 图探针都使用当前输入做 eager reference，再从相同初始状态 replay；包含 A → B → C → D → A，不能只用 capture 的原输入 replay 一次。压缩输出只比较有效行，state/cache 比较完整存储。attention 有效行之外预填 NaN，用于观察 kernel 是否写 padding 行，不把 padding 必须为零当作算子既定契约。
 
-默认参数是合成尺寸，不是推荐部署配方：T=64、主 attention heads=64、head_dim=512、indexer heads=32、index_dim=128、topk=512、page=128、candidate blocks=2048、compressor hidden=4096、ratio-2 ring=2（对应非投机路径）。
+默认参数是合成尺寸，不是推荐部署配方：T=64、主 attention heads=64、head_dim=512、indexer heads=32、index_dim=128、topk=512、full page=128、**index PA page=64**、**candidate block size=8**、candidate blocks=2048、compressor hidden=4096、ratio-2 ring=2（对应非投机路径）。`--index-page-size` 必须整除 `--page-size/2`；例如测试 index page=128 时设置 `--page-size 256`。
 
 确认默认结果后，可以用新目录扩大 bucket，例如 `--tokens 128`；压缩投影宽度可以用 `--hidden-size` 指定，DSpark 对应的较宽 private ring 可单独用 `--state-ring-size 8` 复跑。不能将这些 synthetic 变体当成真实模型或 DSpark 整体验证。
 
@@ -72,9 +78,9 @@ python verify_dsv41_prefill_graph.py \
 - `TIMEOUT` / `CRASH`：保留最后 checkpoint、已完成 case 和进程退出码；需要结合机器日志分析。
 - 进程返回值：0 为所有选中探针通过，1 有失败/超时/崩溃，2 只有环境/API 阻塞，130 为用户中断；这些情况都会尽量产出结果包。
 
-浮点默认 `rtol=1e-3, atol=1e-3`，记录在每份报告中；整数、hash、top-k 和 cache bytes 精确比较。失败会记录误差和小段样本，不能为了变绿而忽略误差。QLI/QSLI 的有序 top-k 不一致可能涉及并列分数，需根据原始证据分析；不把无序相等自动当作通过。
+浮点 eager/replay 默认 `--rtol 1e-3 --atol 1e-3`；CPU FP32 参考单独使用 `--reference-rtol 1e-3 --reference-atol 1e-3`，本次没有放宽默认值。整数、hash、top-k 和 cache bytes 精确比较。失败会记录误差和小段样本，不能为了变绿而忽略误差。QLI/QSLI 的有序 top-k 不一致可能涉及并列分数，需根据原始证据分析；不把无序相等自动当作通过。
 
-attention 的 CPU reference 是部分行/head 的独立算术对照，eager/replay 则比较全部有效输出。即使 CPU reference 有差异，也会继续收集 graph parity，二者分开记录。
+attention 的 CPU reference 是部分行/head 的独立算术对照，eager/replay 则比较全部有效输出。即使 CPU reference 有差异，也继续收集 graph parity，并在 `checks` 和摘要各列分开记录。新增 BF16 ULP、归一化 L2、最大误差坐标、最近 BF16 舍入值及一种 BF16-softmax 算术假设的诊断，均不代替 FP32 oracle 或改变严格判定。padding 另记有限值数量、零值数量和最大绝对值。
 
 本地上游参考包与 A5 分支的某些 API 支持说明存在版本差异，尤其是 `compressor_v2` 和 custom epilog 注册。脚本使用本分支实际调用的 API 名，记录部署包签名；某组无法执行时，其余组仍能提供证据，不静默换成其他代际算子。
 

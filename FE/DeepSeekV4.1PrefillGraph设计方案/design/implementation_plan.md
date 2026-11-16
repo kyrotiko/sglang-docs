@@ -2,6 +2,8 @@
 
 开发基线：`sglang/dsv41-a5@5633d68b04`；2026-11-16。11 个入图功能、修复和 scope 重构提交已迁入，来源和验证见 [集成记录](../analysis/prefill_graph_integration.md)。本文已纳入两轮方案评审；以下闸门和 V4.1 扩展仍为待实现设计，主仓尚未据此修改。
 
+首轮 A5 [事实记录](../validation/a5-20261116-run1/findings.md)已确认几何、metadata planning、K prologue、Engram break 及 MQSMLA 的多轮 graph/eager 对照可行。Attention 的独立 FP32 参考仍未通过，compressor/epilog 是部署 API 缺口；QLI 页 8 是探针夹具错误，主仓实际使用 64/128。阶段 B 只能记为部分完成；先补正确接口和修订探针证据，不能把所有原始 FAIL 归为 graph 能力问题。
+
 ## 1. 复用边界与首版范围
 
 直接复用现有 `PrefillCudaGraphRunner`、NPU breakable backend、NPUGraph segment、metadata hooks、MoE prefill scope、固定 AllGather 和 eager tail。保留已有 device-neutral graph 基类与生命周期。

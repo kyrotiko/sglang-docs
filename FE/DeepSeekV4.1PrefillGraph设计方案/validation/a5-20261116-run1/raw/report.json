@@ -1,0 +1,4480 @@
+{
+  "schema_version": 1,
+  "expected_source_baseline": "5633d68b04",
+  "created": "2026-11-16T16:57:21+0000",
+  "script_sha256": "58140f4821fa8106fafc0205297475891c2947bf802c5a05231a5456ee6fb387",
+  "options": {
+    "output_dir": "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/dsv41-prefill-evidence",
+    "sglang_root": "/mnt/share/y00627667/repos/sglang",
+    "device": 0,
+    "tokens": 64,
+    "hidden_size": 4096,
+    "page_size": 128,
+    "candidate_blocks": 2048,
+    "state_ring_size": 2,
+    "timeout": 600,
+    "seed": 20261116,
+    "rtol": 0.001,
+    "atol": 0.001,
+    "probes": "all",
+    "list": false,
+    "self_test": false
+  },
+  "interrupted": false,
+  "results": [
+    {
+      "probe": "environment",
+      "status": "PASS",
+      "phase": "complete",
+      "started": "2026-11-16T16:48:45+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "python": "3.12.15 (main, Oct 23 2026, 02:39:17) [GCC 11.4.0]",
+      "platform": "Linux-6.6.0-159.4.7.160.oe2403sp4.aarch64-aarch64-with-glibc2.35",
+      "executable": "/usr/local/python3.12.15/bin/python",
+      "packages": {
+        "torch": "2.13.0+cpu",
+        "torch-npu": "2.13.0",
+        "sglang": "0.5.24.dev1448+g8a1bd8a55",
+        "sgl-kernel-npu": "2026.11.0.post4",
+        "triton": "3.6.0",
+        "numpy": "2.3.5"
+      },
+      "npu_smi": {
+        "returncode": 0,
+        "stdout": "+------------------------------------------------------------------------------------------------------------------+\n| npu-smi 25.1.rc3                                 Version: 25.1.rc3                                               |\n+--------+------------------+---------------+----------------------------------------------------------------------+\n| NPU ID | Name             | Health        | Power(W)              Temp(C)                  Hugepages-Usage(page) |\n|        |                  | Bus-Id        | NPU Util(%)           Memory-Usage(MB)         HBM-Usage(MB)         |\n+========+==================+===============+======================================================================+\n| 0      | Ascend950PR      | OK            | 484.7                 54                       0     / 0             |\n|        |                  | NA            | 100                   0     / 0                30428 / 131072        |\n+===========================+===============+======================================================================+\n| 1      | Ascend950PR      | OK            | 489.6                 53                       0     / 0             |\n|        |                  | NA            | 100                   0     / 0                30256 / 131072        |\n+===========================+===============+======================================================================+\n| 2      | Ascend950PR      | OK            | 478.4                 52                       0     / 0             |\n|        |                  | NA            | 100                   0     / 0                30243 / 131072        |\n+===========================+===============+======================================================================+\n| 3      | Ascend950PR      | OK            | 479.5                 52                       0     / 0             |\n|        |                  | NA            | 100                   0     / 0                30257 / 131072        |\n+===========================+===============+======================================================================+\n| 4      | Ascend950PR      | OK            | 290.6                 50                       0     / 0             |\n|        |                  | NA            | 0                     0     / 0                12828 / 131072        |\n+===========================+===============+======================================================================+\n| 5      | Ascend950PR      | OK            | 286.4                 48                       0     / 0             |\n|        |                  | NA            | 0                     0     / 0                12827 / 131072        |\n+===========================+===============+======================================================================+\n| 6      | Ascend950PR      | OK            | 284.8                 51                       0     / 0             |\n|        |                  | NA            | 0                     0     / 0                12830 / 131072        |\n+===========================+===============+======================================================================+\n| 7      | Ascend950PR      | OK            | 279.5                 48                       0     / 0             |\n|        |                  | NA            | 0                     0     / 0                12828 / 131072        |\n+===========================+===============+======================================================================+\n+---------------------------+---------------+----------------------------------------------------------------------+\n| NPU ID                    | Process id    | Process name       | Process memory(MB)    | Process id in container |\n+===========================+===============+======================================================================+\n| 0                         | 649134        |                    | 24951                 | 29032                   |\n+===========================+===============+======================================================================+\n| 1                         | 660258        |                    | 24951                 | 29251                   |\n+===========================+===============+======================================================================+\n| 2                         | 671553        |                    | 24951                 | 29515                   |\n+===========================+===============+======================================================================+\n| 3                         | 682468        |                    | 24951                 | 29799                   |\n+===========================+===============+======================================================================+\n| 4                         | 649129        |                    | 7541                  | 29031                   |\n+===========================+===============+======================================================================+\n| 5                         | 660255        |                    | 7541                  | 29249                   |\n+===========================+===============+======================================================================+\n| 6                         | 671551        |                    | 7541                  | 29514                   |\n+===========================+===============+======================================================================+\n| 7                         | 682464        |                    | 7541                  | 29798                   |\n+===========================+===============+======================================================================+\n",
+        "stderr": ""
+      },
+      "cann_files": {},
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "sglang_file": "/mnt/share/y00627667/repos/sglang/python/sglang/__init__.py",
+      "source": {
+        "root": "/mnt/share/y00627667/repos/sglang",
+        "git": {
+          "returncode": 0,
+          "stdout": "5633d68b04ad1bdd4faecb1c8e370e5c5ea6403c\n",
+          "stderr": ""
+        },
+        "status": {
+          "returncode": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      },
+      "apis": {
+        "compressor_v2": {
+          "signature": "(x, wkv, wgate, state_cache, cmp_ratio=4, *, state_block_table=None, cu_seqlens=None, seqused=None, start_pos=None, impl='auto')",
+          "module": "sgl_kernel_npu.operators.attention.compressor_v2",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/compressor_v2.py",
+          "source_sha256": "279e3ea676a31f286e41d6f43d6d4eca13a61e8da78441fe8a03750045eee975"
+        },
+        "mixed_quant_sparse_flash_mla_dsl": {
+          "signature": "(q, *, ori_kv=None, cmp_kv=None, ori_sparse_indices=None, cmp_sparse_indices=None, ori_block_table=None, cmp_block_table=None, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, ori_topk_length=None, cmp_topk_length=None, sinks=None, metadata=None, quant_mode, softmax_scale=None, layout_q='TND', layout_kv='PA_BBND', return_softmax_lse=False, out, lse, impl='auto')",
+          "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_dsl.py",
+          "source_sha256": "6f4684a03a22a002cbc7389bf9bdcc99c84522e87471a8d7bdae1e8d8681a3d8"
+        },
+        "mixed_quant_sparse_flash_mla_metadata_dsl": {
+          "signature": "(ori_topk_length, cmp_topk_length, *, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, batch_size=None, max_seqlen_q=None, max_seqlen_ori_kv=None, max_seqlen_cmp_kv=None, num_heads_q, num_heads_kv, head_dim, quant_mode, layout_q='TND', layout_kv='PA_BBND', has_ori_kv=True, has_cmp_kv=True, impl='auto')",
+          "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_metadata_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_metadata_dsl.py",
+          "source_sha256": "b433325803d3453ef445e3ab6edf5cf4f7a514dd07dd67d1befa53b9ae05dea9"
+        },
+        "indexer_prologue_k_dsl": {
+          "signature": "(latent: 'torch.Tensor', wk: 'torch.Tensor', norm_weight: 'torch.Tensor', rope_sin: 'torch.Tensor', rope_cos: 'torch.Tensor', k_cache: 'torch.Tensor', k_scale_cache: 'torch.Tensor | None' = None, *, cache_index: 'torch.Tensor', storage_mode: 'int', norm_eps: 'float', combined_block_size: 'int' = -1, impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.indexer_prologue_k_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/indexer_prologue_k_dsl.py",
+          "source_sha256": "08246dd0bca05045f537e1d549255667ae28d4ba23bc12b8cf2192db0329b9b1"
+        },
+        "quant_lightning_indexer_dsl": {
+          "signature": "(q: 'torch.Tensor', k: 'torch.Tensor', w: 'torch.Tensor', descale_q: 'torch.Tensor', descale_k: 'torch.Tensor', cu_seqlens_q: 'Optional[torch.Tensor]' = None, cu_seqlens_k: 'Optional[torch.Tensor]' = None, seqused_q: 'Optional[torch.Tensor]' = None, seqused_k: 'Optional[torch.Tensor]' = None, cmp_residual_k: 'Optional[torch.Tensor]' = None, block_table: 'Optional[torch.Tensor]' = None, output_idx_offset: 'Optional[torch.Tensor]' = None, metadata: 'Optional[torch.Tensor]' = None, *, topk: 'int', quant_mode: 'int', max_seqlen_q: 'int' = -1, mask_mode: 'int' = 0, cmp_ratio: 'int' = 1, layout_q: 'str' = 'TND', layout_k: 'str' = 'TND', return_value: 'bool' = False, candidate_topk_blocks: 'int' = -1, candidate_block_size: 'int' = -1, impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py",
+          "source_sha256": "bb5d1da7cd85a6cda8cbb7026bcdcca755612bd84e6757ca8f4207c1f786ccc4"
+        },
+        "quant_lightning_indexer_metadata_dsl": {
+          "signature": "(cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', candidate_topk_blocks=-1, candidate_block_size=-1, impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_metadata_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_metadata_dsl.py",
+          "source_sha256": "53ec103db4e474e2cfc35faca212803e75b22c98fd95ab99fa81a5f70d49ced4"
+        },
+        "quant_sparse_lightning_indexer_dsl": {
+          "signature": "(q: 'torch.Tensor', k: 'torch.Tensor', w: 'torch.Tensor', descale_q: 'torch.Tensor', candidate_block_indices: 'torch.Tensor', candidate_block_length: 'torch.Tensor', cu_seqlens_q: 'Optional[torch.Tensor]' = None, cu_seqlens_k: 'Optional[torch.Tensor]' = None, seqused_q: 'Optional[torch.Tensor]' = None, seqused_k: 'Optional[torch.Tensor]' = None, cmp_residual_k: 'Optional[torch.Tensor]' = None, block_table: 'Optional[torch.Tensor]' = None, output_idx_offset: 'Optional[torch.Tensor]' = None, metadata: 'Optional[torch.Tensor]' = None, *, descale_k: 'Optional[torch.Tensor]' = None, topk: 'int', candidate_block_size: 'int', quant_mode: 'int', max_seqlen_q: 'int' = -1, mask_mode: 'int' = 0, cmp_ratio: 'int' = 1, layout_q: 'str' = 'TND', layout_k: 'str' = 'TND', return_value: 'bool' = False, impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.quant_sparse_lightning_indexer_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_sparse_lightning_indexer_dsl.py",
+          "source_sha256": "774600852d819cb9b11fc757dc28dc1d04389294bf7923be569283316d3fb2e0"
+        },
+        "quant_sparse_lightning_indexer_metadata_dsl": {
+          "signature": "(candidate_block_length, cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, quant_mode, candidate_block_size, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.quant_sparse_lightning_indexer_metadata_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_sparse_lightning_indexer_metadata_dsl.py",
+          "source_sha256": "efbfff1fadecf7820f9786db1f8f7d37689dba0506a114b0fec13f35ca0d6f4d"
+        }
+      },
+      "custom_op_schemas": {
+        "custom.kv_compress_epilog_v2": "not registered",
+        "custom.npu_hc_pre_v2": "not registered"
+      },
+      "device_capabilities": "_NPUDeviceProperties(name='Ascend950PR_9589', total_memory=126208MB, cube_core_num=32, vector_core_num=64, uuid=cc08d80a-d200-0000-0000-00000004b800, L2_cache_size=128MB)",
+      "runtime_environment": {
+        "ASCEND_HOME_PATH": "/usr/local/Ascend/cann-9.2.0",
+        "ASCEND_OPP_PATH": "/usr/local/Ascend/cann-9.2.0/opp",
+        "ASCEND_RT_VISIBLE_DEVICES": null,
+        "ASCEND_LAUNCH_BLOCKING": null,
+        "PYTORCH_NPU_ALLOC_CONF": null
+      },
+      "sglang_prefill_capability_source": "    def _supports_dsv4_prefill_graph_capture(self) -> bool:\n        if not check_cuda_graph_backend(Phase.PREFILL, Backend.BREAKABLE):\n            return False\n        # Draft workers keep the eager prefill metadata path; their graph\n        # coverage is handled by the speculative runner.\n        if self.is_draft_worker:\n            return False\n        parallel = get_parallel()\n        if parallel.attn_cp_size != 1 or parallel.attn_dcp_size != 1:\n            raise ValueError(\n                \"DSV4 breakable prefill graph captures the compressor and \"\n                \"indexer and requires a model without CP/DCP. Disable \"\n                \"--cuda-graph-backend-prefill=breakable for this model.\"\n            )\n        # Ascend 950 shares the explicit cache_mode=2 compressor state table\n        # and npu.compressor with A3; its arch-specific KV / indexer fused\n        # epilogs write through the same fixed loc buffers inside the segment.\n        return True\n",
+      "low_ratio_prefill_graph": false,
+      "scope": "Inspection only; API presence does not prove operator execution or graph support.",
+      "elapsed_seconds": 18.765,
+      "returncode": 0,
+      "wall_seconds": 23.333
+    },
+    {
+      "probe": "geometry",
+      "status": "PASS",
+      "phase": "complete",
+      "started": "2026-11-16T16:49:08+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "capture_supported": true,
+      "cases": [
+        {
+          "name": "full_A",
+          "parameters": {
+            "name": "full_A",
+            "live": 64,
+            "prefix": 768,
+            "page_shift": 0,
+            "seed": 20261116
+          },
+          "status": "PASS",
+          "comparisons": {
+            "window": {
+              "shape": [
+                64,
+                1,
+                128
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "window_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "cmp1_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "cmp2_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "c1_positions": {
+              "shape": [
+                64
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c1_slots": {
+              "shape": [
+                64
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c2_positions": {
+              "shape": [
+                33
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c2_slots": {
+              "shape": [
+                33
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            }
+          }
+        },
+        {
+          "name": "short_B",
+          "parameters": {
+            "name": "short_B",
+            "live": 31,
+            "prefix": 1,
+            "page_shift": 1,
+            "seed": 20261117
+          },
+          "status": "PASS",
+          "comparisons": {
+            "window": {
+              "shape": [
+                64,
+                1,
+                128
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "window_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "cmp1_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "cmp2_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "c1_positions": {
+              "shape": [
+                64
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c1_slots": {
+              "shape": [
+                64
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c2_positions": {
+              "shape": [
+                33
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c2_slots": {
+              "shape": [
+                33
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            }
+          }
+        },
+        {
+          "name": "page_boundary_C",
+          "parameters": {
+            "name": "page_boundary_C",
+            "live": 16,
+            "prefix": 127,
+            "page_shift": 2,
+            "seed": 20261118
+          },
+          "status": "PASS",
+          "comparisons": {
+            "window": {
+              "shape": [
+                64,
+                1,
+                128
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "window_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "cmp1_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "cmp2_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "c1_positions": {
+              "shape": [
+                64
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c1_slots": {
+              "shape": [
+                64
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c2_positions": {
+              "shape": [
+                33
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c2_slots": {
+              "shape": [
+                33
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            }
+          }
+        },
+        {
+          "name": "different_prefix_D",
+          "parameters": {
+            "name": "different_prefix_D",
+            "live": 61,
+            "prefix": 513,
+            "page_shift": 1,
+            "seed": 20261119
+          },
+          "status": "PASS",
+          "comparisons": {
+            "window": {
+              "shape": [
+                64,
+                1,
+                128
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "window_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "cmp1_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "cmp2_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "c1_positions": {
+              "shape": [
+                64
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c1_slots": {
+              "shape": [
+                64
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c2_positions": {
+              "shape": [
+                33
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c2_slots": {
+              "shape": [
+                33
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            }
+          }
+        },
+        {
+          "name": "repeat_A",
+          "parameters": {
+            "name": "repeat_A",
+            "live": 64,
+            "prefix": 768,
+            "page_shift": 0,
+            "seed": 20261116
+          },
+          "status": "PASS",
+          "comparisons": {
+            "window": {
+              "shape": [
+                64,
+                1,
+                128
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "window_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "cmp1_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "cmp2_length": {
+              "shape": [
+                64,
+                1
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "c1_positions": {
+              "shape": [
+                64
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c1_slots": {
+              "shape": [
+                64
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c2_positions": {
+              "shape": [
+                33
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "c2_slots": {
+              "shape": [
+                33
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            }
+          }
+        }
+      ],
+      "bound_input_pointers": {
+        "positions": 19792490694656,
+        "slots": 19792490695168,
+        "mask": 19792490659840
+      },
+      "replay_count": 5,
+      "observed_output_changed": true,
+      "request_slot_zero_reserved": true,
+      "scope": "Actual SGLang geometry helpers and reserved request slot; explicit live mask supplied by this probe.",
+      "elapsed_seconds": 15.295,
+      "returncode": 0,
+      "wall_seconds": 18.864
+    },
+    {
+      "probe": "metadata",
+      "status": "PASS",
+      "phase": "complete",
+      "started": "2026-11-16T16:49:27+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "apis": {
+        "mixed_quant_sparse_flash_mla_metadata_dsl": {
+          "signature": "(ori_topk_length, cmp_topk_length, *, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, batch_size=None, max_seqlen_q=None, max_seqlen_ori_kv=None, max_seqlen_cmp_kv=None, num_heads_q, num_heads_kv, head_dim, quant_mode, layout_q='TND', layout_kv='PA_BBND', has_ori_kv=True, has_cmp_kv=True, impl='auto')",
+          "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_metadata_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_metadata_dsl.py"
+        },
+        "quant_lightning_indexer_metadata_dsl": {
+          "signature": "(cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', candidate_topk_blocks=-1, candidate_block_size=-1, impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_metadata_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_metadata_dsl.py"
+        },
+        "quant_sparse_lightning_indexer_metadata_dsl": {
+          "signature": "(candidate_block_length, cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, quant_mode, candidate_block_size, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.quant_sparse_lightning_indexer_metadata_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_sparse_lightning_indexer_metadata_dsl.py"
+        }
+      },
+      "cases": [
+        {
+          "name": "full_A",
+          "ratio": 0,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490663936,
+              "sha256": "470f3c613a612b374752a9ea867d3d4f967ef4503f0c9ca340065ac9174b5118",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "full_A",
+          "ratio": 1,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490672128,
+              "sha256": "470f3c613a612b374752a9ea867d3d4f967ef4503f0c9ca340065ac9174b5118",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            },
+            "qli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490676224,
+              "sha256": "c7465937c0f41b6cba2bae64f9fcc2e6d3ac83a7378610303990daeba8ce1abd",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                1,
+                0,
+                0,
+                2,
+                0,
+                1,
+                0,
+                1,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                2,
+                2,
+                1,
+                0,
+                1,
+                2,
+                0,
+                2,
+                0,
+                3
+              ]
+            },
+            "qsli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490734592,
+              "sha256": "3c3d73b14a05cb86f6959d7871ff4913a40ff11d3fe15c06c39d937886fa54f9",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0,
+                8,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "full_A",
+          "ratio": 2,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490684416,
+              "sha256": "470f3c613a612b374752a9ea867d3d4f967ef4503f0c9ca340065ac9174b5118",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            },
+            "qli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490688512,
+              "sha256": "84510ad12c7f425de57258d92d3c9422fe7141b1e5d9d6c1aead8489690736ab",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                1,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                1,
+                2,
+                1,
+                0,
+                1,
+                1,
+                0,
+                2,
+                0,
+                3
+              ]
+            }
+          }
+        },
+        {
+          "name": "short_B",
+          "ratio": 0,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490663936,
+              "sha256": "c7145dbeff0711eb6e46e1251deaf272bba20477a536bbc27372c0543d5b0393",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "short_B",
+          "ratio": 1,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490672128,
+              "sha256": "c7145dbeff0711eb6e46e1251deaf272bba20477a536bbc27372c0543d5b0393",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            },
+            "qli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490676224,
+              "sha256": "ff68560cabaf02c0c6b00cfa0e5e685c9673f49665067726fd60987ce9916913",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                2,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                3,
+                0,
+                0,
+                1,
+                0,
+                3,
+                0,
+                0,
+                4,
+                0,
+                0
+              ]
+            },
+            "qsli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490734592,
+              "sha256": "3228e3c58725272a688bc5bfa12074aff60c31defd33d58b40b94d6bf715c63c",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                2,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                3,
+                0,
+                0,
+                1,
+                0,
+                3,
+                0,
+                0,
+                4,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "short_B",
+          "ratio": 2,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490684416,
+              "sha256": "c7145dbeff0711eb6e46e1251deaf272bba20477a536bbc27372c0543d5b0393",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            },
+            "qli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490688512,
+              "sha256": "ff68560cabaf02c0c6b00cfa0e5e685c9673f49665067726fd60987ce9916913",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                2,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                3,
+                0,
+                0,
+                1,
+                0,
+                3,
+                0,
+                0,
+                4,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "page_boundary_C",
+          "ratio": 0,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490663936,
+              "sha256": "238baf8118fd1d184e1a2fe3a86c379cc928a73f54d9bbbe69bc9832f230b390",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "page_boundary_C",
+          "ratio": 1,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490672128,
+              "sha256": "238baf8118fd1d184e1a2fe3a86c379cc928a73f54d9bbbe69bc9832f230b390",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            },
+            "qli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490676224,
+              "sha256": "d0af8925387424d4505bb5ecff4c42949048e3d222d55756a68d73a8abc0ec2d",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                2,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "qsli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490734592,
+              "sha256": "0814c8ec658f562cb1cff90049cb620caa4a3ec5f503177f3ebb43c053689e83",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                2,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                3,
+                0,
+                0,
+                1,
+                0,
+                3,
+                0,
+                0,
+                4,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "page_boundary_C",
+          "ratio": 2,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490684416,
+              "sha256": "238baf8118fd1d184e1a2fe3a86c379cc928a73f54d9bbbe69bc9832f230b390",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            },
+            "qli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490688512,
+              "sha256": "d0af8925387424d4505bb5ecff4c42949048e3d222d55756a68d73a8abc0ec2d",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                2,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "different_prefix_D",
+          "ratio": 0,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490663936,
+              "sha256": "a15ed5beae7a5ed3382e9dfad5ceaca8258b6b5a63ebe7b63462357213b77f84",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "different_prefix_D",
+          "ratio": 1,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490672128,
+              "sha256": "a15ed5beae7a5ed3382e9dfad5ceaca8258b6b5a63ebe7b63462357213b77f84",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            },
+            "qli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490676224,
+              "sha256": "9f2dcdbd0cbc5b19ff45ea2d722bec80a75b519ade38c0fdcd8b33573d39c487",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                0,
+                2,
+                1,
+                1,
+                0,
+                0,
+                2,
+                0,
+                1,
+                0,
+                2,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                1,
+                3
+              ]
+            },
+            "qsli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490734592,
+              "sha256": "377c3c302709dd9cdf98af66002e537f6e81623bac9decd0e76c59598c79d988",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                0,
+                1,
+                0,
+                1,
+                1,
+                0,
+                3,
+                1,
+                1,
+                1,
+                0,
+                3,
+                1,
+                0,
+                5,
+                1,
+                3,
+                1,
+                0,
+                5,
+                1,
+                0,
+                7,
+                1,
+                5
+              ]
+            }
+          }
+        },
+        {
+          "name": "different_prefix_D",
+          "ratio": 2,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490684416,
+              "sha256": "a15ed5beae7a5ed3382e9dfad5ceaca8258b6b5a63ebe7b63462357213b77f84",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            },
+            "qli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490688512,
+              "sha256": "84510ad12c7f425de57258d92d3c9422fe7141b1e5d9d6c1aead8489690736ab",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                1,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                1,
+                2,
+                1,
+                0,
+                1,
+                1,
+                0,
+                2,
+                0,
+                3
+              ]
+            }
+          }
+        },
+        {
+          "name": "repeat_A",
+          "ratio": 0,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490663936,
+              "sha256": "470f3c613a612b374752a9ea867d3d4f967ef4503f0c9ca340065ac9174b5118",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "repeat_A",
+          "ratio": 1,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490672128,
+              "sha256": "470f3c613a612b374752a9ea867d3d4f967ef4503f0c9ca340065ac9174b5118",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            },
+            "qli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490676224,
+              "sha256": "c7465937c0f41b6cba2bae64f9fcc2e6d3ac83a7378610303990daeba8ce1abd",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                1,
+                0,
+                0,
+                2,
+                0,
+                1,
+                0,
+                1,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                2,
+                2,
+                1,
+                0,
+                1,
+                2,
+                0,
+                2,
+                0,
+                3
+              ]
+            },
+            "qsli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490734592,
+              "sha256": "3c3d73b14a05cb86f6959d7871ff4913a40ff11d3fe15c06c39d937886fa54f9",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0,
+                8,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "repeat_A",
+          "ratio": 2,
+          "status": "PASS",
+          "metadata": {
+            "attention_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490684416,
+              "sha256": "470f3c613a612b374752a9ea867d3d4f967ef4503f0c9ca340065ac9174b5118",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                2,
+                0,
+                0,
+                4,
+                0,
+                0,
+                0,
+                1,
+                0,
+                4,
+                0,
+                0,
+                6,
+                0,
+                0,
+                0,
+                1,
+                0,
+                6,
+                0,
+                0
+              ]
+            },
+            "qli_metadata": {
+              "shape": [
+                1024
+              ],
+              "dtype": "torch.int32",
+              "data_ptr": 19792490688512,
+              "sha256": "84510ad12c7f425de57258d92d3c9422fe7141b1e5d9d6c1aead8489690736ab",
+              "first_32": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                1,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                1,
+                2,
+                1,
+                0,
+                1,
+                1,
+                0,
+                2,
+                0,
+                3
+              ]
+            }
+          }
+        }
+      ],
+      "scope": "Real metadata APIs execute eagerly, then copy to fixed buffers. This probe does not require metadata planning itself to be captured.",
+      "elapsed_seconds": 17.632,
+      "returncode": 0,
+      "wall_seconds": 20.752
+    },
+    {
+      "probe": "compressor",
+      "status": "FAIL",
+      "phase": "warmup",
+      "started": "2026-11-16T16:49:48+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "apis": {
+        "compressor_v2": {
+          "signature": "(x, wkv, wgate, state_cache, cmp_ratio=4, *, state_block_table=None, cu_seqlens=None, seqused=None, start_pos=None, impl='auto')",
+          "module": "sgl_kernel_npu.operators.attention.compressor_v2",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/compressor_v2.py"
+        }
+      },
+      "error": "UnsupportedGenerationError: attention.compressor_v2 [impl=auto] does not support generation=arch35; supported generations=['arch22']",
+      "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1064, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1038, in dispatch_probe\n    probe_compressor()\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 469, in probe_compressor\n    matrix(cases, prepare, reset, body, observe, after)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 214, in matrix\n    graph, outputs, stream = capture(body)\n                             ^^^^^^^^^^^^^\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 197, in capture\n    body()\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 449, in body\n    value = function(x=x, wkv=wkv, wgate=wgate, seqused=used, start_pos=start,\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/compressor_v2.py\", line 149, in compressor_v2\n    return get_impl_by_name(\"attention.compressor_v2\", impl)(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/utils/registry.py\", line 130, in get_impl_by_name\n    raise UnsupportedGenerationError(\nsgl_kernel_npu.operators.utils.registry.UnsupportedGenerationError: attention.compressor_v2 [impl=auto] does not support generation=arch35; supported generations=['arch22']\n",
+      "elapsed_seconds": 8.546,
+      "returncode": 1,
+      "wall_seconds": 10.895
+    },
+    {
+      "probe": "epilog_fp8",
+      "status": "BLOCKED",
+      "phase": "start",
+      "started": "2026-11-16T16:49:59+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "error": "custom.kv_compress_epilog_v2 is not registered in this serving environment",
+      "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1064, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1040, in dispatch_probe\n    probe_epilog(name.split(\"_\", 1)[1])\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 496, in probe_epilog\n    function = epilog()\n               ^^^^^^^^\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 490, in epilog\n    raise Blocked(\"custom.kv_compress_epilog_v2 is not registered in this serving environment\")\nBlocked: custom.kv_compress_epilog_v2 is not registered in this serving environment\n",
+      "elapsed_seconds": 7.679,
+      "returncode": 2,
+      "wall_seconds": 10.591
+    },
+    {
+      "probe": "epilog_fp4",
+      "status": "BLOCKED",
+      "phase": "start",
+      "started": "2026-11-16T16:50:09+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "error": "custom.kv_compress_epilog_v2 is not registered in this serving environment",
+      "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1064, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1040, in dispatch_probe\n    probe_epilog(name.split(\"_\", 1)[1])\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 496, in probe_epilog\n    function = epilog()\n               ^^^^^^^^\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 490, in epilog\n    raise Blocked(\"custom.kv_compress_epilog_v2 is not registered in this serving environment\")\nBlocked: custom.kv_compress_epilog_v2 is not registered in this serving environment\n",
+      "elapsed_seconds": 7.973,
+      "returncode": 2,
+      "wall_seconds": 10.783
+    },
+    {
+      "probe": "prologue",
+      "status": "PASS",
+      "phase": "complete",
+      "started": "2026-11-16T16:50:20+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "apis": {
+        "indexer_prologue_k_dsl": {
+          "signature": "(latent: 'torch.Tensor', wk: 'torch.Tensor', norm_weight: 'torch.Tensor', rope_sin: 'torch.Tensor', rope_cos: 'torch.Tensor', k_cache: 'torch.Tensor', k_scale_cache: 'torch.Tensor | None' = None, *, cache_index: 'torch.Tensor', storage_mode: 'int', norm_eps: 'float', combined_block_size: 'int' = -1, impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.indexer_prologue_k_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/indexer_prologue_k_dsl.py"
+        }
+      },
+      "capture_supported": true,
+      "cases": [
+        {
+          "name": "full_A",
+          "parameters": {
+            "name": "full_A",
+            "live": 64,
+            "offset": 128,
+            "seed": 20261116
+          },
+          "status": "PASS",
+          "comparisons": {
+            "key": {
+              "shape": [
+                32,
+                8,
+                1,
+                64
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            },
+            "scales": {
+              "shape": [
+                32,
+                8,
+                1,
+                4
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            },
+            "combined": {
+              "shape": [
+                32,
+                1,
+                1,
+                544
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          }
+        },
+        {
+          "name": "short_B",
+          "parameters": {
+            "name": "short_B",
+            "live": 31,
+            "offset": 192,
+            "seed": 20261118
+          },
+          "status": "PASS",
+          "comparisons": {
+            "key": {
+              "shape": [
+                32,
+                8,
+                1,
+                64
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            },
+            "scales": {
+              "shape": [
+                32,
+                8,
+                1,
+                4
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            },
+            "combined": {
+              "shape": [
+                32,
+                1,
+                1,
+                544
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          }
+        },
+        {
+          "name": "all_skip",
+          "parameters": {
+            "name": "all_skip",
+            "live": 0,
+            "offset": 128,
+            "seed": 20261119
+          },
+          "status": "PASS",
+          "comparisons": {
+            "key": {
+              "shape": [
+                32,
+                8,
+                1,
+                64
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            },
+            "scales": {
+              "shape": [
+                32,
+                8,
+                1,
+                4
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            },
+            "combined": {
+              "shape": [
+                32,
+                1,
+                1,
+                544
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          }
+        },
+        {
+          "name": "repeat_A",
+          "parameters": {
+            "name": "repeat_A",
+            "live": 64,
+            "offset": 128,
+            "seed": 20261116
+          },
+          "status": "PASS",
+          "comparisons": {
+            "key": {
+              "shape": [
+                32,
+                8,
+                1,
+                64
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            },
+            "scales": {
+              "shape": [
+                32,
+                8,
+                1,
+                4
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            },
+            "combined": {
+              "shape": [
+                32,
+                1,
+                1,
+                544
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          }
+        }
+      ],
+      "bound_input_pointers": {
+        "latent": 19792490659840,
+        "loc": 19792490889728,
+        "key": 19792490890240,
+        "scales": 19792490906624,
+        "combined": 19792490907648
+      },
+      "replay_count": 4,
+      "observed_output_changed": true,
+      "scope": "Actual K prologue modes 0/1, fixed caches, -1 skip and packed-record equivalence; identity RoPE, synthetic BF16 weights.",
+      "elapsed_seconds": 19.331,
+      "returncode": 0,
+      "wall_seconds": 21.908
+    },
+    {
+      "probe": "qli_c2",
+      "status": "FAIL",
+      "phase": "warmup",
+      "started": "2026-11-16T16:50:42+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "apis": {
+        "quant_lightning_indexer_dsl": {
+          "signature": "(q: 'torch.Tensor', k: 'torch.Tensor', w: 'torch.Tensor', descale_q: 'torch.Tensor', descale_k: 'torch.Tensor', cu_seqlens_q: 'Optional[torch.Tensor]' = None, cu_seqlens_k: 'Optional[torch.Tensor]' = None, seqused_q: 'Optional[torch.Tensor]' = None, seqused_k: 'Optional[torch.Tensor]' = None, cmp_residual_k: 'Optional[torch.Tensor]' = None, block_table: 'Optional[torch.Tensor]' = None, output_idx_offset: 'Optional[torch.Tensor]' = None, metadata: 'Optional[torch.Tensor]' = None, *, topk: 'int', quant_mode: 'int', max_seqlen_q: 'int' = -1, mask_mode: 'int' = 0, cmp_ratio: 'int' = 1, layout_q: 'str' = 'TND', layout_k: 'str' = 'TND', return_value: 'bool' = False, candidate_topk_blocks: 'int' = -1, candidate_block_size: 'int' = -1, impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py"
+        },
+        "quant_lightning_indexer_metadata_dsl": {
+          "signature": "(cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', candidate_topk_blocks=-1, candidate_block_size=-1, impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_metadata_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_metadata_dsl.py"
+        }
+      },
+      "error": "ValueError: PA block_size must be a multiple of 16 in (0, 1024]",
+      "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1064, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1044, in dispatch_probe\n    probe_index(False)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 804, in probe_index\n    matrix(case_layouts(), prepare, lambda case: None, body, observe)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 214, in matrix\n    graph, outputs, stream = capture(body)\n                             ^^^^^^^^^^^^^\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 197, in capture\n    body()\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 784, in body\n    result = run_qli(qli, buffers, ratio, candidate)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 734, in run_qli\n    return function(\n           ^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py\", line 111, in quant_lightning_indexer_dsl\n    return get_impl_by_name(\"indexer.quant_lightning_indexer_dsl\", impl)(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py\", line 50, in _cannbot_dsl_impl\n    return _cannbot_dsl_fn(q, *args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/implementation/cannbot-dsl/indexer/quant_lightning_indexer.py\", line 7781, in quant_lightning_indexer\n    raise ValueError(\"PA block_size must be a multiple of 16 in (0, 1024]\")\nValueError: PA block_size must be a multiple of 16 in (0, 1024]\n",
+      "elapsed_seconds": 17.514,
+      "returncode": 1,
+      "wall_seconds": 20.265
+    },
+    {
+      "probe": "candidate_chain",
+      "status": "FAIL",
+      "phase": "warmup",
+      "started": "2026-11-16T16:51:02+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "apis": {
+        "quant_lightning_indexer_dsl": {
+          "signature": "(q: 'torch.Tensor', k: 'torch.Tensor', w: 'torch.Tensor', descale_q: 'torch.Tensor', descale_k: 'torch.Tensor', cu_seqlens_q: 'Optional[torch.Tensor]' = None, cu_seqlens_k: 'Optional[torch.Tensor]' = None, seqused_q: 'Optional[torch.Tensor]' = None, seqused_k: 'Optional[torch.Tensor]' = None, cmp_residual_k: 'Optional[torch.Tensor]' = None, block_table: 'Optional[torch.Tensor]' = None, output_idx_offset: 'Optional[torch.Tensor]' = None, metadata: 'Optional[torch.Tensor]' = None, *, topk: 'int', quant_mode: 'int', max_seqlen_q: 'int' = -1, mask_mode: 'int' = 0, cmp_ratio: 'int' = 1, layout_q: 'str' = 'TND', layout_k: 'str' = 'TND', return_value: 'bool' = False, candidate_topk_blocks: 'int' = -1, candidate_block_size: 'int' = -1, impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py"
+        },
+        "quant_lightning_indexer_metadata_dsl": {
+          "signature": "(cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', candidate_topk_blocks=-1, candidate_block_size=-1, impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_metadata_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_metadata_dsl.py"
+        },
+        "quant_sparse_lightning_indexer_dsl": {
+          "signature": "(q: 'torch.Tensor', k: 'torch.Tensor', w: 'torch.Tensor', descale_q: 'torch.Tensor', candidate_block_indices: 'torch.Tensor', candidate_block_length: 'torch.Tensor', cu_seqlens_q: 'Optional[torch.Tensor]' = None, cu_seqlens_k: 'Optional[torch.Tensor]' = None, seqused_q: 'Optional[torch.Tensor]' = None, seqused_k: 'Optional[torch.Tensor]' = None, cmp_residual_k: 'Optional[torch.Tensor]' = None, block_table: 'Optional[torch.Tensor]' = None, output_idx_offset: 'Optional[torch.Tensor]' = None, metadata: 'Optional[torch.Tensor]' = None, *, descale_k: 'Optional[torch.Tensor]' = None, topk: 'int', candidate_block_size: 'int', quant_mode: 'int', max_seqlen_q: 'int' = -1, mask_mode: 'int' = 0, cmp_ratio: 'int' = 1, layout_q: 'str' = 'TND', layout_k: 'str' = 'TND', return_value: 'bool' = False, impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.quant_sparse_lightning_indexer_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_sparse_lightning_indexer_dsl.py"
+        },
+        "quant_sparse_lightning_indexer_metadata_dsl": {
+          "signature": "(candidate_block_length, cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, quant_mode, candidate_block_size, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', impl='auto')",
+          "module": "sgl_kernel_npu.operators.indexer.quant_sparse_lightning_indexer_metadata_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_sparse_lightning_indexer_metadata_dsl.py"
+        }
+      },
+      "error": "ValueError: PA block_size must be a multiple of 16 in (0, 1024]",
+      "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1064, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1046, in dispatch_probe\n    probe_index(True)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 804, in probe_index\n    matrix(case_layouts(), prepare, lambda case: None, body, observe)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 214, in matrix\n    graph, outputs, stream = capture(body)\n                             ^^^^^^^^^^^^^\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 197, in capture\n    body()\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 784, in body\n    result = run_qli(qli, buffers, ratio, candidate)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 734, in run_qli\n    return function(\n           ^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py\", line 111, in quant_lightning_indexer_dsl\n    return get_impl_by_name(\"indexer.quant_lightning_indexer_dsl\", impl)(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py\", line 50, in _cannbot_dsl_impl\n    return _cannbot_dsl_fn(q, *args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/implementation/cannbot-dsl/indexer/quant_lightning_indexer.py\", line 7781, in quant_lightning_indexer\n    raise ValueError(\"PA block_size must be a multiple of 16 in (0, 1024]\")\nValueError: PA block_size must be a multiple of 16 in (0, 1024]\n",
+      "elapsed_seconds": 13.509,
+      "returncode": 1,
+      "wall_seconds": 16.632
+    },
+    {
+      "probe": "attention_r0",
+      "status": "FAIL",
+      "phase": "passed:repeat_A",
+      "started": "2026-11-16T16:51:19+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "apis": {
+        "mixed_quant_sparse_flash_mla_dsl": {
+          "signature": "(q, *, ori_kv=None, cmp_kv=None, ori_sparse_indices=None, cmp_sparse_indices=None, ori_block_table=None, cmp_block_table=None, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, ori_topk_length=None, cmp_topk_length=None, sinks=None, metadata=None, quant_mode, softmax_scale=None, layout_q='TND', layout_kv='PA_BBND', return_softmax_lse=False, out, lse, impl='auto')",
+          "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_dsl.py"
+        },
+        "mixed_quant_sparse_flash_mla_metadata_dsl": {
+          "signature": "(ori_topk_length, cmp_topk_length, *, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, batch_size=None, max_seqlen_q=None, max_seqlen_ori_kv=None, max_seqlen_cmp_kv=None, num_heads_q, num_heads_kv, head_dim, quant_mode, layout_q='TND', layout_kv='PA_BBND', has_ori_kv=True, has_cmp_kv=True, impl='auto')",
+          "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_metadata_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_metadata_dsl.py"
+        }
+      },
+      "capture_supported": true,
+      "cases": [
+        {
+          "name": "full_A",
+          "parameters": {
+            "name": "full_A",
+            "live": 64,
+            "prefix": 768,
+            "page_shift": 0,
+            "seed": 20261116
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                64,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "short_B",
+          "parameters": {
+            "name": "short_B",
+            "live": 31,
+            "prefix": 1,
+            "page_shift": 1,
+            "seed": 20261117
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                31,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "page_boundary_C",
+          "parameters": {
+            "name": "page_boundary_C",
+            "live": 16,
+            "prefix": 127,
+            "page_shift": 2,
+            "seed": 20261118
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                16,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "different_prefix_D",
+          "parameters": {
+            "name": "different_prefix_D",
+            "live": 61,
+            "prefix": 513,
+            "page_shift": 1,
+            "seed": 20261119
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                61,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "repeat_A",
+          "parameters": {
+            "name": "repeat_A",
+            "live": 64,
+            "prefix": 768,
+            "page_shift": 0,
+            "seed": 20261116
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                64,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        }
+      ],
+      "cpu_reference": {
+        "full_A": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0002572089433670044,
+              "max_rel": 0.3356935407006891
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00019349902868270874,
+              "max_rel": 1.3539315135819034
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00015246495604515076,
+              "max_rel": 0.387897582224512
+            }
+          },
+          "row63_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00017695128917694092,
+              "max_rel": 2.6812779246173863
+            }
+          },
+          "row63_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00015497207641601562,
+              "max_rel": 0.14019416081310193
+            }
+          },
+          "row63_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00014755874872207642,
+              "max_rel": 0.4964900593223027
+            }
+          }
+        },
+        "short_B": {
+          "row0_head0": {
+            "status": "FAIL",
+            "error": "CPU attention reference/reference: Tensor-likes are not close!\n\nMismatched elements: 1 / 512 (0.2%)\nGreatest absolute difference: 0.0018430352210998535 at index (121,) (up to 0.001 allowed)\nGreatest relative difference: 0.0036441676784306765 at index (121,) (up to 0.001 allowed)",
+            "details": {
+              "label": "CPU attention reference",
+              "tensor": "reference",
+              "metrics": {
+                "shape": [
+                  512
+                ],
+                "dtype": "torch.float32",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.0018430352210998535,
+                "max_rel": 0.07692122780694673
+              },
+              "expected_sample": [
+                0.03975987061858177,
+                -0.05026652663946152,
+                -0.10940820723772049,
+                0.004387769382447004,
+                -0.26494207978248596,
+                -0.039627041667699814,
+                -0.18756641447544098,
+                -0.07147479057312012,
+                -0.005028098355978727,
+                0.22579871118068695,
+                0.13329508900642395,
+                0.288697212934494
+              ],
+              "actual_sample": [
+                0.039794921875,
+                -0.05029296875,
+                -0.109375,
+                0.004364013671875,
+                -0.265625,
+                -0.03955078125,
+                -0.1875,
+                -0.0712890625,
+                -0.0050048828125,
+                0.2255859375,
+                0.1337890625,
+                0.2890625
+              ]
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.001090705394744873,
+              "max_rel": 0.2235402281419276
+            }
+          },
+          "row0_head63": {
+            "status": "FAIL",
+            "error": "CPU attention reference/reference: Tensor-likes are not close!\n\nMismatched elements: 2 / 512 (0.4%)\nGreatest absolute difference: 0.0014763474464416504 at index (52,) (up to 0.001 allowed)\nGreatest relative difference: 0.004869040567427874 at index (52,) (up to 0.001 allowed)",
+            "details": {
+              "label": "CPU attention reference",
+              "tensor": "reference",
+              "metrics": {
+                "shape": [
+                  512
+                ],
+                "dtype": "torch.float32",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.0014763474464416504,
+                "max_rel": 0.10225823084365762
+              },
+              "expected_sample": [
+                0.043126367032527924,
+                -0.04778172820806503,
+                -0.1095685213804245,
+                0.006712252274155617,
+                -0.27107393741607666,
+                -0.04235229641199112,
+                -0.187887042760849,
+                -0.07708561420440674,
+                -0.005729451775550842,
+                0.22211159765720367,
+                0.1309105008840561,
+                0.2869338095188141
+              ],
+              "actual_sample": [
+                0.04296875,
+                -0.0478515625,
+                -0.10986328125,
+                0.006622314453125,
+                -0.271484375,
+                -0.042236328125,
+                -0.1884765625,
+                -0.0771484375,
+                -0.005706787109375,
+                0.22265625,
+                0.130859375,
+                0.287109375
+              ]
+            }
+          },
+          "row30_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.000348508358001709,
+              "max_rel": 0.8334970036563736
+            }
+          },
+          "row30_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00043636560440063477,
+              "max_rel": 0.2848281432570833
+            }
+          },
+          "row30_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0003980100154876709,
+              "max_rel": 0.37953447397242884
+            }
+          }
+        },
+        "page_boundary_C": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00016124919056892395,
+              "max_rel": 0.4948443636488364
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00018408149480819702,
+              "max_rel": 0.4133841829801905
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00019452720880508423,
+              "max_rel": 0.9770274090802029
+            }
+          },
+          "row15_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001993626356124878,
+              "max_rel": 0.6991577582764247
+            }
+          },
+          "row15_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.000186234712600708,
+              "max_rel": 0.422534605311145
+            }
+          },
+          "row15_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0002254694700241089,
+              "max_rel": 0.22720611061777596
+            }
+          }
+        },
+        "different_prefix_D": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001466795802116394,
+              "max_rel": 0.4384623853134782
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00017036497592926025,
+              "max_rel": 0.16813149775738248
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001609399914741516,
+              "max_rel": 0.38636761080617593
+            }
+          },
+          "row60_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00027020275592803955,
+              "max_rel": 0.3194680733261524
+            }
+          },
+          "row60_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001597665250301361,
+              "max_rel": 0.16033583593103987
+            }
+          },
+          "row60_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00013359636068344116,
+              "max_rel": 0.11657180932620262
+            }
+          }
+        },
+        "repeat_A": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0002572089433670044,
+              "max_rel": 0.3356935407006891
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00019349902868270874,
+              "max_rel": 1.3539315135819034
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00015246495604515076,
+              "max_rel": 0.387897582224512
+            }
+          },
+          "row63_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00017695128917694092,
+              "max_rel": 2.6812779246173863
+            }
+          },
+          "row63_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00015497207641601562,
+              "max_rel": 0.14019416081310193
+            }
+          },
+          "row63_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00014755874872207642,
+              "max_rel": 0.4964900593223027
+            }
+          }
+        }
+      },
+      "padding_observations": {
+        "full_A": {
+          "rows": 0,
+          "finite_values": 0,
+          "elements": 0,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        },
+        "short_B": {
+          "rows": 33,
+          "finite_values": 1081344,
+          "elements": 1081344,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        },
+        "page_boundary_C": {
+          "rows": 48,
+          "finite_values": 1572864,
+          "elements": 1572864,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        },
+        "different_prefix_D": {
+          "rows": 3,
+          "finite_values": 98304,
+          "elements": 98304,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        },
+        "repeat_A": {
+          "rows": 0,
+          "finite_values": 0,
+          "elements": 0,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        }
+      },
+      "comparison_failure": {
+        "label": "CPU attention reference",
+        "tensor": "reference",
+        "metrics": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0014763474464416504,
+          "max_rel": 0.10225823084365762
+        },
+        "expected_sample": [
+          0.043126367032527924,
+          -0.04778172820806503,
+          -0.1095685213804245,
+          0.006712252274155617,
+          -0.27107393741607666,
+          -0.04235229641199112,
+          -0.187887042760849,
+          -0.07708561420440674,
+          -0.005729451775550842,
+          0.22211159765720367,
+          0.1309105008840561,
+          0.2869338095188141
+        ],
+        "actual_sample": [
+          0.04296875,
+          -0.0478515625,
+          -0.10986328125,
+          0.006622314453125,
+          -0.271484375,
+          -0.042236328125,
+          -0.1884765625,
+          -0.0771484375,
+          -0.005706787109375,
+          0.22265625,
+          0.130859375,
+          0.287109375
+        ]
+      },
+      "cpu_reference_failures": {
+        "short_B": true
+      },
+      "bound_input_pointers": {
+        "positions": 19792490826240,
+        "cu": 19792490826752,
+        "kv_lengths": 19792490827264,
+        "window": 19792490827776,
+        "window_length": 19792490860544,
+        "cmp_length": 19792490861056,
+        "sparse": 19792490861568,
+        "block_table": 19792490660352,
+        "original": 19792491549696,
+        "q": 19792496951296,
+        "sinks": 19792490660864,
+        "metadata": 19792490665472
+      },
+      "replay_count": 5,
+      "observed_output_changed": true,
+      "scope": "Real MQSMLA eager/replay, varying lengths/page IDs/Q/KV, with CPU float32 reference on selected rows/heads.",
+      "packing": "CPU-built valid fp8+BF16-scale ori rows and fp4+BF16-scale cmp rows; independent of custom epilog registration.",
+      "cpu_reference_scope": "Six or fewer row/head samples per case, not all output elements; sinks fixed at -10000.",
+      "error": "AssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.",
+      "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1064, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1048, in dispatch_probe\n    probe_attention(int(name[-1]))\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 903, in probe_attention\n    raise AssertionError(\"Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.\")\nAssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.\n",
+      "elapsed_seconds": 86.766,
+      "returncode": 1,
+      "wall_seconds": 89.563
+    },
+    {
+      "probe": "attention_r1",
+      "status": "FAIL",
+      "phase": "passed:repeat_A",
+      "started": "2026-11-16T16:52:49+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "apis": {
+        "mixed_quant_sparse_flash_mla_dsl": {
+          "signature": "(q, *, ori_kv=None, cmp_kv=None, ori_sparse_indices=None, cmp_sparse_indices=None, ori_block_table=None, cmp_block_table=None, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, ori_topk_length=None, cmp_topk_length=None, sinks=None, metadata=None, quant_mode, softmax_scale=None, layout_q='TND', layout_kv='PA_BBND', return_softmax_lse=False, out, lse, impl='auto')",
+          "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_dsl.py"
+        },
+        "mixed_quant_sparse_flash_mla_metadata_dsl": {
+          "signature": "(ori_topk_length, cmp_topk_length, *, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, batch_size=None, max_seqlen_q=None, max_seqlen_ori_kv=None, max_seqlen_cmp_kv=None, num_heads_q, num_heads_kv, head_dim, quant_mode, layout_q='TND', layout_kv='PA_BBND', has_ori_kv=True, has_cmp_kv=True, impl='auto')",
+          "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_metadata_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_metadata_dsl.py"
+        }
+      },
+      "capture_supported": true,
+      "cases": [
+        {
+          "name": "full_A",
+          "parameters": {
+            "name": "full_A",
+            "live": 64,
+            "prefix": 768,
+            "page_shift": 0,
+            "seed": 20261116
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                64,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "short_B",
+          "parameters": {
+            "name": "short_B",
+            "live": 31,
+            "prefix": 1,
+            "page_shift": 1,
+            "seed": 20261117
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                31,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "page_boundary_C",
+          "parameters": {
+            "name": "page_boundary_C",
+            "live": 16,
+            "prefix": 127,
+            "page_shift": 2,
+            "seed": 20261118
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                16,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "different_prefix_D",
+          "parameters": {
+            "name": "different_prefix_D",
+            "live": 61,
+            "prefix": 513,
+            "page_shift": 1,
+            "seed": 20261119
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                61,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "repeat_A",
+          "parameters": {
+            "name": "repeat_A",
+            "live": 64,
+            "prefix": 768,
+            "page_shift": 0,
+            "seed": 20261116
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                64,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        }
+      ],
+      "cpu_reference": {
+        "full_A": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00011011213064193726,
+              "max_rel": 2.2852622639098703
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00013834983110427856,
+              "max_rel": 0.7911531248600939
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001508072018623352,
+              "max_rel": 0.6495902485648375
+            }
+          },
+          "row63_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00011009722948074341,
+              "max_rel": 0.19503061796531382
+            }
+          },
+          "row63_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001425519585609436,
+              "max_rel": 1.17630511126881
+            }
+          },
+          "row63_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00013014674186706543,
+              "max_rel": 2.036483981996293
+            }
+          }
+        },
+        "short_B": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0015028715133666992,
+              "max_rel": 5.56710948236372
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0009783804416656494,
+              "max_rel": 0.9480440586382748
+            }
+          },
+          "row0_head63": {
+            "status": "FAIL",
+            "error": "CPU attention reference/reference: Tensor-likes are not close!\n\nMismatched elements: 2 / 512 (0.4%)\nGreatest absolute difference: 0.0018134117126464844 at index (450,) (up to 0.001 allowed)\nGreatest relative difference: 0.005002446006983519 at index (75,) (up to 0.001 allowed)",
+            "details": {
+              "label": "CPU attention reference",
+              "tensor": "reference",
+              "metrics": {
+                "shape": [
+                  512
+                ],
+                "dtype": "torch.float32",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.0018134117126464844,
+                "max_rel": 0.4169315627382827
+              },
+              "expected_sample": [
+                0.21370501816272736,
+                -0.12166775017976761,
+                -0.08776440471410751,
+                0.05734114348888397,
+                -0.199881911277771,
+                -0.02122526243329048,
+                -0.03683304041624069,
+                -0.03779441863298416,
+                0.1251898556947708,
+                0.004286479204893112,
+                0.06895817816257477,
+                0.1691126823425293
+              ],
+              "actual_sample": [
+                0.2138671875,
+                -0.12158203125,
+                -0.087890625,
+                0.057373046875,
+                -0.2001953125,
+                -0.021240234375,
+                -0.036865234375,
+                -0.037841796875,
+                0.125,
+                0.00445556640625,
+                0.06884765625,
+                0.1689453125
+              ]
+            }
+          },
+          "row30_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0003211796283721924,
+              "max_rel": 0.05521293643471083
+            }
+          },
+          "row30_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0002676621079444885,
+              "max_rel": 0.9520192151891496
+            }
+          },
+          "row30_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0003002732992172241,
+              "max_rel": 1.5037953331459095
+            }
+          }
+        },
+        "page_boundary_C": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00013899430632591248,
+              "max_rel": 0.10405566038391638
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00014363229274749756,
+              "max_rel": 0.15089480968443506
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001561380922794342,
+              "max_rel": 3.671792560520088
+            }
+          },
+          "row15_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001575276255607605,
+              "max_rel": 1.0729445521674648
+            }
+          },
+          "row15_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001720637083053589,
+              "max_rel": 2.41900976621442
+            }
+          },
+          "row15_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00017010420560836792,
+              "max_rel": 2.9231096795326748
+            }
+          }
+        },
+        "different_prefix_D": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00011147186160087585,
+              "max_rel": 0.1238102862614212
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 9.852088987827301e-05,
+              "max_rel": 0.3517870852708198
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 9.91281121969223e-05,
+              "max_rel": 1.4529882836641361
+            }
+          },
+          "row60_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00014464184641838074,
+              "max_rel": 45.99308250379619
+            }
+          },
+          "row60_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00011145323514938354,
+              "max_rel": 0.19906764053280984
+            }
+          },
+          "row60_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00012418627738952637,
+              "max_rel": 0.23717825407592646
+            }
+          }
+        },
+        "repeat_A": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00011011213064193726,
+              "max_rel": 2.2852622639098703
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00013834983110427856,
+              "max_rel": 0.7911531248600939
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001508072018623352,
+              "max_rel": 0.6495902485648375
+            }
+          },
+          "row63_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00011009722948074341,
+              "max_rel": 0.19503061796531382
+            }
+          },
+          "row63_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001425519585609436,
+              "max_rel": 1.17630511126881
+            }
+          },
+          "row63_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00013014674186706543,
+              "max_rel": 2.036483981996293
+            }
+          }
+        }
+      },
+      "padding_observations": {
+        "full_A": {
+          "rows": 0,
+          "finite_values": 0,
+          "elements": 0,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        },
+        "short_B": {
+          "rows": 33,
+          "finite_values": 1081344,
+          "elements": 1081344,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        },
+        "page_boundary_C": {
+          "rows": 48,
+          "finite_values": 1572864,
+          "elements": 1572864,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        },
+        "different_prefix_D": {
+          "rows": 3,
+          "finite_values": 98304,
+          "elements": 98304,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        },
+        "repeat_A": {
+          "rows": 0,
+          "finite_values": 0,
+          "elements": 0,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        }
+      },
+      "comparison_failure": {
+        "label": "CPU attention reference",
+        "tensor": "reference",
+        "metrics": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0018134117126464844,
+          "max_rel": 0.4169315627382827
+        },
+        "expected_sample": [
+          0.21370501816272736,
+          -0.12166775017976761,
+          -0.08776440471410751,
+          0.05734114348888397,
+          -0.199881911277771,
+          -0.02122526243329048,
+          -0.03683304041624069,
+          -0.03779441863298416,
+          0.1251898556947708,
+          0.004286479204893112,
+          0.06895817816257477,
+          0.1691126823425293
+        ],
+        "actual_sample": [
+          0.2138671875,
+          -0.12158203125,
+          -0.087890625,
+          0.057373046875,
+          -0.2001953125,
+          -0.021240234375,
+          -0.036865234375,
+          -0.037841796875,
+          0.125,
+          0.00445556640625,
+          0.06884765625,
+          0.1689453125
+        ]
+      },
+      "cpu_reference_failures": {
+        "short_B": true
+      },
+      "bound_input_pointers": {
+        "positions": 19792490826240,
+        "cu": 19792490826752,
+        "kv_lengths": 19792490827264,
+        "window": 19792490827776,
+        "window_length": 19792490860544,
+        "cmp_length": 19792490861056,
+        "sparse": 19792490861568,
+        "block_table": 19792490660352,
+        "original": 19792491549696,
+        "compressed": 19792492106752,
+        "compressed_lengths": 19792490660864,
+        "q": 19792496951296,
+        "sinks": 19792490661376,
+        "metadata": 19792490665984
+      },
+      "replay_count": 5,
+      "observed_output_changed": true,
+      "scope": "Real MQSMLA eager/replay, varying lengths/page IDs/Q/KV, with CPU float32 reference on selected rows/heads.",
+      "packing": "CPU-built valid fp8+BF16-scale ori rows and fp4+BF16-scale cmp rows; independent of custom epilog registration.",
+      "cpu_reference_scope": "Six or fewer row/head samples per case, not all output elements; sinks fixed at -10000.",
+      "error": "AssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.",
+      "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1064, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1048, in dispatch_probe\n    probe_attention(int(name[-1]))\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 903, in probe_attention\n    raise AssertionError(\"Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.\")\nAssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.\n",
+      "elapsed_seconds": 118.115,
+      "returncode": 1,
+      "wall_seconds": 121.741
+    },
+    {
+      "probe": "attention_r2",
+      "status": "FAIL",
+      "phase": "passed:repeat_A",
+      "started": "2026-11-16T16:54:50+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "apis": {
+        "mixed_quant_sparse_flash_mla_dsl": {
+          "signature": "(q, *, ori_kv=None, cmp_kv=None, ori_sparse_indices=None, cmp_sparse_indices=None, ori_block_table=None, cmp_block_table=None, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, ori_topk_length=None, cmp_topk_length=None, sinks=None, metadata=None, quant_mode, softmax_scale=None, layout_q='TND', layout_kv='PA_BBND', return_softmax_lse=False, out, lse, impl='auto')",
+          "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_dsl.py"
+        },
+        "mixed_quant_sparse_flash_mla_metadata_dsl": {
+          "signature": "(ori_topk_length, cmp_topk_length, *, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, batch_size=None, max_seqlen_q=None, max_seqlen_ori_kv=None, max_seqlen_cmp_kv=None, num_heads_q, num_heads_kv, head_dim, quant_mode, layout_q='TND', layout_kv='PA_BBND', has_ori_kv=True, has_cmp_kv=True, impl='auto')",
+          "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_metadata_dsl",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_metadata_dsl.py"
+        }
+      },
+      "capture_supported": true,
+      "cases": [
+        {
+          "name": "full_A",
+          "parameters": {
+            "name": "full_A",
+            "live": 64,
+            "prefix": 768,
+            "page_shift": 0,
+            "seed": 20261116
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                64,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "short_B",
+          "parameters": {
+            "name": "short_B",
+            "live": 31,
+            "prefix": 1,
+            "page_shift": 1,
+            "seed": 20261117
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                31,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "page_boundary_C",
+          "parameters": {
+            "name": "page_boundary_C",
+            "live": 16,
+            "prefix": 127,
+            "page_shift": 2,
+            "seed": 20261118
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                16,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "different_prefix_D",
+          "parameters": {
+            "name": "different_prefix_D",
+            "live": 61,
+            "prefix": 513,
+            "page_shift": 1,
+            "seed": 20261119
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                61,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "repeat_A",
+          "parameters": {
+            "name": "repeat_A",
+            "live": 64,
+            "prefix": 768,
+            "page_shift": 0,
+            "seed": 20261116
+          },
+          "status": "PASS",
+          "comparisons": {
+            "valid_output": {
+              "shape": [
+                64,
+                64,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        }
+      ],
+      "cpu_reference": {
+        "full_A": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00013217702507972717,
+              "max_rel": 0.5265589383666596
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00012589618563652039,
+              "max_rel": 2.442344676893628
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00014675408601760864,
+              "max_rel": 0.27046872745052847
+            }
+          },
+          "row63_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00014488771557807922,
+              "max_rel": 0.4428633321130743
+            }
+          },
+          "row63_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001334063708782196,
+              "max_rel": 0.20178219026692248
+            }
+          },
+          "row63_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00010894238948822021,
+              "max_rel": 0.474336247792982
+            }
+          }
+        },
+        "short_B": {
+          "row0_head0": {
+            "status": "FAIL",
+            "error": "CPU attention reference/reference: Tensor-likes are not close!\n\nMismatched elements: 1 / 512 (0.2%)\nGreatest absolute difference: 0.0013743340969085693 at index (299,) (up to 0.001 allowed)\nGreatest relative difference: 0.004809820093214512 at index (299,) (up to 0.001 allowed)",
+            "details": {
+              "label": "CPU attention reference",
+              "tensor": "reference",
+              "metrics": {
+                "shape": [
+                  512
+                ],
+                "dtype": "torch.float32",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.0013743340969085693,
+                "max_rel": 0.7158705701078583
+              },
+              "expected_sample": [
+                0.1487453281879425,
+                0.12862330675125122,
+                -0.012884324416518211,
+                0.24678383767604828,
+                -0.17881028354167938,
+                0.2170781046152115,
+                -0.12658919394016266,
+                -0.21078690886497498,
+                -0.0440305657684803,
+                0.030481021851301193,
+                0.1509169191122055,
+                0.19484269618988037
+              ],
+              "actual_sample": [
+                0.1484375,
+                0.12890625,
+                -0.0128173828125,
+                0.2470703125,
+                -0.1787109375,
+                0.2177734375,
+                -0.126953125,
+                -0.2109375,
+                -0.044189453125,
+                0.0303955078125,
+                0.1513671875,
+                0.1953125
+              ]
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0011224150657653809,
+              "max_rel": 0.7032325068155264
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0009834766387939453,
+              "max_rel": 0.1919125149089655
+            }
+          },
+          "row30_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0005737543106079102,
+              "max_rel": 0.1653910837749832
+            }
+          },
+          "row30_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0004511028528213501,
+              "max_rel": 0.581086557174856
+            }
+          },
+          "row30_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0002989768981933594,
+              "max_rel": 0.32654114759367664
+            }
+          }
+        },
+        "page_boundary_C": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00023622065782546997,
+              "max_rel": 3.4686810142765823
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0002765357494354248,
+              "max_rel": 0.473757118175691
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001867637038230896,
+              "max_rel": 0.34457222658053893
+            }
+          },
+          "row15_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001808367669582367,
+              "max_rel": 0.9474688745950132
+            }
+          },
+          "row15_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0002459287643432617,
+              "max_rel": 0.2264421877753859
+            }
+          },
+          "row15_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00013807415962219238,
+              "max_rel": 0.5650438116159509
+            }
+          }
+        },
+        "different_prefix_D": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001525580883026123,
+              "max_rel": 3.9091711932714213
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001398622989654541,
+              "max_rel": 0.6856865143404598
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00013100355863571167,
+              "max_rel": 0.5424431027288568
+            }
+          },
+          "row60_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001431480050086975,
+              "max_rel": 0.48626913153849116
+            }
+          },
+          "row60_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00014890357851982117,
+              "max_rel": 2.180275011853959
+            }
+          },
+          "row60_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00015792623162269592,
+              "max_rel": 0.829907976977986
+            }
+          }
+        },
+        "repeat_A": {
+          "row0_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00013217702507972717,
+              "max_rel": 0.5265589383666596
+            }
+          },
+          "row0_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00012589618563652039,
+              "max_rel": 2.442344676893628
+            }
+          },
+          "row0_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00014675408601760864,
+              "max_rel": 0.27046872745052847
+            }
+          },
+          "row63_head0": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00014488771557807922,
+              "max_rel": 0.4428633321130743
+            }
+          },
+          "row63_head31": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.0001334063708782196,
+              "max_rel": 0.20178219026692248
+            }
+          },
+          "row63_head63": {
+            "reference": {
+              "shape": [
+                512
+              ],
+              "dtype": "torch.float32",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.00010894238948822021,
+              "max_rel": 0.474336247792982
+            }
+          }
+        }
+      },
+      "padding_observations": {
+        "full_A": {
+          "rows": 0,
+          "finite_values": 0,
+          "elements": 0,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        },
+        "short_B": {
+          "rows": 33,
+          "finite_values": 1081344,
+          "elements": 1081344,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        },
+        "page_boundary_C": {
+          "rows": 48,
+          "finite_values": 1572864,
+          "elements": 1572864,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        },
+        "different_prefix_D": {
+          "rows": 3,
+          "finite_values": 98304,
+          "elements": 98304,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        },
+        "repeat_A": {
+          "rows": 0,
+          "finite_values": 0,
+          "elements": 0,
+          "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+        }
+      },
+      "comparison_failure": {
+        "label": "CPU attention reference",
+        "tensor": "reference",
+        "metrics": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0013743340969085693,
+          "max_rel": 0.7158705701078583
+        },
+        "expected_sample": [
+          0.1487453281879425,
+          0.12862330675125122,
+          -0.012884324416518211,
+          0.24678383767604828,
+          -0.17881028354167938,
+          0.2170781046152115,
+          -0.12658919394016266,
+          -0.21078690886497498,
+          -0.0440305657684803,
+          0.030481021851301193,
+          0.1509169191122055,
+          0.19484269618988037
+        ],
+        "actual_sample": [
+          0.1484375,
+          0.12890625,
+          -0.0128173828125,
+          0.2470703125,
+          -0.1787109375,
+          0.2177734375,
+          -0.126953125,
+          -0.2109375,
+          -0.044189453125,
+          0.0303955078125,
+          0.1513671875,
+          0.1953125
+        ]
+      },
+      "cpu_reference_failures": {
+        "short_B": true
+      },
+      "bound_input_pointers": {
+        "positions": 19792490826240,
+        "cu": 19792490826752,
+        "kv_lengths": 19792490827264,
+        "window": 19792490827776,
+        "window_length": 19792490860544,
+        "cmp_length": 19792490861056,
+        "sparse": 19792490861568,
+        "block_table": 19792490660352,
+        "original": 19792491549696,
+        "compressed": 19792491156480,
+        "compressed_lengths": 19792490660864,
+        "q": 19792496951296,
+        "sinks": 19792490661376,
+        "metadata": 19792490665984
+      },
+      "replay_count": 5,
+      "observed_output_changed": true,
+      "scope": "Real MQSMLA eager/replay, varying lengths/page IDs/Q/KV, with CPU float32 reference on selected rows/heads.",
+      "packing": "CPU-built valid fp8+BF16-scale ori rows and fp4+BF16-scale cmp rows; independent of custom epilog registration.",
+      "cpu_reference_scope": "Six or fewer row/head samples per case, not all output elements; sinks fixed at -10000.",
+      "error": "AssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.",
+      "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1064, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1048, in dispatch_probe\n    probe_attention(int(name[-1]))\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 903, in probe_attention\n    raise AssertionError(\"Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.\")\nAssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.\n",
+      "elapsed_seconds": 128.515,
+      "returncode": 1,
+      "wall_seconds": 132.405
+    },
+    {
+      "probe": "engram_break",
+      "status": "PASS",
+      "phase": "complete",
+      "started": "2026-11-16T16:57:03+0000",
+      "rtol": 0.001,
+      "atol": 0.001,
+      "device": "Ascend950PR_9589",
+      "torch": "2.13.0+cpu",
+      "torch_npu": "2.13.0",
+      "capture_supported": true,
+      "cases": [
+        {
+          "name": "full_A",
+          "status": "PASS",
+          "comparisons": {
+            "hash": {
+              "shape": [
+                64,
+                1,
+                4
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "history": {
+              "shape": [
+                4,
+                2
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "consumer": {
+              "shape": [
+                64,
+                1,
+                4
+              ],
+              "dtype": "torch.float32",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "short_B",
+          "status": "PASS",
+          "comparisons": {
+            "hash": {
+              "shape": [
+                64,
+                1,
+                4
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "history": {
+              "shape": [
+                4,
+                2
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "consumer": {
+              "shape": [
+                64,
+                1,
+                4
+              ],
+              "dtype": "torch.float32",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "page_boundary_C",
+          "status": "PASS",
+          "comparisons": {
+            "hash": {
+              "shape": [
+                64,
+                1,
+                4
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "history": {
+              "shape": [
+                4,
+                2
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "consumer": {
+              "shape": [
+                64,
+                1,
+                4
+              ],
+              "dtype": "torch.float32",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "different_prefix_D",
+          "status": "PASS",
+          "comparisons": {
+            "hash": {
+              "shape": [
+                64,
+                1,
+                4
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "history": {
+              "shape": [
+                4,
+                2
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "consumer": {
+              "shape": [
+                64,
+                1,
+                4
+              ],
+              "dtype": "torch.float32",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        },
+        {
+          "name": "repeat_A",
+          "status": "PASS",
+          "comparisons": {
+            "hash": {
+              "shape": [
+                64,
+                1,
+                4
+              ],
+              "dtype": "torch.int64",
+              "exact": true
+            },
+            "history": {
+              "shape": [
+                4,
+                2
+              ],
+              "dtype": "torch.int32",
+              "exact": true
+            },
+            "consumer": {
+              "shape": [
+                64,
+                1,
+                4
+              ],
+              "dtype": "torch.float32",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            }
+          }
+        }
+      ],
+      "break_calls": 5,
+      "verify_commit": {
+        "history": {
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        }
+      },
+      "scope": "Actual EngramHasher fallback and shared breakable graph, synthetic identity tokenizer and tiny hash parameters. No lookup tables, lookup communication, or model weights.",
+      "elapsed_seconds": 14.077,
+      "returncode": 0,
+      "wall_seconds": 18.697
+    }
+  ],
+  "not_covered": [
+    "Full model, real checkpoint/tokenizer/Engram lookup tables",
+    "mHC operator and multi-stream joins",
+    "Real serving allocator/source-group lifetime and cache sharing",
+    "Complete compressor/RoPE/cache/indexer/attention integration",
+    "DSpark packed aux hidden and draft KV injection",
+    "DP/TP/EP collectives, admission consensus, idle ranks",
+    "End-to-end accuracy, throughput, latency and capture memory budget"
+  ],
+  "interpretation": "PASS applies only to a probe's recorded scope and cases. Metadata planning is eager. Environment/API presence is inspection, not device execution evidence. An operator FAIL before capture is not proof of graph incompatibility. No source files or serving configuration are modified."
+}

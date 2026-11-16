@@ -1,0 +1,13 @@
+[epilog_fp4] start
+Traceback (most recent call last):
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1064, in worker
+    dispatch_probe(options.worker)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1040, in dispatch_probe
+    probe_epilog(name.split("_", 1)[1])
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 496, in probe_epilog
+    function = epilog()
+               ^^^^^^^^
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 490, in epilog
+    raise Blocked("custom.kv_compress_epilog_v2 is not registered in this serving environment")
+Blocked: custom.kv_compress_epilog_v2 is not registered in this serving environment
+

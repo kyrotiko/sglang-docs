@@ -1,0 +1,151 @@
+{
+  "source_directory": "C:/Users/admin/Desktop/file",
+  "source_sha": "5633d68b04ad1bdd4faecb1c8e370e5c5ea6403c",
+  "returned_script_sha256": "58140f4821fa8106fafc0205297475891c2947bf802c5a05231a5456ee6fb387",
+  "reported_script_sha256": "58140f4821fa8106fafc0205297475891c2947bf802c5a05231a5456ee6fb387",
+  "script_matches_manifest": true,
+  "script_matches_local_after_lf_normalization": true,
+  "note": "Copied JSON/log/Markdown as data only. Returned Python script was hashed, never executed or imported.",
+  "files": [
+    {
+      "file": "raw/attention_r0.json",
+      "bytes": 19503,
+      "sha256": "ba8d67bd67d91f98e78c1bb7943e136b739262f1272cd8e8415b6db04f558cf8"
+    },
+    {
+      "file": "raw/attention_r0.log",
+      "bytes": 1605,
+      "sha256": "f91b1da017db20bf9d66a1ea36c0b10d28cceb0f5ad73de9f14531d33b5ca883"
+    },
+    {
+      "file": "raw/attention_r1.json",
+      "bytes": 18303,
+      "sha256": "bd9a312e7ab3eb7896b55dbb4d93992aac63a3477e3532722186665ddf36605e"
+    },
+    {
+      "file": "raw/attention_r1.log",
+      "bytes": 1605,
+      "sha256": "d0a891413162437acc86c120a1ac0ea06efbd6d504755e80b0e76474e045730b"
+    },
+    {
+      "file": "raw/attention_r2.json",
+      "bytes": 18287,
+      "sha256": "9aadcdddedb58c2118a862f02c17f4b974d6789bd8947839aa5b62e2f75acd07"
+    },
+    {
+      "file": "raw/attention_r2.log",
+      "bytes": 1605,
+      "sha256": "d3615818ba6f6d9556b77281abf9c74c805f1aa09e283a586adeeffda53bcab0"
+    },
+    {
+      "file": "raw/candidate_chain.json",
+      "bytes": 6211,
+      "sha256": "261fc6418cc39931debd003f5eaea74d20b94e7326b1f49da978c1eff6b038aa"
+    },
+    {
+      "file": "raw/candidate_chain.log",
+      "bytes": 2783,
+      "sha256": "5561a3c1f92165214268be14606953970de5708f17735b468925ccc0272f4df2"
+    },
+    {
+      "file": "raw/compressor.json",
+      "bytes": 2810,
+      "sha256": "e7b4b6b1d6e3866606c9849955248f731eb886d3e6ef3461d26e18aa0ac40a0f"
+    },
+    {
+      "file": "raw/compressor.log",
+      "bytes": 1959,
+      "sha256": "fa1635909f28ab78a4f9faf567de615d4a2c82aba22552b413470e3a461ae672"
+    },
+    {
+      "file": "raw/engram_break.json",
+      "bytes": 4024,
+      "sha256": "5085533c3a77dd5af9702727161b3de1f66b82db529d0bf0d5ffa54d2ecb008b"
+    },
+    {
+      "file": "raw/engram_break.log",
+      "bytes": 1966,
+      "sha256": "747ba56cbea46bc4adfa3f3d441b08ddb7df8ecf42fe40e28e483636b204f452"
+    },
+    {
+      "file": "raw/environment.json",
+      "bytes": 15142,
+      "sha256": "d4d29bf95171ab4fbb299ff746ae1ca44d69c4b139450c3584f12853ef1261ef"
+    },
+    {
+      "file": "raw/environment.log",
+      "bytes": 1108,
+      "sha256": "0670d5faa3510b8e76592ef252f4cc9e7f55d3cb418a7b57feacb994cb0b2472"
+    },
+    {
+      "file": "raw/epilog_fp4.json",
+      "bytes": 1374,
+      "sha256": "a50497b5d1dc09c3f6a7b2a31cea3556e1e480c7753ecf236ec87e421dd7c23a"
+    },
+    {
+      "file": "raw/epilog_fp4.log",
+      "bytes": 962,
+      "sha256": "0bbacb21ace7df5bbf56dd5cfe4b9c0b5f4bf2efc4d029c0c09022d1f8bd0844"
+    },
+    {
+      "file": "raw/epilog_fp8.json",
+      "bytes": 1374,
+      "sha256": "a8ccdf47572f16c85b4bf9762973fdb5a99bc74ab26ddbe1a124625f48e0a2c7"
+    },
+    {
+      "file": "raw/epilog_fp8.log",
+      "bytes": 962,
+      "sha256": "55f06c9bd11c327210cfafb171d5e5c3cef3bea09215e19d09c6174de277f192"
+    },
+    {
+      "file": "raw/geometry.json",
+      "bytes": 7998,
+      "sha256": "a5daa7a3f34dac07304dc60867cc84300f214eed2d9a3f5080df19633d348baa"
+    },
+    {
+      "file": "raw/geometry.log",
+      "bytes": 2159,
+      "sha256": "f75921f38923fee135fd451fcec8ada846102366364a6e46c2ce4bd42c134e37"
+    },
+    {
+      "file": "raw/metadata.json",
+      "bytes": 27047,
+      "sha256": "a004b6d660c02252b2c3253ff1108d5dbbc8edc8283a7beab8e6c5c561e10be8"
+    },
+    {
+      "file": "raw/metadata.log",
+      "bytes": 1172,
+      "sha256": "5deae79b8774aab8ded05fad8c7ee2db0dbeec9416aa3767a7b6050c3662f213"
+    },
+    {
+      "file": "raw/prologue.json",
+      "bytes": 4387,
+      "sha256": "cdb484f9d9eed3e318273ddb1b842beb264a0b212f8fe642175207a51c5b4fa1"
+    },
+    {
+      "file": "raw/prologue.log",
+      "bytes": 523,
+      "sha256": "19a652ad039c71e2cf768d8e2f5f6cd53bfd5a6af079bc87cbe3f9a5ee1ab81a"
+    },
+    {
+      "file": "raw/qli_c2.json",
+      "bytes": 4448,
+      "sha256": "93de95166c0d90b0dac2c0d5ebd7e45f7dc67e1583773c7cc5556ea215ce3211"
+    },
+    {
+      "file": "raw/qli_c2.log",
+      "bytes": 2766,
+      "sha256": "63dad57480b6f8de31b4819ce6de995ff88ab8834061f8d433c9b4f83b8b6471"
+    },
+    {
+      "file": "raw/report.json",
+      "bytes": 150191,
+      "sha256": "25876db620f47064f777417ec43666514371801076c47bb41cedd15710b1dd3c"
+    },
+    {
+      "file": "raw/report.md",
+      "bytes": 2469,
+      "sha256": "37fc0cd043e2b44166483512f922edbf3f01b4464042569576e38c1f90b91578"
+    }
+  ]
+}

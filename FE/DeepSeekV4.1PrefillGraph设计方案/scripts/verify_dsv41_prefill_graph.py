@@ -28,6 +28,7 @@ from types import SimpleNamespace
 
 
 BASELINE = "5633d68b04"
+SCRIPT_REVISION = 2
 PROBES = (
     "environment", "geometry", "metadata", "compressor", "epilog_fp8",
     "epilog_fp4", "prologue", "qli_c2", "candidate_chain",
@@ -58,7 +59,7 @@ class Blocked(RuntimeError):
 def atomic_json(path, value):
     path = Path(path)
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     temporary.replace(path)
 
 
@@ -96,6 +97,10 @@ def load_device():
     T.npu.set_device(O.device)
     T.set_grad_enabled(False)
     T.manual_seed(O.seed)
+    R["registration_imports"] = []
+    for name in O.import_module:
+        module = importlib.import_module(name)
+        R["registration_imports"].append({"module": name, "file": getattr(module, "__file__", None)})
     R["device"] = T.npu.get_device_name(O.device)
     R["torch"] = T.__version__
     R["torch_npu"] = N.__version__
@@ -153,7 +158,9 @@ def comparison_failure(label, name, reference, got, metrics):
                                "expected_sample": sample(reference), "actual_sample": sample(got)}
 
 
-def compare(expected, actual, label):
+def compare(expected, actual, label, *, rtol=None, atol=None):
+    rtol = O.rtol if rtol is None else rtol
+    atol = O.atol if atol is None else atol
     metrics = {}
     if expected.keys() != actual.keys():
         raise AssertionError(f"{label}: output keys differ")
@@ -173,7 +180,7 @@ def compare(expected, actual, label):
             item["max_abs"] = float((a - b).abs().max())
             item["max_rel"] = float(((a - b).abs() / a.abs().clamp_min(1e-8)).max())
             try:
-                T.testing.assert_close(got, reference, rtol=O.rtol, atol=O.atol,
+                T.testing.assert_close(got, reference, rtol=rtol, atol=atol,
                                        msg=lambda message: f"{label}/{name}: {message}")
             except AssertionError:
                 comparison_failure(label, name, reference, got, item)
@@ -213,6 +220,7 @@ def matrix(cases, prepare, reset, body, observe, after=None):
     reset(cases[0])
     graph, outputs, stream = capture(body)
     R["capture_supported"] = True
+    R.setdefault("checks", {})["capture"] = "PASS"
     R["cases"] = []
     pointers = None
     observations = []
@@ -242,6 +250,7 @@ def matrix(cases, prepare, reset, body, observe, after=None):
             after(case, expected)
         checkpoint("passed:" + case["name"])
     R["bound_input_pointers"] = pointers
+    R.setdefault("checks", {})["eager_replay"] = "PASS"
     R["replay_count"] = len(cases)
     if len(observations) > 1:
         R["observed_output_changed"] = any(
@@ -278,6 +287,51 @@ def case_layouts():
 
 def compression_count(prefix, length, ratio=2):
     return (prefix + length) // ratio - prefix // ratio
+
+
+def operator_inventory():
+    inventory = {}
+    for group in ("attention", "mem_cache"):
+        key = "sgl_kernel_npu.operators." + group
+        try:
+            module = importlib.import_module(key)
+            entries = {}
+            for name in dir(module):
+                if name.startswith("_") or not any(part in name.lower() for part in ("compress", "epilog", "mhc", "hc_pre")):
+                    continue
+                try:
+                    function = getattr(module, name)
+                    if not callable(function):
+                        continue
+                    entries[name] = {"signature": str(inspect.signature(function)),
+                                     "file": inspect.getsourcefile(function),
+                                     "doc": (inspect.getdoc(function) or "")[:2000]}
+                except Exception as exc:
+                    entries[name] = {"inspection_error": f"{type(exc).__name__}: {exc}"}
+            inventory[key] = {"file": module.__file__, "exports": entries}
+        except Exception as exc:
+            inventory[key] = {"error": f"{type(exc).__name__}: {exc}"}
+    schemas = []
+    for schema in T._C._jit_get_all_schemas():
+        text = str(schema)
+        name = text.split("(", 1)[0]
+        if name.startswith(("npu::", "custom::", "sgl_kernel_npu::")) and any(part in name.lower() for part in ("compress", "epilog", "mhc", "hc_pre")):
+            schemas.append(text)
+    inventory["registered_schemas"] = sorted(schemas)
+    try:
+        registry = importlib.import_module("sgl_kernel_npu.operators.utils.registry")
+        resolved = {}
+        for name in ("attention.compressor", "attention.compressor_v2", "mem_cache.kv_compress_epilog"):
+            try:
+                function = registry.get_impl_by_name(name, "auto")
+                resolved[name] = {"module": function.__module__, "name": function.__name__,
+                                  "signature": str(inspect.signature(function))}
+            except Exception as exc:
+                resolved[name] = {"error": f"{type(exc).__name__}: {exc}"}
+        inventory["auto_resolution_without_execution"] = resolved
+    except Exception as exc:
+        inventory["registry_inspection_error"] = f"{type(exc).__name__}: {exc}"
+    return inventory
 
 
 def probe_environment():
@@ -317,6 +371,13 @@ def probe_environment():
         packet = getattr(getattr(T.ops, namespace), name, None)
         overload = getattr(packet, "default", None) if packet is not None else None
         R["custom_op_schemas"][namespace + "." + name] = str(getattr(overload, "_schema", "not registered"))
+    R["operator_inventory"] = operator_inventory()
+    R["probe_index_page_size"] = O.index_page_size
+    try:
+        pool_module = importlib.import_module("sglang.srt.mem_cache.deepseek_v4_memory_pool")
+        R["sglang_index_page_size"] = int(pool_module.DSV41_INDEX_PAGE_SIZE)
+    except Exception as exc:
+        R["index_page_inspection_error"] = f"{type(exc).__name__}: {exc}"
     R["device_capabilities"] = str(T.npu.get_device_properties(O.device))
     R["runtime_environment"] = {
         name: os.environ.get(name) for name in (
@@ -382,6 +443,7 @@ def probe_geometry():
     pool = ReqToTokenPool(size=2, max_context_len=128, device=f"npu:{O.device}", enable_memory_saver=False)
     if 0 in pool.free_slots or pool.req_to_token.shape[0] < 3:
         raise AssertionError("Request slot zero is not reserved")
+    R.setdefault("checks", {})["cpu_reference"] = "PASS"
     R["request_slot_zero_reserved"] = True
     R["scope"] = "Actual SGLang geometry helpers and reserved request slot; explicit live mask supplied by this probe."
 
@@ -562,11 +624,23 @@ def index_fixture(rows, seed):
     return data, scales
 
 
+def index_cache_views(key, scale, index_page):
+    rows = key.shape[0]
+    if rows % index_page or index_page % 8:
+        raise ValueError("Index pages must contain whole eight-token records")
+    pages = rows // index_page
+    record = T.cat((key.view(pages, index_page // 8, 8 * 64),
+                    scale.view(pages, index_page // 8, 8 * 4)), dim=-1)
+    return {"key": key.view(pages, index_page, 1, 64),
+            "key_scale": scale.view(pages, index_page, 1, 2, 2),
+            "combined_key": record.view(pages, index_page // 8, 544)}
+
+
 def physical_tables(case, ratio):
     full_pages = math.ceil((6 * O.page_size + O.tokens) / O.page_size)
     table = [1 + (i + case["page_shift"]) % full_pages for i in range(full_pages)]
     full = T.tensor([table], dtype=T.int32)
-    expansion = O.page_size // ratio // 8
+    expansion = O.page_size // ratio // O.index_page_size
     index = (full.unsqueeze(-1) * expansion + T.arange(expansion, dtype=T.int32)).reshape(1, -1)
     return full, index, full_pages + 1
 
@@ -651,15 +725,16 @@ def probe_prologue():
     load_device()
     function = api("indexer", "indexer_prologue_k_dsl")
     n, rows = O.tokens, O.page_size + 2 * O.tokens
-    rows = math.ceil(rows / 8) * 8
+    index_page = O.index_page_size
+    rows = math.ceil(rows / index_page) * index_page
     latent = random_tensor((n, 512), O.seed)
     weight = random_tensor((128, 512), O.seed + 1, scale=0.03)
     norm = T.ones(128, dtype=T.float32, device=latent.device)
     sine, cosine = T.zeros((n, 64), dtype=T.float32, device=latent.device), T.ones((n, 64), dtype=T.float32, device=latent.device)
     loc = T.zeros(n, dtype=T.int64, device=latent.device)
-    key = T.zeros((rows // 8, 8, 1, 64), dtype=T.uint8, device=latent.device)
-    scales = T.zeros((rows // 8, 8, 1, 4), dtype=T.uint8, device=latent.device)
-    combined = T.zeros((rows // 8, 1, 1, 544), dtype=T.uint8, device=latent.device)
+    key = T.zeros((rows // index_page, index_page, 1, 64), dtype=T.uint8, device=latent.device)
+    scales = T.zeros((rows // index_page, index_page, 1, 4), dtype=T.uint8, device=latent.device)
+    combined = T.zeros((rows // index_page, index_page // 8, 1, 544), dtype=T.uint8, device=latent.device)
     cases = [
         {"name": "full_A", "live": n, "offset": O.page_size, "seed": O.seed},
         {"name": "short_B", "live": max(1, n // 2 - 1), "offset": O.page_size + n, "seed": O.seed + 2},
@@ -716,11 +791,8 @@ def prepare_index(buffers, case, ratio, candidate, metadata_fn, qsli_metadata_fn
     stage(buffers, "residual", buffers["kv_lengths"] % ratio)
     rows = physical_pages * (O.page_size // ratio)
     key, scale = index_fixture(rows, case["seed"] + 10)
-    pages = rows // 8
-    stage(buffers, "key", key.view(pages, 8, 1, 64).to(f"npu:{O.device}"))
-    stage(buffers, "key_scale", scale.view(pages, 8, 1, 2, 2).to(f"npu:{O.device}"))
-    record = T.cat((key.view(pages, 8 * 64), scale.view(pages, 8 * 4)), dim=-1)
-    stage(buffers, "combined_key", record.view(pages, 1, 544).to(f"npu:{O.device}"))
+    for name, value in index_cache_views(key, scale, O.index_page_size).items():
+        stage(buffers, name, value.to(f"npu:{O.device}"))
     q, qscale = index_fixture(n * 32, case["seed"] + 11)
     stage(buffers, "q", q.view(n, 32, 64).to(f"npu:{O.device}"))
     stage(buffers, "qscale", qscale.view(n, 32, 2, 2).to(f"npu:{O.device}"))
@@ -804,7 +876,8 @@ def probe_index(candidate):
     matrix(case_layouts(), prepare, lambda case: None, body, observe)
     R["scope"] = "Real QLI -> QSLI graph dataflow" if candidate else "Real ratio-2 QLI graph"
     R["comparison_note"] = "Ordered indices are checked exactly; a failure with equal selected sets may be a tie and needs inspection. No independent score oracle is claimed."
-    R["layout"] = {"query_heads": 32, "logical_head_dim": 128, "index_page_size": 8,
+    R["layout"] = {"query_heads": 32, "logical_head_dim": 128, "index_page_size": O.index_page_size,
+                   "candidate_block_size": 8,
                    "topk": 512, "candidate_blocks": O.candidate_blocks if candidate else None}
 
 
@@ -828,7 +901,7 @@ def prepare_attention(buffers, cpu, case, ratio, metadata_fn):
     return addresses(buffers)
 
 
-def attention_reference(cpu, case, ratio, row, head):
+def attention_reference(cpu, case, ratio, row, head, *, round_probabilities=False):
     position = case["prefix"] + row
     logical = list(range(max(0, position - 127), position + 1))
     table = cpu["table"].reshape(-1)
@@ -842,7 +915,38 @@ def attention_reference(cpu, case, ratio, row, head):
         values = T.cat((values, cpu["compressed"][physical]), dim=0)
     scores = T.mv(values, cpu["q"][row, head]) / math.sqrt(512)
     probabilities = T.softmax(scores, dim=0)
+    if round_probabilities:
+        probabilities = probabilities.to(T.bfloat16).float()
     return T.mv(values.T, probabilities)
+
+
+def bf16_diagnostics(reference, actual):
+    reference, actual = reference.double(), actual.double()
+    if not bool(T.isfinite(reference).all() and T.isfinite(actual).all()):
+        return {"finite": False}
+    rounded = reference.to(T.bfloat16)
+    ref_bits = rounded.contiguous().view(T.int16).to(T.int32)
+    got_bits = actual.to(T.bfloat16).contiguous().view(T.int16).to(T.int32)
+    def ordered(bits):
+        magnitude = bits & 0x7fff
+        return T.where(bits < 0, 0x8000 - magnitude, 0x8000 + magnitude)
+    ulps = (ordered(ref_bits) - ordered(got_bits)).abs()
+    error = (reference - actual).abs()
+    index = int(error.argmax())
+    return {
+        "finite": True,
+        "rmse": float(((reference - actual) ** 2).mean().sqrt()),
+        "normalized_l2": float(T.linalg.vector_norm(reference - actual) / T.linalg.vector_norm(reference).clamp_min(1e-30)),
+        "fp32_to_bf16_rounding_max_abs": float((reference - rounded.double()).abs().max()),
+        "actual_to_rounded_reference_max_abs": float((actual - rounded.double()).abs().max()),
+        "max_bf16_ulp_distance": int(ulps.max()),
+        "within_one_bf16_ulp": int((ulps <= 1).sum()),
+        "elements": reference.numel(),
+        "largest_error": {"index": index, "reference_fp32": float(reference[index]),
+                          "reference_bf16": float(rounded[index]), "actual": float(actual[index]),
+                          "abs_error": float(error[index])},
+        "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status.",
+    }
 
 
 def probe_attention(ratio):
@@ -879,18 +983,28 @@ def probe_attention(ratio):
         for row in sorted({0, case["live"] - 1}):
             for head in (0, 31, 63):
                 reference = attention_reference(cpu, case, ratio, row, head)
+                key = f"row{row}_head{head}"
+                actual = value[row, head].float()
                 try:
-                    metrics[f"row{row}_head{head}"] = compare(
-                        {"reference": reference}, {"reference": value[row, head].float()}, "CPU attention reference")
+                    metrics[key] = compare(
+                        {"reference": reference}, {"reference": actual}, "CPU attention reference",
+                        rtol=O.reference_rtol, atol=O.reference_atol)
                 except AssertionError as exc:
-                    metrics[f"row{row}_head{head}"] = {"status": "FAIL", "error": str(exc),
-                                                        "details": dict(R["comparison_failure"])}
+                    metrics[key] = {"status": "FAIL", "error": str(exc),
+                                    "details": dict(R["comparison_failure"])}
                     R.setdefault("cpu_reference_failures", {})[case["name"]] = True
+                    hypothesis = attention_reference(cpu, case, ratio, row, head, round_probabilities=True).to(T.bfloat16).float()
+                    difference = (hypothesis - actual).abs()
+                    metrics[key]["rounded_softmax_hypothesis_max_abs"] = float(difference.max()) if bool(T.isfinite(difference).all()) else None
+                    metrics[key]["hypothesis_note"] = "Diagnostic alternate arithmetic; not substituted for the FP32 oracle."
+                metrics[key]["bf16_diagnostics"] = bf16_diagnostics(reference, actual)
         R.setdefault("cpu_reference", {})[case["name"]] = metrics
         padding = value[case["live"]:].float()
         R.setdefault("padding_observations", {})[case["name"]] = {
             "rows": int(padding.shape[0]),
             "finite_values": int(T.isfinite(padding).sum()), "elements": padding.numel(),
+            "zero_values": int((padding == 0).sum()),
+            "max_abs_finite": float(padding[T.isfinite(padding)].abs().max()) if bool(T.isfinite(padding).any()) else None,
             "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel.",
         }
         return {"valid_output": out["output"][:case["live"]]}
@@ -899,6 +1013,7 @@ def probe_attention(ratio):
     R["scope"] = "Real MQSMLA eager/replay, varying lengths/page IDs/Q/KV, with CPU float32 reference on selected rows/heads."
     R["packing"] = "CPU-built valid fp8+BF16-scale ori rows and fp4+BF16-scale cmp rows; independent of custom epilog registration."
     R["cpu_reference_scope"] = "Six or fewer row/head samples per case, not all output elements; sinks fixed at -10000."
+    R.setdefault("checks", {})["cpu_reference"] = "FAIL" if R.get("cpu_reference_failures") else "PASS"
     if R.get("cpu_reference_failures"):
         raise AssertionError("Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.")
 
@@ -977,6 +1092,7 @@ def probe_engram():
     if calls[0] != 0:
         raise AssertionError("Engram eager break executed during capture")
     R["capture_supported"] = True
+    R.setdefault("checks", {})["capture"] = "PASS"
     R["cases"] = []
     for case in case_layouts():
         checkpoint("engram_replay:" + case["name"])
@@ -1002,6 +1118,7 @@ def probe_engram():
         checkpoint("engram_passed:" + case["name"])
     R["break_calls"] = calls[0]
     check_engram_verify(hasher, reference)
+    R.setdefault("checks", {}).update(eager_replay="PASS", cpu_reference="PASS", verify_commit="PASS")
     R["scope"] = "Actual EngramHasher fallback and shared breakable graph, synthetic identity tokenizer and tiny hash parameters. No lookup tables, lookup communication, or model weights."
 
 
@@ -1057,7 +1174,9 @@ def worker(options):
     O = options
     R = {"probe": options.worker, "status": "RUNNING", "phase": "start",
          "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-         "rtol": options.rtol, "atol": options.atol}
+         "script_revision": SCRIPT_REVISION,
+         "rtol": options.rtol, "atol": options.atol,
+         "reference_rtol": options.reference_rtol, "reference_atol": options.reference_atol}
     started = time.monotonic()
     checkpoint("start")
     try:
@@ -1094,10 +1213,14 @@ def run_child(name, options):
             "--output-dir", str(output), "--device", str(options.device),
             "--tokens", str(options.tokens), "--hidden-size", str(options.hidden_size),
             "--page-size", str(options.page_size), "--candidate-blocks", str(options.candidate_blocks),
+            "--index-page-size", str(options.index_page_size),
+            "--reference-rtol", str(options.reference_rtol), "--reference-atol", str(options.reference_atol),
             "--state-ring-size", str(options.state_ring_size),
             "--seed", str(options.seed), "--rtol", str(options.rtol), "--atol", str(options.atol)]
     if options.sglang_root:
         argv += ["--sglang-root", options.sglang_root]
+    for name in options.import_module:
+        argv += ["--import-module", name]
     started = time.monotonic()
     timeout = False
     with (output / (name + ".log")).open("w", encoding="utf-8") as log:
@@ -1134,7 +1257,7 @@ def run_child(name, options):
 def finish_report(options, results, interrupted=False):
     output = Path(options.output_dir)
     summary = {
-        "schema_version": 1, "expected_source_baseline": BASELINE,
+        "schema_version": 2, "script_revision": SCRIPT_REVISION, "expected_source_baseline": BASELINE,
         "created": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "options": {k: v for k, v in vars(options).items() if k != "worker"},
@@ -1158,9 +1281,11 @@ def finish_report(options, results, interrupted=False):
     atomic_json(output / "report.json", summary)
     lines = ["# DeepSeek V4.1 A5 prefill graph probe", "",
              f"Expected source baseline: `{BASELINE}`", "",
-             "| Probe | Result | Last phase | Seconds |", "| --- | --- | --- | --- |"]
+             "| Probe | Result | Capture | Eager/replay | CPU reference | Last phase | Seconds |",
+             "| --- | --- | --- | --- | --- | --- | --- |"]
     for result in results:
-        lines.append(f"| {result['probe']} | {result['status']} | {result.get('phase', '').replace('|', '/')} | {result.get('wall_seconds', 0)} |")
+        checks = result.get("checks", {})
+        lines.append(f"| {result['probe']} | {result['status']} | {checks.get('capture', '-')} | {checks.get('eager_replay', '-')} | {checks.get('cpu_reference', '-')} | {result.get('phase', '').replace('|', '/')} | {result.get('wall_seconds', 0)} |")
     lines += ["", "## Failures / blocked probes", ""]
     for result in results:
         if result["status"] != "PASS":
@@ -1216,9 +1341,21 @@ def self_test(options):
             raise AssertionError("Ratio-1 padding sentinel failed")
         for ratio in (1, 2):
             full, index, physical_pages = physical_tables(case, ratio)
-            if int(index.max()) >= physical_pages * options.page_size // ratio // 8:
+            if int(index.max()) >= physical_pages * options.page_size // ratio // options.index_page_size:
                 raise AssertionError("Expanded index page table overflows")
-    print("CPU self-test passed: count boundaries, packed KV round-trip, geometry tails, page-table bounds.")
+    for index_page in (16, 32, 64, 128):
+        key, scale = index_fixture(3 * index_page, options.seed)
+        views = index_cache_views(key, scale, index_page)
+        record = views["combined_key"].reshape(-1, 544)
+        assert views["key"].shape == (3, index_page, 1, 64)
+        assert views["combined_key"].shape == (3, index_page // 8, 544)
+        T.testing.assert_close(record[:, :512].reshape(-1, 64), key, rtol=0, atol=0)
+        T.testing.assert_close(record[:, 512:].reshape(-1, 4), scale, rtol=0, atol=0)
+    diagnostics = bf16_diagnostics(T.tensor([1.0, -1.0, 0.0]), T.tensor([1.0, -1.0, 0.0]))
+    assert diagnostics["max_bf16_ulp_distance"] == 0
+    diagnostics = bf16_diagnostics(T.tensor([1.0]), T.tensor([1.0 + 1.0 / 128]))
+    assert diagnostics["max_bf16_ulp_distance"] == 1
+    print("CPU self-test passed: count boundaries, KV packing, geometry tails, index PA/record separation, BF16 diagnostics.")
     print("This is a script/oracle check, not NPU graph evidence.")
     return 0
 
@@ -1231,13 +1368,19 @@ def parse_args(argv=None):
     parser.add_argument("--tokens", type=int, default=64, help="Static token capacity, multiple of 16 (default: 64)")
     parser.add_argument("--hidden-size", type=int, default=4096, help="Synthetic compressor input width, >=1024 and divisible by 64")
     parser.add_argument("--page-size", type=int, choices=(128, 256), default=128)
+    parser.add_argument("--index-page-size", type=int, choices=(16, 32, 64, 128), default=64,
+                        help="Index K PA page size, distinct from the fixed candidate block size 8 (default: 64)")
+    parser.add_argument("--import-module", action="append", default=[],
+                        help="Explicit serving registration module to import in each worker; repeatable")
     parser.add_argument("--candidate-blocks", type=int, default=2048, help="QLI candidate output capacity (default: 2048)")
     parser.add_argument("--state-ring-size", type=int, choices=(2, 4, 8, 16, 32, 64, 128), default=2,
                         help="Ratio-2 private ring size; default 2 matches non-speculative serving")
     parser.add_argument("--timeout", type=int, default=600, help="Seconds per independent probe, including JIT compilation (default: 600)")
     parser.add_argument("--seed", type=int, default=20261116)
     parser.add_argument("--rtol", type=float, default=1e-3, help="Recorded float parity/reference tolerance")
-    parser.add_argument("--atol", type=float, default=1e-3, help="Recorded float parity/reference tolerance")
+    parser.add_argument("--atol", type=float, default=1e-3, help="Recorded eager/replay float parity tolerance")
+    parser.add_argument("--reference-rtol", type=float, default=1e-3, help="Independent CPU FP32 oracle tolerance")
+    parser.add_argument("--reference-atol", type=float, default=1e-3, help="Independent CPU FP32 oracle tolerance")
     parser.add_argument("--probes", default="all", help="Comma-separated probe names, or all")
     parser.add_argument("--list", action="store_true", help="List probes without importing torch")
     parser.add_argument("--self-test", action="store_true", help="CPU checks of script oracles; no torch_npu needed")
@@ -1247,8 +1390,13 @@ def parse_args(argv=None):
         parser.error("--tokens must be a positive multiple of 16")
     if options.hidden_size < 1024 or options.hidden_size % 64:
         parser.error("--hidden-size must be >=1024 and divisible by 64")
-    if options.timeout <= 0 or options.candidate_blocks <= 0 or options.rtol < 0 or options.atol < 0:
-        parser.error("timeout/candidate-blocks must be positive and tolerances nonnegative")
+    if options.timeout <= 0 or options.candidate_blocks <= 0:
+        parser.error("timeout/candidate-blocks must be positive")
+    tolerances = (options.rtol, options.atol, options.reference_rtol, options.reference_atol)
+    if any(value < 0 or not math.isfinite(value) for value in tolerances):
+        parser.error("tolerances must be finite and nonnegative")
+    if (options.page_size // 2) % options.index_page_size:
+        parser.error("--index-page-size must divide --page-size/2 for the ratio-2 cases")
     if options.sglang_root:
         options.sglang_root = str(Path(options.sglang_root).expanduser().resolve())
     return options

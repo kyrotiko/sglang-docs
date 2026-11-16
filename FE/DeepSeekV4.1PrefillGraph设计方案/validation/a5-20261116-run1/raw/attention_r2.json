@@ -1,0 +1,660 @@
+{
+  "probe": "attention_r2",
+  "status": "FAIL",
+  "phase": "passed:repeat_A",
+  "started": "2026-11-16T16:54:50+0000",
+  "rtol": 0.001,
+  "atol": 0.001,
+  "device": "Ascend950PR_9589",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "apis": {
+    "mixed_quant_sparse_flash_mla_dsl": {
+      "signature": "(q, *, ori_kv=None, cmp_kv=None, ori_sparse_indices=None, cmp_sparse_indices=None, ori_block_table=None, cmp_block_table=None, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, ori_topk_length=None, cmp_topk_length=None, sinks=None, metadata=None, quant_mode, softmax_scale=None, layout_q='TND', layout_kv='PA_BBND', return_softmax_lse=False, out, lse, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_dsl.py"
+    },
+    "mixed_quant_sparse_flash_mla_metadata_dsl": {
+      "signature": "(ori_topk_length, cmp_topk_length, *, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, batch_size=None, max_seqlen_q=None, max_seqlen_ori_kv=None, max_seqlen_cmp_kv=None, num_heads_q, num_heads_kv, head_dim, quant_mode, layout_q='TND', layout_kv='PA_BBND', has_ori_kv=True, has_cmp_kv=True, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_metadata_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_metadata_dsl.py"
+    }
+  },
+  "capture_supported": true,
+  "cases": [
+    {
+      "name": "full_A",
+      "parameters": {
+        "name": "full_A",
+        "live": 64,
+        "prefix": 768,
+        "page_shift": 0,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            64,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "short_B",
+      "parameters": {
+        "name": "short_B",
+        "live": 31,
+        "prefix": 1,
+        "page_shift": 1,
+        "seed": 20261117
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            31,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "page_boundary_C",
+      "parameters": {
+        "name": "page_boundary_C",
+        "live": 16,
+        "prefix": 127,
+        "page_shift": 2,
+        "seed": 20261118
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            16,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "different_prefix_D",
+      "parameters": {
+        "name": "different_prefix_D",
+        "live": 61,
+        "prefix": 513,
+        "page_shift": 1,
+        "seed": 20261119
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            61,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "repeat_A",
+      "parameters": {
+        "name": "repeat_A",
+        "live": 64,
+        "prefix": 768,
+        "page_shift": 0,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            64,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    }
+  ],
+  "cpu_reference": {
+    "full_A": {
+      "row0_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00013217702507972717,
+          "max_rel": 0.5265589383666596
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00012589618563652039,
+          "max_rel": 2.442344676893628
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00014675408601760864,
+          "max_rel": 0.27046872745052847
+        }
+      },
+      "row63_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00014488771557807922,
+          "max_rel": 0.4428633321130743
+        }
+      },
+      "row63_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001334063708782196,
+          "max_rel": 0.20178219026692248
+        }
+      },
+      "row63_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00010894238948822021,
+          "max_rel": 0.474336247792982
+        }
+      }
+    },
+    "short_B": {
+      "row0_head0": {
+        "status": "FAIL",
+        "error": "CPU attention reference/reference: Tensor-likes are not close!\n\nMismatched elements: 1 / 512 (0.2%)\nGreatest absolute difference: 0.0013743340969085693 at index (299,) (up to 0.001 allowed)\nGreatest relative difference: 0.004809820093214512 at index (299,) (up to 0.001 allowed)",
+        "details": {
+          "label": "CPU attention reference",
+          "tensor": "reference",
+          "metrics": {
+            "shape": [
+              512
+            ],
+            "dtype": "torch.float32",
+            "exact": false,
+            "finite": true,
+            "max_abs": 0.0013743340969085693,
+            "max_rel": 0.7158705701078583
+          },
+          "expected_sample": [
+            0.1487453281879425,
+            0.12862330675125122,
+            -0.012884324416518211,
+            0.24678383767604828,
+            -0.17881028354167938,
+            0.2170781046152115,
+            -0.12658919394016266,
+            -0.21078690886497498,
+            -0.0440305657684803,
+            0.030481021851301193,
+            0.1509169191122055,
+            0.19484269618988037
+          ],
+          "actual_sample": [
+            0.1484375,
+            0.12890625,
+            -0.0128173828125,
+            0.2470703125,
+            -0.1787109375,
+            0.2177734375,
+            -0.126953125,
+            -0.2109375,
+            -0.044189453125,
+            0.0303955078125,
+            0.1513671875,
+            0.1953125
+          ]
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0011224150657653809,
+          "max_rel": 0.7032325068155264
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0009834766387939453,
+          "max_rel": 0.1919125149089655
+        }
+      },
+      "row30_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0005737543106079102,
+          "max_rel": 0.1653910837749832
+        }
+      },
+      "row30_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0004511028528213501,
+          "max_rel": 0.581086557174856
+        }
+      },
+      "row30_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0002989768981933594,
+          "max_rel": 0.32654114759367664
+        }
+      }
+    },
+    "page_boundary_C": {
+      "row0_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00023622065782546997,
+          "max_rel": 3.4686810142765823
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0002765357494354248,
+          "max_rel": 0.473757118175691
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001867637038230896,
+          "max_rel": 0.34457222658053893
+        }
+      },
+      "row15_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001808367669582367,
+          "max_rel": 0.9474688745950132
+        }
+      },
+      "row15_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0002459287643432617,
+          "max_rel": 0.2264421877753859
+        }
+      },
+      "row15_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00013807415962219238,
+          "max_rel": 0.5650438116159509
+        }
+      }
+    },
+    "different_prefix_D": {
+      "row0_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001525580883026123,
+          "max_rel": 3.9091711932714213
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001398622989654541,
+          "max_rel": 0.6856865143404598
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00013100355863571167,
+          "max_rel": 0.5424431027288568
+        }
+      },
+      "row60_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001431480050086975,
+          "max_rel": 0.48626913153849116
+        }
+      },
+      "row60_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00014890357851982117,
+          "max_rel": 2.180275011853959
+        }
+      },
+      "row60_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00015792623162269592,
+          "max_rel": 0.829907976977986
+        }
+      }
+    },
+    "repeat_A": {
+      "row0_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00013217702507972717,
+          "max_rel": 0.5265589383666596
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00012589618563652039,
+          "max_rel": 2.442344676893628
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00014675408601760864,
+          "max_rel": 0.27046872745052847
+        }
+      },
+      "row63_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00014488771557807922,
+          "max_rel": 0.4428633321130743
+        }
+      },
+      "row63_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001334063708782196,
+          "max_rel": 0.20178219026692248
+        }
+      },
+      "row63_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00010894238948822021,
+          "max_rel": 0.474336247792982
+        }
+      }
+    }
+  },
+  "padding_observations": {
+    "full_A": {
+      "rows": 0,
+      "finite_values": 0,
+      "elements": 0,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    },
+    "short_B": {
+      "rows": 33,
+      "finite_values": 1081344,
+      "elements": 1081344,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    },
+    "page_boundary_C": {
+      "rows": 48,
+      "finite_values": 1572864,
+      "elements": 1572864,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    },
+    "different_prefix_D": {
+      "rows": 3,
+      "finite_values": 98304,
+      "elements": 98304,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    },
+    "repeat_A": {
+      "rows": 0,
+      "finite_values": 0,
+      "elements": 0,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    }
+  },
+  "comparison_failure": {
+    "label": "CPU attention reference",
+    "tensor": "reference",
+    "metrics": {
+      "shape": [
+        512
+      ],
+      "dtype": "torch.float32",
+      "exact": false,
+      "finite": true,
+      "max_abs": 0.0013743340969085693,
+      "max_rel": 0.7158705701078583
+    },
+    "expected_sample": [
+      0.1487453281879425,
+      0.12862330675125122,
+      -0.012884324416518211,
+      0.24678383767604828,
+      -0.17881028354167938,
+      0.2170781046152115,
+      -0.12658919394016266,
+      -0.21078690886497498,
+      -0.0440305657684803,
+      0.030481021851301193,
+      0.1509169191122055,
+      0.19484269618988037
+    ],
+    "actual_sample": [
+      0.1484375,
+      0.12890625,
+      -0.0128173828125,
+      0.2470703125,
+      -0.1787109375,
+      0.2177734375,
+      -0.126953125,
+      -0.2109375,
+      -0.044189453125,
+      0.0303955078125,
+      0.1513671875,
+      0.1953125
+    ]
+  },
+  "cpu_reference_failures": {
+    "short_B": true
+  },
+  "bound_input_pointers": {
+    "positions": 19792490826240,
+    "cu": 19792490826752,
+    "kv_lengths": 19792490827264,
+    "window": 19792490827776,
+    "window_length": 19792490860544,
+    "cmp_length": 19792490861056,
+    "sparse": 19792490861568,
+    "block_table": 19792490660352,
+    "original": 19792491549696,
+    "compressed": 19792491156480,
+    "compressed_lengths": 19792490660864,
+    "q": 19792496951296,
+    "sinks": 19792490661376,
+    "metadata": 19792490665984
+  },
+  "replay_count": 5,
+  "observed_output_changed": true,
+  "scope": "Real MQSMLA eager/replay, varying lengths/page IDs/Q/KV, with CPU float32 reference on selected rows/heads.",
+  "packing": "CPU-built valid fp8+BF16-scale ori rows and fp4+BF16-scale cmp rows; independent of custom epilog registration.",
+  "cpu_reference_scope": "Six or fewer row/head samples per case, not all output elements; sinks fixed at -10000.",
+  "error": "AssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.",
+  "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1064, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1048, in dispatch_probe\n    probe_attention(int(name[-1]))\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 903, in probe_attention\n    raise AssertionError(\"Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.\")\nAssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.\n",
+  "elapsed_seconds": 128.515,
+  "returncode": 1,
+  "wall_seconds": 132.405
+}

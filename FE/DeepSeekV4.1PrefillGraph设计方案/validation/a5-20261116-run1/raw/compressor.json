@@ -1,0 +1,23 @@
+{
+  "probe": "compressor",
+  "status": "FAIL",
+  "phase": "warmup",
+  "started": "2026-11-16T16:49:48+0000",
+  "rtol": 0.001,
+  "atol": 0.001,
+  "device": "Ascend950PR_9589",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "apis": {
+    "compressor_v2": {
+      "signature": "(x, wkv, wgate, state_cache, cmp_ratio=4, *, state_block_table=None, cu_seqlens=None, seqused=None, start_pos=None, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.compressor_v2",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/compressor_v2.py"
+    }
+  },
+  "error": "UnsupportedGenerationError: attention.compressor_v2 [impl=auto] does not support generation=arch35; supported generations=['arch22']",
+  "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1064, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1038, in dispatch_probe\n    probe_compressor()\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 469, in probe_compressor\n    matrix(cases, prepare, reset, body, observe, after)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 214, in matrix\n    graph, outputs, stream = capture(body)\n                             ^^^^^^^^^^^^^\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 197, in capture\n    body()\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 449, in body\n    value = function(x=x, wkv=wkv, wgate=wgate, seqused=used, start_pos=start,\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/compressor_v2.py\", line 149, in compressor_v2\n    return get_impl_by_name(\"attention.compressor_v2\", impl)(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/utils/registry.py\", line 130, in get_impl_by_name\n    raise UnsupportedGenerationError(\nsgl_kernel_npu.operators.utils.registry.UnsupportedGenerationError: attention.compressor_v2 [impl=auto] does not support generation=arch35; supported generations=['arch22']\n",
+  "elapsed_seconds": 8.546,
+  "returncode": 1,
+  "wall_seconds": 10.895
+}

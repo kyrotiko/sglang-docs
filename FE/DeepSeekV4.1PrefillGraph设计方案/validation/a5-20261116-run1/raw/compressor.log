@@ -1,0 +1,24 @@
+[compressor] start
+[compressor] warmup
+Traceback (most recent call last):
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1064, in worker
+    dispatch_probe(options.worker)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1038, in dispatch_probe
+    probe_compressor()
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 469, in probe_compressor
+    matrix(cases, prepare, reset, body, observe, after)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 214, in matrix
+    graph, outputs, stream = capture(body)
+                             ^^^^^^^^^^^^^
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 197, in capture
+    body()
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 449, in body
+    value = function(x=x, wkv=wkv, wgate=wgate, seqused=used, start_pos=start,
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/compressor_v2.py", line 149, in compressor_v2
+    return get_impl_by_name("attention.compressor_v2", impl)(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/utils/registry.py", line 130, in get_impl_by_name
+    raise UnsupportedGenerationError(
+sgl_kernel_npu.operators.utils.registry.UnsupportedGenerationError: attention.compressor_v2 [impl=auto] does not support generation=arch35; supported generations=['arch22']
+

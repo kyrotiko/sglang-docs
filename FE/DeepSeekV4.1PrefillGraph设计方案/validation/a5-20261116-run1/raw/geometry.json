@@ -1,0 +1,396 @@
+{
+  "probe": "geometry",
+  "status": "PASS",
+  "phase": "complete",
+  "started": "2026-11-16T16:49:08+0000",
+  "rtol": 0.001,
+  "atol": 0.001,
+  "device": "Ascend950PR_9589",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "capture_supported": true,
+  "cases": [
+    {
+      "name": "full_A",
+      "parameters": {
+        "name": "full_A",
+        "live": 64,
+        "prefix": 768,
+        "page_shift": 0,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "window": {
+          "shape": [
+            64,
+            1,
+            128
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "window_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "cmp1_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "cmp2_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "c1_positions": {
+          "shape": [
+            64
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c1_slots": {
+          "shape": [
+            64
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c2_positions": {
+          "shape": [
+            33
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c2_slots": {
+          "shape": [
+            33
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "short_B",
+      "parameters": {
+        "name": "short_B",
+        "live": 31,
+        "prefix": 1,
+        "page_shift": 1,
+        "seed": 20261117
+      },
+      "status": "PASS",
+      "comparisons": {
+        "window": {
+          "shape": [
+            64,
+            1,
+            128
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "window_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "cmp1_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "cmp2_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "c1_positions": {
+          "shape": [
+            64
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c1_slots": {
+          "shape": [
+            64
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c2_positions": {
+          "shape": [
+            33
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c2_slots": {
+          "shape": [
+            33
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "page_boundary_C",
+      "parameters": {
+        "name": "page_boundary_C",
+        "live": 16,
+        "prefix": 127,
+        "page_shift": 2,
+        "seed": 20261118
+      },
+      "status": "PASS",
+      "comparisons": {
+        "window": {
+          "shape": [
+            64,
+            1,
+            128
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "window_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "cmp1_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "cmp2_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "c1_positions": {
+          "shape": [
+            64
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c1_slots": {
+          "shape": [
+            64
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c2_positions": {
+          "shape": [
+            33
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c2_slots": {
+          "shape": [
+            33
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "different_prefix_D",
+      "parameters": {
+        "name": "different_prefix_D",
+        "live": 61,
+        "prefix": 513,
+        "page_shift": 1,
+        "seed": 20261119
+      },
+      "status": "PASS",
+      "comparisons": {
+        "window": {
+          "shape": [
+            64,
+            1,
+            128
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "window_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "cmp1_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "cmp2_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "c1_positions": {
+          "shape": [
+            64
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c1_slots": {
+          "shape": [
+            64
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c2_positions": {
+          "shape": [
+            33
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c2_slots": {
+          "shape": [
+            33
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "repeat_A",
+      "parameters": {
+        "name": "repeat_A",
+        "live": 64,
+        "prefix": 768,
+        "page_shift": 0,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "window": {
+          "shape": [
+            64,
+            1,
+            128
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "window_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "cmp1_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "cmp2_length": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "c1_positions": {
+          "shape": [
+            64
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c1_slots": {
+          "shape": [
+            64
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c2_positions": {
+          "shape": [
+            33
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "c2_slots": {
+          "shape": [
+            33
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        }
+      }
+    }
+  ],
+  "bound_input_pointers": {
+    "positions": 19792490694656,
+    "slots": 19792490695168,
+    "mask": 19792490659840
+  },
+  "replay_count": 5,
+  "observed_output_changed": true,
+  "request_slot_zero_reserved": true,
+  "scope": "Actual SGLang geometry helpers and reserved request slot; explicit live mask supplied by this probe.",
+  "elapsed_seconds": 15.295,
+  "returncode": 0,
+  "wall_seconds": 18.864
+}

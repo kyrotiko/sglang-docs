@@ -1,0 +1,38 @@
+{
+  "probe": "candidate_chain",
+  "status": "FAIL",
+  "phase": "warmup",
+  "started": "2026-11-16T16:51:02+0000",
+  "rtol": 0.001,
+  "atol": 0.001,
+  "device": "Ascend950PR_9589",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "apis": {
+    "quant_lightning_indexer_dsl": {
+      "signature": "(q: 'torch.Tensor', k: 'torch.Tensor', w: 'torch.Tensor', descale_q: 'torch.Tensor', descale_k: 'torch.Tensor', cu_seqlens_q: 'Optional[torch.Tensor]' = None, cu_seqlens_k: 'Optional[torch.Tensor]' = None, seqused_q: 'Optional[torch.Tensor]' = None, seqused_k: 'Optional[torch.Tensor]' = None, cmp_residual_k: 'Optional[torch.Tensor]' = None, block_table: 'Optional[torch.Tensor]' = None, output_idx_offset: 'Optional[torch.Tensor]' = None, metadata: 'Optional[torch.Tensor]' = None, *, topk: 'int', quant_mode: 'int', max_seqlen_q: 'int' = -1, mask_mode: 'int' = 0, cmp_ratio: 'int' = 1, layout_q: 'str' = 'TND', layout_k: 'str' = 'TND', return_value: 'bool' = False, candidate_topk_blocks: 'int' = -1, candidate_block_size: 'int' = -1, impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py"
+    },
+    "quant_lightning_indexer_metadata_dsl": {
+      "signature": "(cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', candidate_topk_blocks=-1, candidate_block_size=-1, impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_metadata_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_metadata_dsl.py"
+    },
+    "quant_sparse_lightning_indexer_dsl": {
+      "signature": "(q: 'torch.Tensor', k: 'torch.Tensor', w: 'torch.Tensor', descale_q: 'torch.Tensor', candidate_block_indices: 'torch.Tensor', candidate_block_length: 'torch.Tensor', cu_seqlens_q: 'Optional[torch.Tensor]' = None, cu_seqlens_k: 'Optional[torch.Tensor]' = None, seqused_q: 'Optional[torch.Tensor]' = None, seqused_k: 'Optional[torch.Tensor]' = None, cmp_residual_k: 'Optional[torch.Tensor]' = None, block_table: 'Optional[torch.Tensor]' = None, output_idx_offset: 'Optional[torch.Tensor]' = None, metadata: 'Optional[torch.Tensor]' = None, *, descale_k: 'Optional[torch.Tensor]' = None, topk: 'int', candidate_block_size: 'int', quant_mode: 'int', max_seqlen_q: 'int' = -1, mask_mode: 'int' = 0, cmp_ratio: 'int' = 1, layout_q: 'str' = 'TND', layout_k: 'str' = 'TND', return_value: 'bool' = False, impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.quant_sparse_lightning_indexer_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_sparse_lightning_indexer_dsl.py"
+    },
+    "quant_sparse_lightning_indexer_metadata_dsl": {
+      "signature": "(candidate_block_length, cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, quant_mode, candidate_block_size, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.quant_sparse_lightning_indexer_metadata_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_sparse_lightning_indexer_metadata_dsl.py"
+    }
+  },
+  "error": "ValueError: PA block_size must be a multiple of 16 in (0, 1024]",
+  "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1064, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1046, in dispatch_probe\n    probe_index(True)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 804, in probe_index\n    matrix(case_layouts(), prepare, lambda case: None, body, observe)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 214, in matrix\n    graph, outputs, stream = capture(body)\n                             ^^^^^^^^^^^^^\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 197, in capture\n    body()\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 784, in body\n    result = run_qli(qli, buffers, ratio, candidate)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 734, in run_qli\n    return function(\n           ^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py\", line 111, in quant_lightning_indexer_dsl\n    return get_impl_by_name(\"indexer.quant_lightning_indexer_dsl\", impl)(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py\", line 50, in _cannbot_dsl_impl\n    return _cannbot_dsl_fn(q, *args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/implementation/cannbot-dsl/indexer/quant_lightning_indexer.py\", line 7781, in quant_lightning_indexer\n    raise ValueError(\"PA block_size must be a multiple of 16 in (0, 1024]\")\nValueError: PA block_size must be a multiple of 16 in (0, 1024]\n",
+  "elapsed_seconds": 13.509,
+  "returncode": 1,
+  "wall_seconds": 16.632
+}

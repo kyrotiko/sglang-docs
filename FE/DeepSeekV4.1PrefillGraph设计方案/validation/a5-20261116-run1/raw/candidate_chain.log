@@ -1,0 +1,32 @@
+[candidate_chain] start
+/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py:716: UserWarning: Cannot create tensor with internal format while allow_internal_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:406.)
+  stage(buffers, "residual", buffers["kv_lengths"] % ratio)
+[candidate_chain] warmup
+Traceback (most recent call last):
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1064, in worker
+    dispatch_probe(options.worker)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1046, in dispatch_probe
+    probe_index(True)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 804, in probe_index
+    matrix(case_layouts(), prepare, lambda case: None, body, observe)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 214, in matrix
+    graph, outputs, stream = capture(body)
+                             ^^^^^^^^^^^^^
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 197, in capture
+    body()
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 784, in body
+    result = run_qli(qli, buffers, ratio, candidate)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 734, in run_qli
+    return function(
+           ^^^^^^^^^
+  File "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py", line 111, in quant_lightning_indexer_dsl
+    return get_impl_by_name("indexer.quant_lightning_indexer_dsl", impl)(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py", line 50, in _cannbot_dsl_impl
+    return _cannbot_dsl_fn(q, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/implementation/cannbot-dsl/indexer/quant_lightning_indexer.py", line 7781, in quant_lightning_indexer
+    raise ValueError("PA block_size must be a multiple of 16 in (0, 1024]")
+ValueError: PA block_size must be a multiple of 16 in (0, 1024]
+

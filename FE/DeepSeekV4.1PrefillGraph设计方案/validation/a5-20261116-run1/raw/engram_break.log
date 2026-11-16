@@ -1,0 +1,23 @@
+[engram_break] start
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:13: FutureWarning: triton.language.extra.cann.extension.atan2 is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.atan2 instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.atan2")
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:35: FutureWarning: triton.language.extra.cann.extension.isfinited is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.isfinited instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.isfinited")
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:49: FutureWarning: triton.language.extra.cann.extension.finitef is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.finitef instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.finitef")
+[engram_break] engram_warmup
+/mnt/share/y00627667/repos/sglang/python/sglang/srt/layers/engram.py:275: UserWarning: Cannot create tensor with internal format while allow_internal_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:406.)
+  hashes.append(rolling.unsqueeze(-1) % primes[:, i - 1])
+[engram_break] engram_capture
+[engram_break] engram_replay:full_A
+[engram_break] engram_passed:full_A
+[engram_break] engram_replay:short_B
+[engram_break] engram_passed:short_B
+[engram_break] engram_replay:page_boundary_C
+[engram_break] engram_passed:page_boundary_C
+[engram_break] engram_replay:different_prefix_D
+[engram_break] engram_passed:different_prefix_D
+[engram_break] engram_replay:repeat_A
+[engram_break] engram_passed:repeat_A
+[engram_break] engram_verify_deferred_commit
+[engram_break] complete

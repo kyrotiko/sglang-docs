@@ -1,0 +1,16 @@
+{
+  "probe": "epilog_fp4",
+  "status": "BLOCKED",
+  "phase": "start",
+  "started": "2026-11-16T16:50:09+0000",
+  "rtol": 0.001,
+  "atol": 0.001,
+  "device": "Ascend950PR_9589",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "error": "custom.kv_compress_epilog_v2 is not registered in this serving environment",
+  "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1064, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1040, in dispatch_probe\n    probe_epilog(name.split(\"_\", 1)[1])\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 496, in probe_epilog\n    function = epilog()\n               ^^^^^^^^\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 490, in epilog\n    raise Blocked(\"custom.kv_compress_epilog_v2 is not registered in this serving environment\")\nBlocked: custom.kv_compress_epilog_v2 is not registered in this serving environment\n",
+  "elapsed_seconds": 7.973,
+  "returncode": 2,
+  "wall_seconds": 10.783
+}
