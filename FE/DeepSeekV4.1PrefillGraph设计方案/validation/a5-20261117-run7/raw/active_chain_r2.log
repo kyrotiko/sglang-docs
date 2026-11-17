@@ -1,0 +1,37 @@
+[active_chain_r2] start
+[active_chain_r2] prime_legal_pending_pair
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:13: FutureWarning: triton.language.extra.cann.extension.atan2 is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.atan2 instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.atan2")
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:35: FutureWarning: triton.language.extra.cann.extension.isfinited is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.isfinited instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.isfinited")
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:49: FutureWarning: triton.language.extra.cann.extension.finitef is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.finitef instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.finitef")
+/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py:1359: UserWarning: Cannot create tensor with internal format while allow_internal_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:406.)
+  stage(buffers, "residual", buffers["kv_lengths"] % ratio)
+[active_chain_r2] warmup
+[active_chain_r2] capture_begin
+[active_chain_r2] capture_end
+[active_chain_r2] prepare:live_full
+[active_chain_r2] eager:live_full
+[active_chain_r2] replay:live_full
+[active_chain_r2] passed:live_full
+[active_chain_r2] prepare:live_odd_prefix
+[active_chain_r2] eager:live_odd_prefix
+[active_chain_r2] replay:live_odd_prefix
+[active_chain_r2] failed:live_odd_prefix
+[active_chain_r2] prepare:live_again
+[active_chain_r2] eager:live_again
+[active_chain_r2] replay:live_again
+[active_chain_r2] passed:live_again
+[active_chain_r2] comparison_failures_collected
+Traceback (most recent call last):
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1727, in worker
+    dispatch_probe(options.worker)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1705, in dispatch_probe
+    probe_idle_chain(2, include_idle=False)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1540, in probe_idle_chain
+    matrix(cases, prepare, reset, lambda: run_idle_chain(buffers, ratio, functions),
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 296, in matrix
+    raise AssertionError(f"{len(R['case_failures'])} case(s) failed comparison; all completed comparisons retained")
+AssertionError: 1 case(s) failed comparison; all completed comparisons retained
+

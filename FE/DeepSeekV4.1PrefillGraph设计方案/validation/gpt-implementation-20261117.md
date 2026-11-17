@@ -77,5 +77,7 @@ Python 编译、Ruff format、修改文件的基础 lint 和 `git diff --check` 
 
 [第五轮](a5-20261117-run5/findings.md)已回传：ratio 0/1 各 5 个 case exact；ratio 2 的 full live 与其后 idle exact，之后 live odd-prefix 的 compressed cache 有 17 字节差异。实际源码为 `24deba1e5f…`（clean），不能当作 `d3700bf0a9` 的整模验收。原 FAIL 已归档，未因此修改服务回退策略。
 
-[第六轮](a5-20261117-run6/findings.md)用合法 pending pair 比较有无 idle，两组均在 live odd-prefix 失败，差异已出现在 compressor 原始输出；两轮 idle 状态保护均通过。硬件变为 950PR、driver 25.1.rc3，实际主仓仍是 `24deba1e5f…`。revision 7 只增加独立 compressor 重复执行、逐行/首 pair 对照和合成链 replay 前同步诊断。主源码分支仍保持 `d3700bf0a9`，没有提交 idle veto 或未经设备验证的服务修复。
+[第六轮](a5-20261117-run6/findings.md)用合法 pending pair 比较有无 idle，两组均在 live odd-prefix 失败，差异已出现在 compressor 原始输出；两轮 idle 状态保护均通过。硬件变为 950PR、driver 25.1.rc3，实际主仓仍是 `24deba1e5f…`。
+
+[第七轮](a5-20261117-run7/findings.md)进一步隔离 compressor：相同 GPU 输入/state 下，odd-prefix 长 extend 的 eager 重复已在有效 row 0 不一致，其他有效行和最终 state exact；同步未消除合成链差异。已整理[算子方复现材料](../analysis/compressor_odd_prefix_reproducer.md)，等待匹配部署 ABI/构建的确认或修复，不继续原样重复 probe。主源码分支仍保持 `d3700bf0a9`，没有提交 idle veto 或未经设备验证的服务修复。
 

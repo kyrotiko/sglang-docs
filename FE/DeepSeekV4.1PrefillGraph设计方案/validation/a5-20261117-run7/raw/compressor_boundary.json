@@ -1,0 +1,6174 @@
+{
+  "probe": "compressor_boundary",
+  "status": "FAIL",
+  "phase": "collected:odd_long_repeat",
+  "started": "2026-11-17T21:19:28+0000",
+  "script_revision": 7,
+  "rtol": 0.001,
+  "atol": 0.001,
+  "reference_rtol": 0.001,
+  "reference_atol": 0.001,
+  "registration_imports": [],
+  "device": "Ascend950PR_9589",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "apis": {
+    "compressor_v2": {
+      "signature": "(x, wkv, wgate, state_cache, cmp_ratio=4, *, state_block_table=None, cu_seqlens=None, seqused=None, start_pos=None, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.compressor_v2",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/compressor_v2.py"
+    }
+  },
+  "history_setup": {
+    "0": {
+      "bank": 2,
+      "valid_prefix": 0,
+      "state_sha256": "de676bae28a480011d3d012db14bef539324e62a841a9627863c689bea168af3"
+    },
+    "1": {
+      "bank": 2,
+      "valid_prefix": 1,
+      "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c"
+    },
+    "2": {
+      "bank": 2,
+      "valid_prefix": 2,
+      "state_sha256": "33755977c972a8eb29717d36e01493eaf92ff51f8e3429ce6bf2e0ff1b13398a"
+    },
+    "3": {
+      "bank": 2,
+      "valid_prefix": 3,
+      "state_sha256": "08e1c516a5a25b53446ff952544ac870288cdfdeefb392c7ea50ff8db86ba9c2"
+    }
+  },
+  "checks": {
+    "capture": "PASS",
+    "eager_repeat": "FAIL",
+    "eager_replay": "FAIL",
+    "first_pair_invariance": "FAIL"
+  },
+  "capture_supported": true,
+  "scope": "Isolated actual compressor_v2; eager repeats and graph repeats share a fully synchronized capture stream. No norm/writer/indexer/attention/collective.",
+  "cases": [
+    {
+      "name": "even_full",
+      "parameters": {
+        "prefix": 0,
+        "live": 64,
+        "bank": 2,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "input_hashes": {
+        "eager1": {
+          "state_sha256": "de676bae28a480011d3d012db14bef539324e62a841a9627863c689bea168af3",
+          "x_sha256": "2413e704d1083f3b76d6f14076b1e940c3ceb95edd495012f5f9dea007facfd3"
+        },
+        "eager2": {
+          "state_sha256": "de676bae28a480011d3d012db14bef539324e62a841a9627863c689bea168af3",
+          "x_sha256": "2413e704d1083f3b76d6f14076b1e940c3ceb95edd495012f5f9dea007facfd3"
+        },
+        "replay1": {
+          "state_sha256": "de676bae28a480011d3d012db14bef539324e62a841a9627863c689bea168af3",
+          "x_sha256": "2413e704d1083f3b76d6f14076b1e940c3ceb95edd495012f5f9dea007facfd3"
+        },
+        "replay2": {
+          "state_sha256": "de676bae28a480011d3d012db14bef539324e62a841a9627863c689bea168af3",
+          "x_sha256": "2413e704d1083f3b76d6f14076b1e940c3ceb95edd495012f5f9dea007facfd3"
+        }
+      },
+      "comparisons": {
+        "eager2": {
+          "status": "PASS",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                32,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": []
+        },
+        "replay1": {
+          "status": "PASS",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                32,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": []
+        },
+        "replay2": {
+          "status": "PASS",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                32,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": []
+        }
+      }
+    },
+    {
+      "name": "odd_one",
+      "parameters": {
+        "prefix": 1,
+        "live": 1,
+        "bank": 2,
+        "seed": 20261127
+      },
+      "status": "PASS",
+      "input_hashes": {
+        "eager1": {
+          "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "eager2": {
+          "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "replay1": {
+          "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "replay2": {
+          "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        }
+      },
+      "comparisons": {
+        "eager2": {
+          "status": "PASS",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                1,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.0
+          ],
+          "exact_by_row": [
+            true
+          ],
+          "failures": []
+        },
+        "replay1": {
+          "status": "PASS",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                1,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.0
+          ],
+          "exact_by_row": [
+            true
+          ],
+          "failures": []
+        },
+        "replay2": {
+          "status": "PASS",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                1,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.0
+          ],
+          "exact_by_row": [
+            true
+          ],
+          "failures": []
+        }
+      }
+    },
+    {
+      "name": "odd_long",
+      "parameters": {
+        "prefix": 1,
+        "live": 31,
+        "bank": 2,
+        "seed": 20261127
+      },
+      "status": "FAIL",
+      "input_hashes": {
+        "eager1": {
+          "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "eager2": {
+          "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "replay1": {
+          "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "replay2": {
+          "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        }
+      },
+      "comparisons": {
+        "eager2": {
+          "status": "FAIL",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                16,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.13671875,
+              "max_rel": 386.15315315315314,
+              "status": "FAIL",
+              "error": "odd_long/eager2/raw: Tensor-likes are not close!\n\nMismatched elements: 500 / 8192 (6.1%)\nGreatest absolute difference: 0.13671875 at index (0, 174) (up to 0.001 allowed)\nGreatest relative difference: 386.0 at index (0, 492) (up to 0.001 allowed)"
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.13671875,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": [
+            {
+              "label": "odd_long/eager2",
+              "tensor": "raw",
+              "metrics": {
+                "shape": [
+                  16,
+                  512
+                ],
+                "dtype": "torch.bfloat16",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.13671875,
+                "max_rel": 386.15315315315314
+              },
+              "expected_sample": [
+                -0.052978515625,
+                -0.05126953125,
+                -0.00689697265625,
+                -0.0242919921875,
+                0.11181640625,
+                0.0050048828125,
+                0.0257568359375,
+                0.058837890625,
+                -0.00494384765625,
+                -0.0693359375,
+                -0.01312255859375,
+                -0.00011968612670898438
+              ],
+              "actual_sample": [
+                0.039794921875,
+                0.006561279296875,
+                -0.0142822265625,
+                0.02978515625,
+                0.053466796875,
+                -0.04345703125,
+                0.0615234375,
+                -0.05517578125,
+                -0.06689453125,
+                -0.02001953125,
+                0.0169677734375,
+                0.0174560546875
+              ],
+              "mismatch_samples": [
+                {
+                  "flat_index": 0,
+                  "coordinates": [
+                    0,
+                    0
+                  ],
+                  "expected": -0.052978515625,
+                  "actual": 0.039794921875
+                },
+                {
+                  "flat_index": 1,
+                  "coordinates": [
+                    0,
+                    1
+                  ],
+                  "expected": -0.05126953125,
+                  "actual": 0.006561279296875
+                },
+                {
+                  "flat_index": 2,
+                  "coordinates": [
+                    0,
+                    2
+                  ],
+                  "expected": -0.00689697265625,
+                  "actual": -0.0142822265625
+                },
+                {
+                  "flat_index": 3,
+                  "coordinates": [
+                    0,
+                    3
+                  ],
+                  "expected": -0.0242919921875,
+                  "actual": 0.02978515625
+                },
+                {
+                  "flat_index": 4,
+                  "coordinates": [
+                    0,
+                    4
+                  ],
+                  "expected": 0.11181640625,
+                  "actual": 0.053466796875
+                },
+                {
+                  "flat_index": 5,
+                  "coordinates": [
+                    0,
+                    5
+                  ],
+                  "expected": 0.0050048828125,
+                  "actual": -0.04345703125
+                },
+                {
+                  "flat_index": 6,
+                  "coordinates": [
+                    0,
+                    6
+                  ],
+                  "expected": 0.0257568359375,
+                  "actual": 0.0615234375
+                },
+                {
+                  "flat_index": 7,
+                  "coordinates": [
+                    0,
+                    7
+                  ],
+                  "expected": 0.058837890625,
+                  "actual": -0.05517578125
+                },
+                {
+                  "flat_index": 8,
+                  "coordinates": [
+                    0,
+                    8
+                  ],
+                  "expected": -0.00494384765625,
+                  "actual": -0.06689453125
+                },
+                {
+                  "flat_index": 9,
+                  "coordinates": [
+                    0,
+                    9
+                  ],
+                  "expected": -0.0693359375,
+                  "actual": -0.02001953125
+                },
+                {
+                  "flat_index": 10,
+                  "coordinates": [
+                    0,
+                    10
+                  ],
+                  "expected": -0.01312255859375,
+                  "actual": 0.0169677734375
+                },
+                {
+                  "flat_index": 11,
+                  "coordinates": [
+                    0,
+                    11
+                  ],
+                  "expected": -0.00011968612670898438,
+                  "actual": 0.0174560546875
+                },
+                {
+                  "flat_index": 12,
+                  "coordinates": [
+                    0,
+                    12
+                  ],
+                  "expected": -0.0634765625,
+                  "actual": -0.0859375
+                },
+                {
+                  "flat_index": 13,
+                  "coordinates": [
+                    0,
+                    13
+                  ],
+                  "expected": 0.1240234375,
+                  "actual": 0.0634765625
+                },
+                {
+                  "flat_index": 14,
+                  "coordinates": [
+                    0,
+                    14
+                  ],
+                  "expected": -0.0162353515625,
+                  "actual": 0.00189971923828125
+                },
+                {
+                  "flat_index": 15,
+                  "coordinates": [
+                    0,
+                    15
+                  ],
+                  "expected": -0.054443359375,
+                  "actual": -0.09619140625
+                },
+                {
+                  "flat_index": 16,
+                  "coordinates": [
+                    0,
+                    16
+                  ],
+                  "expected": 0.0123291015625,
+                  "actual": -0.025390625
+                },
+                {
+                  "flat_index": 17,
+                  "coordinates": [
+                    0,
+                    17
+                  ],
+                  "expected": 0.0118408203125,
+                  "actual": 0.0074462890625
+                },
+                {
+                  "flat_index": 18,
+                  "coordinates": [
+                    0,
+                    18
+                  ],
+                  "expected": 0.008544921875,
+                  "actual": -0.032958984375
+                },
+                {
+                  "flat_index": 19,
+                  "coordinates": [
+                    0,
+                    19
+                  ],
+                  "expected": 0.032470703125,
+                  "actual": -0.00982666015625
+                },
+                {
+                  "flat_index": 20,
+                  "coordinates": [
+                    0,
+                    20
+                  ],
+                  "expected": -0.026611328125,
+                  "actual": -0.043212890625
+                },
+                {
+                  "flat_index": 21,
+                  "coordinates": [
+                    0,
+                    21
+                  ],
+                  "expected": 0.03857421875,
+                  "actual": 0.04736328125
+                },
+                {
+                  "flat_index": 22,
+                  "coordinates": [
+                    0,
+                    22
+                  ],
+                  "expected": 0.107421875,
+                  "actual": 0.07080078125
+                },
+                {
+                  "flat_index": 23,
+                  "coordinates": [
+                    0,
+                    23
+                  ],
+                  "expected": 0.034423828125,
+                  "actual": 0.031005859375
+                },
+                {
+                  "flat_index": 24,
+                  "coordinates": [
+                    0,
+                    24
+                  ],
+                  "expected": 0.0034027099609375,
+                  "actual": -0.0228271484375
+                },
+                {
+                  "flat_index": 25,
+                  "coordinates": [
+                    0,
+                    25
+                  ],
+                  "expected": 0.09326171875,
+                  "actual": 0.07861328125
+                },
+                {
+                  "flat_index": 26,
+                  "coordinates": [
+                    0,
+                    26
+                  ],
+                  "expected": 0.0341796875,
+                  "actual": 0.06298828125
+                },
+                {
+                  "flat_index": 27,
+                  "coordinates": [
+                    0,
+                    27
+                  ],
+                  "expected": -0.027587890625,
+                  "actual": -0.0615234375
+                },
+                {
+                  "flat_index": 28,
+                  "coordinates": [
+                    0,
+                    28
+                  ],
+                  "expected": -0.03466796875,
+                  "actual": 0.002471923828125
+                },
+                {
+                  "flat_index": 29,
+                  "coordinates": [
+                    0,
+                    29
+                  ],
+                  "expected": -0.0252685546875,
+                  "actual": -0.026123046875
+                },
+                {
+                  "flat_index": 30,
+                  "coordinates": [
+                    0,
+                    30
+                  ],
+                  "expected": 0.0107421875,
+                  "actual": 0.027099609375
+                },
+                {
+                  "flat_index": 31,
+                  "coordinates": [
+                    0,
+                    31
+                  ],
+                  "expected": 0.028076171875,
+                  "actual": 0.037841796875
+                }
+              ],
+              "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+            }
+          ]
+        },
+        "replay1": {
+          "status": "FAIL",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                16,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.13671875,
+              "max_rel": 386.15315315315314,
+              "status": "FAIL",
+              "error": "odd_long/replay1/raw: Tensor-likes are not close!\n\nMismatched elements: 250 / 8192 (3.1%)\nGreatest absolute difference: 0.13671875 at index (0, 174) (up to 0.001 allowed)\nGreatest relative difference: 386.0 at index (0, 492) (up to 0.001 allowed)"
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.13671875,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": [
+            {
+              "label": "odd_long/replay1",
+              "tensor": "raw",
+              "metrics": {
+                "shape": [
+                  16,
+                  512
+                ],
+                "dtype": "torch.bfloat16",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.13671875,
+                "max_rel": 386.15315315315314
+              },
+              "expected_sample": [
+                -0.052978515625,
+                -0.05126953125,
+                -0.00689697265625,
+                -0.0242919921875,
+                0.11181640625,
+                0.0050048828125,
+                0.0257568359375,
+                0.058837890625,
+                -0.00494384765625,
+                -0.0693359375,
+                -0.01312255859375,
+                -0.00011968612670898438
+              ],
+              "actual_sample": [
+                -0.052978515625,
+                -0.05126953125,
+                -0.00689697265625,
+                -0.0242919921875,
+                0.11181640625,
+                0.0050048828125,
+                0.0257568359375,
+                0.058837890625,
+                -0.00494384765625,
+                -0.0693359375,
+                -0.01312255859375,
+                -0.00011968612670898438
+              ],
+              "mismatch_samples": [
+                {
+                  "flat_index": 128,
+                  "coordinates": [
+                    0,
+                    128
+                  ],
+                  "expected": 0.0400390625,
+                  "actual": -0.01190185546875
+                },
+                {
+                  "flat_index": 129,
+                  "coordinates": [
+                    0,
+                    129
+                  ],
+                  "expected": -0.0050048828125,
+                  "actual": -0.048583984375
+                },
+                {
+                  "flat_index": 130,
+                  "coordinates": [
+                    0,
+                    130
+                  ],
+                  "expected": -0.01409912109375,
+                  "actual": 0.054931640625
+                },
+                {
+                  "flat_index": 131,
+                  "coordinates": [
+                    0,
+                    131
+                  ],
+                  "expected": -0.004150390625,
+                  "actual": 0.022216796875
+                },
+                {
+                  "flat_index": 132,
+                  "coordinates": [
+                    0,
+                    132
+                  ],
+                  "expected": 0.00274658203125,
+                  "actual": -0.056884765625
+                },
+                {
+                  "flat_index": 133,
+                  "coordinates": [
+                    0,
+                    133
+                  ],
+                  "expected": 0.0859375,
+                  "actual": -0.030517578125
+                },
+                {
+                  "flat_index": 134,
+                  "coordinates": [
+                    0,
+                    134
+                  ],
+                  "expected": 0.0322265625,
+                  "actual": -0.0235595703125
+                },
+                {
+                  "flat_index": 135,
+                  "coordinates": [
+                    0,
+                    135
+                  ],
+                  "expected": 0.08544921875,
+                  "actual": 0.006988525390625
+                },
+                {
+                  "flat_index": 136,
+                  "coordinates": [
+                    0,
+                    136
+                  ],
+                  "expected": 0.0179443359375,
+                  "actual": -0.0181884765625
+                },
+                {
+                  "flat_index": 137,
+                  "coordinates": [
+                    0,
+                    137
+                  ],
+                  "expected": -0.09228515625,
+                  "actual": -0.0291748046875
+                },
+                {
+                  "flat_index": 138,
+                  "coordinates": [
+                    0,
+                    138
+                  ],
+                  "expected": 0.0296630859375,
+                  "actual": -0.0113525390625
+                },
+                {
+                  "flat_index": 139,
+                  "coordinates": [
+                    0,
+                    139
+                  ],
+                  "expected": -0.032470703125,
+                  "actual": -0.004852294921875
+                },
+                {
+                  "flat_index": 140,
+                  "coordinates": [
+                    0,
+                    140
+                  ],
+                  "expected": -0.0294189453125,
+                  "actual": 0.0194091796875
+                },
+                {
+                  "flat_index": 141,
+                  "coordinates": [
+                    0,
+                    141
+                  ],
+                  "expected": 0.02099609375,
+                  "actual": 0.07470703125
+                },
+                {
+                  "flat_index": 142,
+                  "coordinates": [
+                    0,
+                    142
+                  ],
+                  "expected": -0.06103515625,
+                  "actual": -0.080078125
+                },
+                {
+                  "flat_index": 143,
+                  "coordinates": [
+                    0,
+                    143
+                  ],
+                  "expected": -0.0235595703125,
+                  "actual": 0.003753662109375
+                },
+                {
+                  "flat_index": 144,
+                  "coordinates": [
+                    0,
+                    144
+                  ],
+                  "expected": 0.0264892578125,
+                  "actual": -0.00799560546875
+                },
+                {
+                  "flat_index": 145,
+                  "coordinates": [
+                    0,
+                    145
+                  ],
+                  "expected": 0.038818359375,
+                  "actual": -0.0113525390625
+                },
+                {
+                  "flat_index": 146,
+                  "coordinates": [
+                    0,
+                    146
+                  ],
+                  "expected": -0.02099609375,
+                  "actual": 0.04150390625
+                },
+                {
+                  "flat_index": 147,
+                  "coordinates": [
+                    0,
+                    147
+                  ],
+                  "expected": -0.0986328125,
+                  "actual": -0.042724609375
+                },
+                {
+                  "flat_index": 148,
+                  "coordinates": [
+                    0,
+                    148
+                  ],
+                  "expected": 0.059814453125,
+                  "actual": 0.0303955078125
+                },
+                {
+                  "flat_index": 149,
+                  "coordinates": [
+                    0,
+                    149
+                  ],
+                  "expected": -0.03125,
+                  "actual": -0.04248046875
+                },
+                {
+                  "flat_index": 150,
+                  "coordinates": [
+                    0,
+                    150
+                  ],
+                  "expected": 0.00811767578125,
+                  "actual": 0.03515625
+                },
+                {
+                  "flat_index": 151,
+                  "coordinates": [
+                    0,
+                    151
+                  ],
+                  "expected": -0.0125732421875,
+                  "actual": -0.07177734375
+                },
+                {
+                  "flat_index": 152,
+                  "coordinates": [
+                    0,
+                    152
+                  ],
+                  "expected": -0.1015625,
+                  "actual": -0.1357421875
+                },
+                {
+                  "flat_index": 153,
+                  "coordinates": [
+                    0,
+                    153
+                  ],
+                  "expected": 0.09619140625,
+                  "actual": -0.03515625
+                },
+                {
+                  "flat_index": 154,
+                  "coordinates": [
+                    0,
+                    154
+                  ],
+                  "expected": 0.020751953125,
+                  "actual": 0.0263671875
+                },
+                {
+                  "flat_index": 155,
+                  "coordinates": [
+                    0,
+                    155
+                  ],
+                  "expected": 0.1259765625,
+                  "actual": 0.056884765625
+                },
+                {
+                  "flat_index": 156,
+                  "coordinates": [
+                    0,
+                    156
+                  ],
+                  "expected": -0.003631591796875,
+                  "actual": -0.0302734375
+                },
+                {
+                  "flat_index": 157,
+                  "coordinates": [
+                    0,
+                    157
+                  ],
+                  "expected": -0.028564453125,
+                  "actual": 0.035400390625
+                },
+                {
+                  "flat_index": 158,
+                  "coordinates": [
+                    0,
+                    158
+                  ],
+                  "expected": -0.00188446044921875,
+                  "actual": 0.0035858154296875
+                },
+                {
+                  "flat_index": 159,
+                  "coordinates": [
+                    0,
+                    159
+                  ],
+                  "expected": 0.057373046875,
+                  "actual": -0.01611328125
+                }
+              ],
+              "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+            }
+          ]
+        },
+        "replay2": {
+          "status": "FAIL",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                16,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.118896484375,
+              "max_rel": 386.15315315315314,
+              "status": "FAIL",
+              "error": "odd_long/replay2/raw: Tensor-likes are not close!\n\nMismatched elements: 376 / 8192 (4.6%)\nGreatest absolute difference: 0.119140625 at index (0, 120) (up to 0.001 allowed)\nGreatest relative difference: 386.0 at index (0, 492) (up to 0.001 allowed)"
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.118896484375,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": [
+            {
+              "label": "odd_long/replay2",
+              "tensor": "raw",
+              "metrics": {
+                "shape": [
+                  16,
+                  512
+                ],
+                "dtype": "torch.bfloat16",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.118896484375,
+                "max_rel": 386.15315315315314
+              },
+              "expected_sample": [
+                -0.052978515625,
+                -0.05126953125,
+                -0.00689697265625,
+                -0.0242919921875,
+                0.11181640625,
+                0.0050048828125,
+                0.0257568359375,
+                0.058837890625,
+                -0.00494384765625,
+                -0.0693359375,
+                -0.01312255859375,
+                -0.00011968612670898438
+              ],
+              "actual_sample": [
+                0.039794921875,
+                0.006561279296875,
+                -0.0142822265625,
+                0.02978515625,
+                0.053466796875,
+                -0.04345703125,
+                0.0615234375,
+                -0.05517578125,
+                -0.06689453125,
+                -0.02001953125,
+                0.0169677734375,
+                0.0174560546875
+              ],
+              "mismatch_samples": [
+                {
+                  "flat_index": 0,
+                  "coordinates": [
+                    0,
+                    0
+                  ],
+                  "expected": -0.052978515625,
+                  "actual": 0.039794921875
+                },
+                {
+                  "flat_index": 1,
+                  "coordinates": [
+                    0,
+                    1
+                  ],
+                  "expected": -0.05126953125,
+                  "actual": 0.006561279296875
+                },
+                {
+                  "flat_index": 2,
+                  "coordinates": [
+                    0,
+                    2
+                  ],
+                  "expected": -0.00689697265625,
+                  "actual": -0.0142822265625
+                },
+                {
+                  "flat_index": 3,
+                  "coordinates": [
+                    0,
+                    3
+                  ],
+                  "expected": -0.0242919921875,
+                  "actual": 0.02978515625
+                },
+                {
+                  "flat_index": 4,
+                  "coordinates": [
+                    0,
+                    4
+                  ],
+                  "expected": 0.11181640625,
+                  "actual": 0.053466796875
+                },
+                {
+                  "flat_index": 5,
+                  "coordinates": [
+                    0,
+                    5
+                  ],
+                  "expected": 0.0050048828125,
+                  "actual": -0.04345703125
+                },
+                {
+                  "flat_index": 6,
+                  "coordinates": [
+                    0,
+                    6
+                  ],
+                  "expected": 0.0257568359375,
+                  "actual": 0.0615234375
+                },
+                {
+                  "flat_index": 7,
+                  "coordinates": [
+                    0,
+                    7
+                  ],
+                  "expected": 0.058837890625,
+                  "actual": -0.05517578125
+                },
+                {
+                  "flat_index": 8,
+                  "coordinates": [
+                    0,
+                    8
+                  ],
+                  "expected": -0.00494384765625,
+                  "actual": -0.06689453125
+                },
+                {
+                  "flat_index": 9,
+                  "coordinates": [
+                    0,
+                    9
+                  ],
+                  "expected": -0.0693359375,
+                  "actual": -0.02001953125
+                },
+                {
+                  "flat_index": 10,
+                  "coordinates": [
+                    0,
+                    10
+                  ],
+                  "expected": -0.01312255859375,
+                  "actual": 0.0169677734375
+                },
+                {
+                  "flat_index": 11,
+                  "coordinates": [
+                    0,
+                    11
+                  ],
+                  "expected": -0.00011968612670898438,
+                  "actual": 0.0174560546875
+                },
+                {
+                  "flat_index": 12,
+                  "coordinates": [
+                    0,
+                    12
+                  ],
+                  "expected": -0.0634765625,
+                  "actual": -0.0859375
+                },
+                {
+                  "flat_index": 13,
+                  "coordinates": [
+                    0,
+                    13
+                  ],
+                  "expected": 0.1240234375,
+                  "actual": 0.0634765625
+                },
+                {
+                  "flat_index": 14,
+                  "coordinates": [
+                    0,
+                    14
+                  ],
+                  "expected": -0.0162353515625,
+                  "actual": 0.00189971923828125
+                },
+                {
+                  "flat_index": 15,
+                  "coordinates": [
+                    0,
+                    15
+                  ],
+                  "expected": -0.054443359375,
+                  "actual": -0.09619140625
+                },
+                {
+                  "flat_index": 16,
+                  "coordinates": [
+                    0,
+                    16
+                  ],
+                  "expected": 0.0123291015625,
+                  "actual": -0.025390625
+                },
+                {
+                  "flat_index": 17,
+                  "coordinates": [
+                    0,
+                    17
+                  ],
+                  "expected": 0.0118408203125,
+                  "actual": 0.0074462890625
+                },
+                {
+                  "flat_index": 18,
+                  "coordinates": [
+                    0,
+                    18
+                  ],
+                  "expected": 0.008544921875,
+                  "actual": -0.032958984375
+                },
+                {
+                  "flat_index": 19,
+                  "coordinates": [
+                    0,
+                    19
+                  ],
+                  "expected": 0.032470703125,
+                  "actual": -0.00982666015625
+                },
+                {
+                  "flat_index": 20,
+                  "coordinates": [
+                    0,
+                    20
+                  ],
+                  "expected": -0.026611328125,
+                  "actual": -0.043212890625
+                },
+                {
+                  "flat_index": 21,
+                  "coordinates": [
+                    0,
+                    21
+                  ],
+                  "expected": 0.03857421875,
+                  "actual": 0.04736328125
+                },
+                {
+                  "flat_index": 22,
+                  "coordinates": [
+                    0,
+                    22
+                  ],
+                  "expected": 0.107421875,
+                  "actual": 0.07080078125
+                },
+                {
+                  "flat_index": 23,
+                  "coordinates": [
+                    0,
+                    23
+                  ],
+                  "expected": 0.034423828125,
+                  "actual": 0.031005859375
+                },
+                {
+                  "flat_index": 24,
+                  "coordinates": [
+                    0,
+                    24
+                  ],
+                  "expected": 0.0034027099609375,
+                  "actual": -0.0228271484375
+                },
+                {
+                  "flat_index": 25,
+                  "coordinates": [
+                    0,
+                    25
+                  ],
+                  "expected": 0.09326171875,
+                  "actual": 0.07861328125
+                },
+                {
+                  "flat_index": 26,
+                  "coordinates": [
+                    0,
+                    26
+                  ],
+                  "expected": 0.0341796875,
+                  "actual": 0.06298828125
+                },
+                {
+                  "flat_index": 27,
+                  "coordinates": [
+                    0,
+                    27
+                  ],
+                  "expected": -0.027587890625,
+                  "actual": -0.0615234375
+                },
+                {
+                  "flat_index": 28,
+                  "coordinates": [
+                    0,
+                    28
+                  ],
+                  "expected": -0.03466796875,
+                  "actual": 0.002471923828125
+                },
+                {
+                  "flat_index": 29,
+                  "coordinates": [
+                    0,
+                    29
+                  ],
+                  "expected": -0.0252685546875,
+                  "actual": -0.026123046875
+                },
+                {
+                  "flat_index": 30,
+                  "coordinates": [
+                    0,
+                    30
+                  ],
+                  "expected": 0.0107421875,
+                  "actual": 0.027099609375
+                },
+                {
+                  "flat_index": 31,
+                  "coordinates": [
+                    0,
+                    31
+                  ],
+                  "expected": 0.028076171875,
+                  "actual": 0.037841796875
+                }
+              ],
+              "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "even_long",
+      "parameters": {
+        "prefix": 2,
+        "live": 31,
+        "bank": 2,
+        "seed": 20261127
+      },
+      "status": "PASS",
+      "input_hashes": {
+        "eager1": {
+          "state_sha256": "33755977c972a8eb29717d36e01493eaf92ff51f8e3429ce6bf2e0ff1b13398a",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "eager2": {
+          "state_sha256": "33755977c972a8eb29717d36e01493eaf92ff51f8e3429ce6bf2e0ff1b13398a",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "replay1": {
+          "state_sha256": "33755977c972a8eb29717d36e01493eaf92ff51f8e3429ce6bf2e0ff1b13398a",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "replay2": {
+          "state_sha256": "33755977c972a8eb29717d36e01493eaf92ff51f8e3429ce6bf2e0ff1b13398a",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        }
+      },
+      "comparisons": {
+        "eager2": {
+          "status": "PASS",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                15,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": []
+        },
+        "replay1": {
+          "status": "PASS",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                15,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": []
+        },
+        "replay2": {
+          "status": "PASS",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                15,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": true,
+              "finite": true,
+              "max_abs": 0.0,
+              "max_rel": 0.0
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": []
+        }
+      }
+    },
+    {
+      "name": "shifted_odd_long",
+      "parameters": {
+        "prefix": 3,
+        "live": 31,
+        "bank": 2,
+        "seed": 20261127
+      },
+      "status": "FAIL",
+      "input_hashes": {
+        "eager1": {
+          "state_sha256": "08e1c516a5a25b53446ff952544ac870288cdfdeefb392c7ea50ff8db86ba9c2",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "eager2": {
+          "state_sha256": "08e1c516a5a25b53446ff952544ac870288cdfdeefb392c7ea50ff8db86ba9c2",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "replay1": {
+          "state_sha256": "08e1c516a5a25b53446ff952544ac870288cdfdeefb392c7ea50ff8db86ba9c2",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "replay2": {
+          "state_sha256": "08e1c516a5a25b53446ff952544ac870288cdfdeefb392c7ea50ff8db86ba9c2",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        }
+      },
+      "comparisons": {
+        "eager2": {
+          "status": "FAIL",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                16,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.132568359375,
+              "max_rel": 40134.952662721895,
+              "status": "FAIL",
+              "error": "shifted_odd_long/eager2/raw: Tensor-likes are not close!\n\nMismatched elements: 424 / 8192 (5.2%)\nGreatest absolute difference: 0.1328125 at index (0, 398) (up to 0.001 allowed)\nGreatest relative difference: 40192.0 at index (0, 504) (up to 0.001 allowed)"
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.132568359375,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": [
+            {
+              "label": "shifted_odd_long/eager2",
+              "tensor": "raw",
+              "metrics": {
+                "shape": [
+                  16,
+                  512
+                ],
+                "dtype": "torch.bfloat16",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.132568359375,
+                "max_rel": 40134.952662721895
+              },
+              "expected_sample": [
+                0.044189453125,
+                -0.017578125,
+                0.0140380859375,
+                -0.01226806640625,
+                0.1435546875,
+                -0.03076171875,
+                0.043212890625,
+                0.06591796875,
+                -0.0028839111328125,
+                -0.058349609375,
+                0.0196533203125,
+                0.013671875
+              ],
+              "actual_sample": [
+                0.037353515625,
+                0.0059814453125,
+                -0.0142822265625,
+                0.0296630859375,
+                0.05224609375,
+                -0.041259765625,
+                0.061767578125,
+                -0.05908203125,
+                -0.06787109375,
+                -0.027587890625,
+                0.01556396484375,
+                0.0181884765625
+              ],
+              "mismatch_samples": [
+                {
+                  "flat_index": 0,
+                  "coordinates": [
+                    0,
+                    0
+                  ],
+                  "expected": 0.044189453125,
+                  "actual": 0.037353515625
+                },
+                {
+                  "flat_index": 1,
+                  "coordinates": [
+                    0,
+                    1
+                  ],
+                  "expected": -0.017578125,
+                  "actual": 0.0059814453125
+                },
+                {
+                  "flat_index": 2,
+                  "coordinates": [
+                    0,
+                    2
+                  ],
+                  "expected": 0.0140380859375,
+                  "actual": -0.0142822265625
+                },
+                {
+                  "flat_index": 3,
+                  "coordinates": [
+                    0,
+                    3
+                  ],
+                  "expected": -0.01226806640625,
+                  "actual": 0.0296630859375
+                },
+                {
+                  "flat_index": 4,
+                  "coordinates": [
+                    0,
+                    4
+                  ],
+                  "expected": 0.1435546875,
+                  "actual": 0.05224609375
+                },
+                {
+                  "flat_index": 5,
+                  "coordinates": [
+                    0,
+                    5
+                  ],
+                  "expected": -0.03076171875,
+                  "actual": -0.041259765625
+                },
+                {
+                  "flat_index": 6,
+                  "coordinates": [
+                    0,
+                    6
+                  ],
+                  "expected": 0.043212890625,
+                  "actual": 0.061767578125
+                },
+                {
+                  "flat_index": 7,
+                  "coordinates": [
+                    0,
+                    7
+                  ],
+                  "expected": 0.06591796875,
+                  "actual": -0.05908203125
+                },
+                {
+                  "flat_index": 8,
+                  "coordinates": [
+                    0,
+                    8
+                  ],
+                  "expected": -0.0028839111328125,
+                  "actual": -0.06787109375
+                },
+                {
+                  "flat_index": 9,
+                  "coordinates": [
+                    0,
+                    9
+                  ],
+                  "expected": -0.058349609375,
+                  "actual": -0.027587890625
+                },
+                {
+                  "flat_index": 10,
+                  "coordinates": [
+                    0,
+                    10
+                  ],
+                  "expected": 0.0196533203125,
+                  "actual": 0.01556396484375
+                },
+                {
+                  "flat_index": 11,
+                  "coordinates": [
+                    0,
+                    11
+                  ],
+                  "expected": 0.013671875,
+                  "actual": 0.0181884765625
+                },
+                {
+                  "flat_index": 12,
+                  "coordinates": [
+                    0,
+                    12
+                  ],
+                  "expected": -0.042724609375,
+                  "actual": -0.0869140625
+                },
+                {
+                  "flat_index": 13,
+                  "coordinates": [
+                    0,
+                    13
+                  ],
+                  "expected": 0.07763671875,
+                  "actual": 0.06298828125
+                },
+                {
+                  "flat_index": 14,
+                  "coordinates": [
+                    0,
+                    14
+                  ],
+                  "expected": -0.043701171875,
+                  "actual": 0.0027313232421875
+                },
+                {
+                  "flat_index": 15,
+                  "coordinates": [
+                    0,
+                    15
+                  ],
+                  "expected": -0.09423828125,
+                  "actual": -0.09375
+                },
+                {
+                  "flat_index": 16,
+                  "coordinates": [
+                    0,
+                    16
+                  ],
+                  "expected": -0.011474609375,
+                  "actual": -0.02783203125
+                },
+                {
+                  "flat_index": 17,
+                  "coordinates": [
+                    0,
+                    17
+                  ],
+                  "expected": -0.01416015625,
+                  "actual": 0.0081787109375
+                },
+                {
+                  "flat_index": 18,
+                  "coordinates": [
+                    0,
+                    18
+                  ],
+                  "expected": -0.012451171875,
+                  "actual": -0.03271484375
+                },
+                {
+                  "flat_index": 19,
+                  "coordinates": [
+                    0,
+                    19
+                  ],
+                  "expected": -0.01287841796875,
+                  "actual": -0.00958251953125
+                },
+                {
+                  "flat_index": 20,
+                  "coordinates": [
+                    0,
+                    20
+                  ],
+                  "expected": -0.0712890625,
+                  "actual": -0.04296875
+                },
+                {
+                  "flat_index": 21,
+                  "coordinates": [
+                    0,
+                    21
+                  ],
+                  "expected": 0.08544921875,
+                  "actual": 0.045654296875
+                },
+                {
+                  "flat_index": 22,
+                  "coordinates": [
+                    0,
+                    22
+                  ],
+                  "expected": 0.05419921875,
+                  "actual": 0.0732421875
+                },
+                {
+                  "flat_index": 23,
+                  "coordinates": [
+                    0,
+                    23
+                  ],
+                  "expected": -0.0218505859375,
+                  "actual": 0.03173828125
+                },
+                {
+                  "flat_index": 24,
+                  "coordinates": [
+                    0,
+                    24
+                  ],
+                  "expected": -0.03857421875,
+                  "actual": -0.0224609375
+                },
+                {
+                  "flat_index": 25,
+                  "coordinates": [
+                    0,
+                    25
+                  ],
+                  "expected": 0.05712890625,
+                  "actual": 0.078125
+                },
+                {
+                  "flat_index": 26,
+                  "coordinates": [
+                    0,
+                    26
+                  ],
+                  "expected": -0.0078125,
+                  "actual": 0.0625
+                },
+                {
+                  "flat_index": 27,
+                  "coordinates": [
+                    0,
+                    27
+                  ],
+                  "expected": 0.0235595703125,
+                  "actual": -0.0615234375
+                },
+                {
+                  "flat_index": 28,
+                  "coordinates": [
+                    0,
+                    28
+                  ],
+                  "expected": -0.01470947265625,
+                  "actual": 0.007659912109375
+                },
+                {
+                  "flat_index": 29,
+                  "coordinates": [
+                    0,
+                    29
+                  ],
+                  "expected": -0.07666015625,
+                  "actual": -0.0264892578125
+                },
+                {
+                  "flat_index": 30,
+                  "coordinates": [
+                    0,
+                    30
+                  ],
+                  "expected": -0.00750732421875,
+                  "actual": 0.026611328125
+                },
+                {
+                  "flat_index": 31,
+                  "coordinates": [
+                    0,
+                    31
+                  ],
+                  "expected": -0.0019989013671875,
+                  "actual": 0.0390625
+                }
+              ],
+              "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+            }
+          ]
+        },
+        "replay1": {
+          "status": "FAIL",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                16,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.132568359375,
+              "max_rel": 40134.952662721895,
+              "status": "FAIL",
+              "error": "shifted_odd_long/replay1/raw: Tensor-likes are not close!\n\nMismatched elements: 126 / 8192 (1.5%)\nGreatest absolute difference: 0.1328125 at index (0, 398) (up to 0.001 allowed)\nGreatest relative difference: 40192.0 at index (0, 504) (up to 0.001 allowed)"
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.132568359375,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": [
+            {
+              "label": "shifted_odd_long/replay1",
+              "tensor": "raw",
+              "metrics": {
+                "shape": [
+                  16,
+                  512
+                ],
+                "dtype": "torch.bfloat16",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.132568359375,
+                "max_rel": 40134.952662721895
+              },
+              "expected_sample": [
+                0.044189453125,
+                -0.017578125,
+                0.0140380859375,
+                -0.01226806640625,
+                0.1435546875,
+                -0.03076171875,
+                0.043212890625,
+                0.06591796875,
+                -0.0028839111328125,
+                -0.058349609375,
+                0.0196533203125,
+                0.013671875
+              ],
+              "actual_sample": [
+                0.044189453125,
+                -0.017578125,
+                0.0140380859375,
+                -0.01226806640625,
+                0.1435546875,
+                -0.03076171875,
+                0.043212890625,
+                0.06591796875,
+                -0.0028839111328125,
+                -0.058349609375,
+                0.0196533203125,
+                0.013671875
+              ],
+              "mismatch_samples": [
+                {
+                  "flat_index": 384,
+                  "coordinates": [
+                    0,
+                    384
+                  ],
+                  "expected": 0.0262451171875,
+                  "actual": -0.006591796875
+                },
+                {
+                  "flat_index": 385,
+                  "coordinates": [
+                    0,
+                    385
+                  ],
+                  "expected": -0.0189208984375,
+                  "actual": -0.0576171875
+                },
+                {
+                  "flat_index": 386,
+                  "coordinates": [
+                    0,
+                    386
+                  ],
+                  "expected": 0.0054931640625,
+                  "actual": -0.00689697265625
+                },
+                {
+                  "flat_index": 387,
+                  "coordinates": [
+                    0,
+                    387
+                  ],
+                  "expected": 0.0771484375,
+                  "actual": 0.095703125
+                },
+                {
+                  "flat_index": 388,
+                  "coordinates": [
+                    0,
+                    388
+                  ],
+                  "expected": -0.03662109375,
+                  "actual": -0.0341796875
+                },
+                {
+                  "flat_index": 389,
+                  "coordinates": [
+                    0,
+                    389
+                  ],
+                  "expected": -0.0001621246337890625,
+                  "actual": -0.01806640625
+                },
+                {
+                  "flat_index": 390,
+                  "coordinates": [
+                    0,
+                    390
+                  ],
+                  "expected": -0.0179443359375,
+                  "actual": -0.02197265625
+                },
+                {
+                  "flat_index": 391,
+                  "coordinates": [
+                    0,
+                    391
+                  ],
+                  "expected": 0.0006561279296875,
+                  "actual": -0.00848388671875
+                },
+                {
+                  "flat_index": 392,
+                  "coordinates": [
+                    0,
+                    392
+                  ],
+                  "expected": -0.0074462890625,
+                  "actual": 0.034423828125
+                },
+                {
+                  "flat_index": 393,
+                  "coordinates": [
+                    0,
+                    393
+                  ],
+                  "expected": -0.01104736328125,
+                  "actual": -0.029052734375
+                },
+                {
+                  "flat_index": 394,
+                  "coordinates": [
+                    0,
+                    394
+                  ],
+                  "expected": -0.015869140625,
+                  "actual": 0.046875
+                },
+                {
+                  "flat_index": 395,
+                  "coordinates": [
+                    0,
+                    395
+                  ],
+                  "expected": 0.0181884765625,
+                  "actual": 0.04541015625
+                },
+                {
+                  "flat_index": 396,
+                  "coordinates": [
+                    0,
+                    396
+                  ],
+                  "expected": -0.035400390625,
+                  "actual": -0.006439208984375
+                },
+                {
+                  "flat_index": 397,
+                  "coordinates": [
+                    0,
+                    397
+                  ],
+                  "expected": 0.0263671875,
+                  "actual": 0.0732421875
+                },
+                {
+                  "flat_index": 398,
+                  "coordinates": [
+                    0,
+                    398
+                  ],
+                  "expected": 0.038818359375,
+                  "actual": -0.09375
+                },
+                {
+                  "flat_index": 399,
+                  "coordinates": [
+                    0,
+                    399
+                  ],
+                  "expected": -0.055908203125,
+                  "actual": 0.0020751953125
+                },
+                {
+                  "flat_index": 400,
+                  "coordinates": [
+                    0,
+                    400
+                  ],
+                  "expected": 0.02880859375,
+                  "actual": 0.0115966796875
+                },
+                {
+                  "flat_index": 401,
+                  "coordinates": [
+                    0,
+                    401
+                  ],
+                  "expected": -0.056396484375,
+                  "actual": -0.0157470703125
+                },
+                {
+                  "flat_index": 402,
+                  "coordinates": [
+                    0,
+                    402
+                  ],
+                  "expected": -0.006011962890625,
+                  "actual": 0.0595703125
+                },
+                {
+                  "flat_index": 403,
+                  "coordinates": [
+                    0,
+                    403
+                  ],
+                  "expected": -0.0103759765625,
+                  "actual": -0.00174713134765625
+                },
+                {
+                  "flat_index": 404,
+                  "coordinates": [
+                    0,
+                    404
+                  ],
+                  "expected": -0.024658203125,
+                  "actual": 0.006134033203125
+                },
+                {
+                  "flat_index": 405,
+                  "coordinates": [
+                    0,
+                    405
+                  ],
+                  "expected": -0.0247802734375,
+                  "actual": 0.05078125
+                },
+                {
+                  "flat_index": 406,
+                  "coordinates": [
+                    0,
+                    406
+                  ],
+                  "expected": 0.01043701171875,
+                  "actual": 0.015380859375
+                },
+                {
+                  "flat_index": 407,
+                  "coordinates": [
+                    0,
+                    407
+                  ],
+                  "expected": 0.0208740234375,
+                  "actual": -0.0003814697265625
+                },
+                {
+                  "flat_index": 408,
+                  "coordinates": [
+                    0,
+                    408
+                  ],
+                  "expected": -0.0301513671875,
+                  "actual": 0.0179443359375
+                },
+                {
+                  "flat_index": 409,
+                  "coordinates": [
+                    0,
+                    409
+                  ],
+                  "expected": 0.018310546875,
+                  "actual": 0.00089263916015625
+                },
+                {
+                  "flat_index": 410,
+                  "coordinates": [
+                    0,
+                    410
+                  ],
+                  "expected": -0.056884765625,
+                  "actual": -0.099609375
+                },
+                {
+                  "flat_index": 411,
+                  "coordinates": [
+                    0,
+                    411
+                  ],
+                  "expected": -0.0146484375,
+                  "actual": -0.0301513671875
+                },
+                {
+                  "flat_index": 412,
+                  "coordinates": [
+                    0,
+                    412
+                  ],
+                  "expected": 0.00093841552734375,
+                  "actual": -0.036376953125
+                },
+                {
+                  "flat_index": 413,
+                  "coordinates": [
+                    0,
+                    413
+                  ],
+                  "expected": 0.0185546875,
+                  "actual": 0.037109375
+                },
+                {
+                  "flat_index": 414,
+                  "coordinates": [
+                    0,
+                    414
+                  ],
+                  "expected": 0.0419921875,
+                  "actual": 0.1025390625
+                },
+                {
+                  "flat_index": 415,
+                  "coordinates": [
+                    0,
+                    415
+                  ],
+                  "expected": -0.046630859375,
+                  "actual": -0.01239013671875
+                }
+              ],
+              "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+            }
+          ]
+        },
+        "replay2": {
+          "status": "FAIL",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                16,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.132080078125,
+              "max_rel": 79.06060606060606,
+              "status": "FAIL",
+              "error": "shifted_odd_long/replay2/raw: Tensor-likes are not close!\n\nMismatched elements: 125 / 8192 (1.5%)\nGreatest absolute difference: 0.1318359375 at index (0, 243) (up to 0.001 allowed)\nGreatest relative difference: 79.0 at index (0, 206) (up to 0.001 allowed)"
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.132080078125,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": [
+            {
+              "label": "shifted_odd_long/replay2",
+              "tensor": "raw",
+              "metrics": {
+                "shape": [
+                  16,
+                  512
+                ],
+                "dtype": "torch.bfloat16",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.132080078125,
+                "max_rel": 79.06060606060606
+              },
+              "expected_sample": [
+                0.044189453125,
+                -0.017578125,
+                0.0140380859375,
+                -0.01226806640625,
+                0.1435546875,
+                -0.03076171875,
+                0.043212890625,
+                0.06591796875,
+                -0.0028839111328125,
+                -0.058349609375,
+                0.0196533203125,
+                0.013671875
+              ],
+              "actual_sample": [
+                0.044189453125,
+                -0.017578125,
+                0.0140380859375,
+                -0.01226806640625,
+                0.1435546875,
+                -0.03076171875,
+                0.043212890625,
+                0.06591796875,
+                -0.0028839111328125,
+                -0.058349609375,
+                0.0196533203125,
+                0.013671875
+              ],
+              "mismatch_samples": [
+                {
+                  "flat_index": 128,
+                  "coordinates": [
+                    0,
+                    128
+                  ],
+                  "expected": 0.0196533203125,
+                  "actual": 0.039794921875
+                },
+                {
+                  "flat_index": 129,
+                  "coordinates": [
+                    0,
+                    129
+                  ],
+                  "expected": -0.048828125,
+                  "actual": -0.005828857421875
+                },
+                {
+                  "flat_index": 130,
+                  "coordinates": [
+                    0,
+                    130
+                  ],
+                  "expected": 0.0390625,
+                  "actual": -0.01422119140625
+                },
+                {
+                  "flat_index": 131,
+                  "coordinates": [
+                    0,
+                    131
+                  ],
+                  "expected": -0.00122833251953125,
+                  "actual": -0.004150390625
+                },
+                {
+                  "flat_index": 132,
+                  "coordinates": [
+                    0,
+                    132
+                  ],
+                  "expected": -0.0291748046875,
+                  "actual": 0.002777099609375
+                },
+                {
+                  "flat_index": 133,
+                  "coordinates": [
+                    0,
+                    133
+                  ],
+                  "expected": 0.05712890625,
+                  "actual": 0.09033203125
+                },
+                {
+                  "flat_index": 134,
+                  "coordinates": [
+                    0,
+                    134
+                  ],
+                  "expected": 0.0013275146484375,
+                  "actual": 0.0322265625
+                },
+                {
+                  "flat_index": 135,
+                  "coordinates": [
+                    0,
+                    135
+                  ],
+                  "expected": 0.016357421875,
+                  "actual": 0.091796875
+                },
+                {
+                  "flat_index": 136,
+                  "coordinates": [
+                    0,
+                    136
+                  ],
+                  "expected": -0.0888671875,
+                  "actual": 0.01953125
+                },
+                {
+                  "flat_index": 137,
+                  "coordinates": [
+                    0,
+                    137
+                  ],
+                  "expected": -0.05419921875,
+                  "actual": -0.0927734375
+                },
+                {
+                  "flat_index": 138,
+                  "coordinates": [
+                    0,
+                    138
+                  ],
+                  "expected": 0.044677734375,
+                  "actual": 0.0289306640625
+                },
+                {
+                  "flat_index": 139,
+                  "coordinates": [
+                    0,
+                    139
+                  ],
+                  "expected": -0.0101318359375,
+                  "actual": -0.033447265625
+                },
+                {
+                  "flat_index": 140,
+                  "coordinates": [
+                    0,
+                    140
+                  ],
+                  "expected": 0.04443359375,
+                  "actual": -0.029541015625
+                },
+                {
+                  "flat_index": 141,
+                  "coordinates": [
+                    0,
+                    141
+                  ],
+                  "expected": 0.0184326171875,
+                  "actual": 0.0234375
+                },
+                {
+                  "flat_index": 142,
+                  "coordinates": [
+                    0,
+                    142
+                  ],
+                  "expected": -0.0233154296875,
+                  "actual": -0.061279296875
+                },
+                {
+                  "flat_index": 143,
+                  "coordinates": [
+                    0,
+                    143
+                  ],
+                  "expected": -0.017333984375,
+                  "actual": -0.02099609375
+                },
+                {
+                  "flat_index": 144,
+                  "coordinates": [
+                    0,
+                    144
+                  ],
+                  "expected": 0.025634765625,
+                  "actual": 0.028076171875
+                },
+                {
+                  "flat_index": 145,
+                  "coordinates": [
+                    0,
+                    145
+                  ],
+                  "expected": 0.0169677734375,
+                  "actual": 0.037841796875
+                },
+                {
+                  "flat_index": 146,
+                  "coordinates": [
+                    0,
+                    146
+                  ],
+                  "expected": -0.03662109375,
+                  "actual": -0.0211181640625
+                },
+                {
+                  "flat_index": 147,
+                  "coordinates": [
+                    0,
+                    147
+                  ],
+                  "expected": -0.1083984375,
+                  "actual": -0.0986328125
+                },
+                {
+                  "flat_index": 148,
+                  "coordinates": [
+                    0,
+                    148
+                  ],
+                  "expected": 0.09033203125,
+                  "actual": 0.064453125
+                },
+                {
+                  "flat_index": 149,
+                  "coordinates": [
+                    0,
+                    149
+                  ],
+                  "expected": -0.03125,
+                  "actual": -0.02880859375
+                },
+                {
+                  "flat_index": 150,
+                  "coordinates": [
+                    0,
+                    150
+                  ],
+                  "expected": 0.03857421875,
+                  "actual": 0.005950927734375
+                },
+                {
+                  "flat_index": 151,
+                  "coordinates": [
+                    0,
+                    151
+                  ],
+                  "expected": -0.09423828125,
+                  "actual": -0.01318359375
+                },
+                {
+                  "flat_index": 152,
+                  "coordinates": [
+                    0,
+                    152
+                  ],
+                  "expected": -0.0177001953125,
+                  "actual": -0.0927734375
+                },
+                {
+                  "flat_index": 153,
+                  "coordinates": [
+                    0,
+                    153
+                  ],
+                  "expected": 0.07177734375,
+                  "actual": 0.095703125
+                },
+                {
+                  "flat_index": 154,
+                  "coordinates": [
+                    0,
+                    154
+                  ],
+                  "expected": 0.0145263671875,
+                  "actual": 0.020263671875
+                },
+                {
+                  "flat_index": 155,
+                  "coordinates": [
+                    0,
+                    155
+                  ],
+                  "expected": -0.004119873046875,
+                  "actual": 0.11962890625
+                },
+                {
+                  "flat_index": 156,
+                  "coordinates": [
+                    0,
+                    156
+                  ],
+                  "expected": -0.05419921875,
+                  "actual": -0.0030364990234375
+                },
+                {
+                  "flat_index": 157,
+                  "coordinates": [
+                    0,
+                    157
+                  ],
+                  "expected": 0.027587890625,
+                  "actual": -0.029052734375
+                },
+                {
+                  "flat_index": 158,
+                  "coordinates": [
+                    0,
+                    158
+                  ],
+                  "expected": -0.0159912109375,
+                  "actual": -0.0030670166015625
+                },
+                {
+                  "flat_index": 159,
+                  "coordinates": [
+                    0,
+                    159
+                  ],
+                  "expected": 0.0157470703125,
+                  "actual": 0.05419921875
+                }
+              ],
+              "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "odd_long_repeat",
+      "parameters": {
+        "prefix": 1,
+        "live": 31,
+        "bank": 2,
+        "seed": 20261127
+      },
+      "status": "FAIL",
+      "input_hashes": {
+        "eager1": {
+          "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "eager2": {
+          "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "replay1": {
+          "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        },
+        "replay2": {
+          "state_sha256": "786e4cc3b4f5958b244705ec8d3fca93ac981b5493975c2616dd9b251ad9ce3c",
+          "x_sha256": "4a22fbb88fa28eb8f6783523a5a848b7f707cf7f746330a714e9c7135834fa04"
+        }
+      },
+      "comparisons": {
+        "eager2": {
+          "status": "FAIL",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                16,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.1005859375,
+              "max_rel": 386.15315315315314,
+              "status": "FAIL",
+              "error": "odd_long_repeat/eager2/raw: Tensor-likes are not close!\n\nMismatched elements: 163 / 8192 (2.0%)\nGreatest absolute difference: 0.1005859375 at index (0, 458) (up to 0.001 allowed)\nGreatest relative difference: 386.0 at index (0, 492) (up to 0.001 allowed)"
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.1005859375,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": [
+            {
+              "label": "odd_long_repeat/eager2",
+              "tensor": "raw",
+              "metrics": {
+                "shape": [
+                  16,
+                  512
+                ],
+                "dtype": "torch.bfloat16",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.1005859375,
+                "max_rel": 386.15315315315314
+              },
+              "expected_sample": [
+                -0.052978515625,
+                -0.05126953125,
+                -0.00689697265625,
+                -0.0242919921875,
+                0.11181640625,
+                0.0050048828125,
+                0.0257568359375,
+                0.058837890625,
+                -0.00494384765625,
+                -0.0693359375,
+                -0.01312255859375,
+                -0.00011968612670898438
+              ],
+              "actual_sample": [
+                -0.052978515625,
+                -0.05126953125,
+                -0.00689697265625,
+                -0.0242919921875,
+                0.11181640625,
+                0.0050048828125,
+                0.0257568359375,
+                0.058837890625,
+                -0.00494384765625,
+                -0.0693359375,
+                -0.01312255859375,
+                -0.00011968612670898438
+              ],
+              "mismatch_samples": [
+                {
+                  "flat_index": 256,
+                  "coordinates": [
+                    0,
+                    256
+                  ],
+                  "expected": 0.0216064453125,
+                  "actual": 0.021240234375
+                },
+                {
+                  "flat_index": 257,
+                  "coordinates": [
+                    0,
+                    257
+                  ],
+                  "expected": 0.044677734375,
+                  "actual": 0.051025390625
+                },
+                {
+                  "flat_index": 259,
+                  "coordinates": [
+                    0,
+                    259
+                  ],
+                  "expected": 0.01513671875,
+                  "actual": 0.01519775390625
+                },
+                {
+                  "flat_index": 260,
+                  "coordinates": [
+                    0,
+                    260
+                  ],
+                  "expected": 0.0169677734375,
+                  "actual": 0.018798828125
+                },
+                {
+                  "flat_index": 261,
+                  "coordinates": [
+                    0,
+                    261
+                  ],
+                  "expected": 0.001708984375,
+                  "actual": 0.00145721435546875
+                },
+                {
+                  "flat_index": 264,
+                  "coordinates": [
+                    0,
+                    264
+                  ],
+                  "expected": 0.0167236328125,
+                  "actual": 0.0142822265625
+                },
+                {
+                  "flat_index": 265,
+                  "coordinates": [
+                    0,
+                    265
+                  ],
+                  "expected": -0.01470947265625,
+                  "actual": -0.015625
+                },
+                {
+                  "flat_index": 267,
+                  "coordinates": [
+                    0,
+                    267
+                  ],
+                  "expected": 0.007415771484375,
+                  "actual": 0.00153350830078125
+                },
+                {
+                  "flat_index": 268,
+                  "coordinates": [
+                    0,
+                    268
+                  ],
+                  "expected": 0.057373046875,
+                  "actual": 0.061279296875
+                },
+                {
+                  "flat_index": 269,
+                  "coordinates": [
+                    0,
+                    269
+                  ],
+                  "expected": 0.013427734375,
+                  "actual": 0.01348876953125
+                },
+                {
+                  "flat_index": 270,
+                  "coordinates": [
+                    0,
+                    270
+                  ],
+                  "expected": -0.0223388671875,
+                  "actual": -0.022705078125
+                },
+                {
+                  "flat_index": 271,
+                  "coordinates": [
+                    0,
+                    271
+                  ],
+                  "expected": 0.0244140625,
+                  "actual": 0.0242919921875
+                },
+                {
+                  "flat_index": 272,
+                  "coordinates": [
+                    0,
+                    272
+                  ],
+                  "expected": -0.01507568359375,
+                  "actual": -0.01483154296875
+                },
+                {
+                  "flat_index": 273,
+                  "coordinates": [
+                    0,
+                    273
+                  ],
+                  "expected": 0.07275390625,
+                  "actual": 0.06982421875
+                },
+                {
+                  "flat_index": 274,
+                  "coordinates": [
+                    0,
+                    274
+                  ],
+                  "expected": 0.05908203125,
+                  "actual": 0.06298828125
+                },
+                {
+                  "flat_index": 275,
+                  "coordinates": [
+                    0,
+                    275
+                  ],
+                  "expected": 0.04833984375,
+                  "actual": 0.048583984375
+                },
+                {
+                  "flat_index": 276,
+                  "coordinates": [
+                    0,
+                    276
+                  ],
+                  "expected": 0.0625,
+                  "actual": 0.06298828125
+                },
+                {
+                  "flat_index": 277,
+                  "coordinates": [
+                    0,
+                    277
+                  ],
+                  "expected": -0.0439453125,
+                  "actual": -0.044189453125
+                },
+                {
+                  "flat_index": 279,
+                  "coordinates": [
+                    0,
+                    279
+                  ],
+                  "expected": 0.018310546875,
+                  "actual": 0.01611328125
+                },
+                {
+                  "flat_index": 280,
+                  "coordinates": [
+                    0,
+                    280
+                  ],
+                  "expected": -0.09326171875,
+                  "actual": -0.09619140625
+                },
+                {
+                  "flat_index": 281,
+                  "coordinates": [
+                    0,
+                    281
+                  ],
+                  "expected": 0.0458984375,
+                  "actual": 0.042236328125
+                },
+                {
+                  "flat_index": 282,
+                  "coordinates": [
+                    0,
+                    282
+                  ],
+                  "expected": 0.0186767578125,
+                  "actual": 0.018798828125
+                },
+                {
+                  "flat_index": 283,
+                  "coordinates": [
+                    0,
+                    283
+                  ],
+                  "expected": -0.0128173828125,
+                  "actual": -0.015869140625
+                },
+                {
+                  "flat_index": 284,
+                  "coordinates": [
+                    0,
+                    284
+                  ],
+                  "expected": -0.00909423828125,
+                  "actual": -0.0089111328125
+                },
+                {
+                  "flat_index": 285,
+                  "coordinates": [
+                    0,
+                    285
+                  ],
+                  "expected": 0.057373046875,
+                  "actual": 0.0576171875
+                },
+                {
+                  "flat_index": 286,
+                  "coordinates": [
+                    0,
+                    286
+                  ],
+                  "expected": -0.07958984375,
+                  "actual": -0.0771484375
+                },
+                {
+                  "flat_index": 287,
+                  "coordinates": [
+                    0,
+                    287
+                  ],
+                  "expected": 0.0223388671875,
+                  "actual": 0.022216796875
+                },
+                {
+                  "flat_index": 289,
+                  "coordinates": [
+                    0,
+                    289
+                  ],
+                  "expected": -0.038330078125,
+                  "actual": -0.03857421875
+                },
+                {
+                  "flat_index": 290,
+                  "coordinates": [
+                    0,
+                    290
+                  ],
+                  "expected": -0.0184326171875,
+                  "actual": -0.0186767578125
+                },
+                {
+                  "flat_index": 291,
+                  "coordinates": [
+                    0,
+                    291
+                  ],
+                  "expected": -0.017822265625,
+                  "actual": -0.01287841796875
+                },
+                {
+                  "flat_index": 292,
+                  "coordinates": [
+                    0,
+                    292
+                  ],
+                  "expected": -0.05078125,
+                  "actual": -0.05029296875
+                },
+                {
+                  "flat_index": 295,
+                  "coordinates": [
+                    0,
+                    295
+                  ],
+                  "expected": -0.00139617919921875,
+                  "actual": -0.0016326904296875
+                }
+              ],
+              "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+            }
+          ]
+        },
+        "replay1": {
+          "status": "FAIL",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                16,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.118896484375,
+              "max_rel": 146.84860557768926,
+              "status": "FAIL",
+              "error": "odd_long_repeat/replay1/raw: Tensor-likes are not close!\n\nMismatched elements: 125 / 8192 (1.5%)\nGreatest absolute difference: 0.119140625 at index (0, 120) (up to 0.001 allowed)\nGreatest relative difference: 147.0 at index (0, 11) (up to 0.001 allowed)"
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.118896484375,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": [
+            {
+              "label": "odd_long_repeat/replay1",
+              "tensor": "raw",
+              "metrics": {
+                "shape": [
+                  16,
+                  512
+                ],
+                "dtype": "torch.bfloat16",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.118896484375,
+                "max_rel": 146.84860557768926
+              },
+              "expected_sample": [
+                -0.052978515625,
+                -0.05126953125,
+                -0.00689697265625,
+                -0.0242919921875,
+                0.11181640625,
+                0.0050048828125,
+                0.0257568359375,
+                0.058837890625,
+                -0.00494384765625,
+                -0.0693359375,
+                -0.01312255859375,
+                -0.00011968612670898438
+              ],
+              "actual_sample": [
+                0.039794921875,
+                0.006561279296875,
+                -0.0142822265625,
+                0.02978515625,
+                0.053466796875,
+                -0.04345703125,
+                0.0615234375,
+                -0.05517578125,
+                -0.06689453125,
+                -0.02001953125,
+                0.0169677734375,
+                0.0174560546875
+              ],
+              "mismatch_samples": [
+                {
+                  "flat_index": 0,
+                  "coordinates": [
+                    0,
+                    0
+                  ],
+                  "expected": -0.052978515625,
+                  "actual": 0.039794921875
+                },
+                {
+                  "flat_index": 1,
+                  "coordinates": [
+                    0,
+                    1
+                  ],
+                  "expected": -0.05126953125,
+                  "actual": 0.006561279296875
+                },
+                {
+                  "flat_index": 2,
+                  "coordinates": [
+                    0,
+                    2
+                  ],
+                  "expected": -0.00689697265625,
+                  "actual": -0.0142822265625
+                },
+                {
+                  "flat_index": 3,
+                  "coordinates": [
+                    0,
+                    3
+                  ],
+                  "expected": -0.0242919921875,
+                  "actual": 0.02978515625
+                },
+                {
+                  "flat_index": 4,
+                  "coordinates": [
+                    0,
+                    4
+                  ],
+                  "expected": 0.11181640625,
+                  "actual": 0.053466796875
+                },
+                {
+                  "flat_index": 5,
+                  "coordinates": [
+                    0,
+                    5
+                  ],
+                  "expected": 0.0050048828125,
+                  "actual": -0.04345703125
+                },
+                {
+                  "flat_index": 6,
+                  "coordinates": [
+                    0,
+                    6
+                  ],
+                  "expected": 0.0257568359375,
+                  "actual": 0.0615234375
+                },
+                {
+                  "flat_index": 7,
+                  "coordinates": [
+                    0,
+                    7
+                  ],
+                  "expected": 0.058837890625,
+                  "actual": -0.05517578125
+                },
+                {
+                  "flat_index": 8,
+                  "coordinates": [
+                    0,
+                    8
+                  ],
+                  "expected": -0.00494384765625,
+                  "actual": -0.06689453125
+                },
+                {
+                  "flat_index": 9,
+                  "coordinates": [
+                    0,
+                    9
+                  ],
+                  "expected": -0.0693359375,
+                  "actual": -0.02001953125
+                },
+                {
+                  "flat_index": 10,
+                  "coordinates": [
+                    0,
+                    10
+                  ],
+                  "expected": -0.01312255859375,
+                  "actual": 0.0169677734375
+                },
+                {
+                  "flat_index": 11,
+                  "coordinates": [
+                    0,
+                    11
+                  ],
+                  "expected": -0.00011968612670898438,
+                  "actual": 0.0174560546875
+                },
+                {
+                  "flat_index": 12,
+                  "coordinates": [
+                    0,
+                    12
+                  ],
+                  "expected": -0.0634765625,
+                  "actual": -0.0859375
+                },
+                {
+                  "flat_index": 13,
+                  "coordinates": [
+                    0,
+                    13
+                  ],
+                  "expected": 0.1240234375,
+                  "actual": 0.0634765625
+                },
+                {
+                  "flat_index": 14,
+                  "coordinates": [
+                    0,
+                    14
+                  ],
+                  "expected": -0.0162353515625,
+                  "actual": 0.00189971923828125
+                },
+                {
+                  "flat_index": 15,
+                  "coordinates": [
+                    0,
+                    15
+                  ],
+                  "expected": -0.054443359375,
+                  "actual": -0.09619140625
+                },
+                {
+                  "flat_index": 16,
+                  "coordinates": [
+                    0,
+                    16
+                  ],
+                  "expected": 0.0123291015625,
+                  "actual": -0.025390625
+                },
+                {
+                  "flat_index": 17,
+                  "coordinates": [
+                    0,
+                    17
+                  ],
+                  "expected": 0.0118408203125,
+                  "actual": 0.0074462890625
+                },
+                {
+                  "flat_index": 18,
+                  "coordinates": [
+                    0,
+                    18
+                  ],
+                  "expected": 0.008544921875,
+                  "actual": -0.032958984375
+                },
+                {
+                  "flat_index": 19,
+                  "coordinates": [
+                    0,
+                    19
+                  ],
+                  "expected": 0.032470703125,
+                  "actual": -0.00982666015625
+                },
+                {
+                  "flat_index": 20,
+                  "coordinates": [
+                    0,
+                    20
+                  ],
+                  "expected": -0.026611328125,
+                  "actual": -0.043212890625
+                },
+                {
+                  "flat_index": 21,
+                  "coordinates": [
+                    0,
+                    21
+                  ],
+                  "expected": 0.03857421875,
+                  "actual": 0.04736328125
+                },
+                {
+                  "flat_index": 22,
+                  "coordinates": [
+                    0,
+                    22
+                  ],
+                  "expected": 0.107421875,
+                  "actual": 0.07080078125
+                },
+                {
+                  "flat_index": 23,
+                  "coordinates": [
+                    0,
+                    23
+                  ],
+                  "expected": 0.034423828125,
+                  "actual": 0.031005859375
+                },
+                {
+                  "flat_index": 24,
+                  "coordinates": [
+                    0,
+                    24
+                  ],
+                  "expected": 0.0034027099609375,
+                  "actual": -0.0228271484375
+                },
+                {
+                  "flat_index": 25,
+                  "coordinates": [
+                    0,
+                    25
+                  ],
+                  "expected": 0.09326171875,
+                  "actual": 0.07861328125
+                },
+                {
+                  "flat_index": 26,
+                  "coordinates": [
+                    0,
+                    26
+                  ],
+                  "expected": 0.0341796875,
+                  "actual": 0.06298828125
+                },
+                {
+                  "flat_index": 27,
+                  "coordinates": [
+                    0,
+                    27
+                  ],
+                  "expected": -0.027587890625,
+                  "actual": -0.0615234375
+                },
+                {
+                  "flat_index": 28,
+                  "coordinates": [
+                    0,
+                    28
+                  ],
+                  "expected": -0.03466796875,
+                  "actual": 0.002471923828125
+                },
+                {
+                  "flat_index": 29,
+                  "coordinates": [
+                    0,
+                    29
+                  ],
+                  "expected": -0.0252685546875,
+                  "actual": -0.026123046875
+                },
+                {
+                  "flat_index": 30,
+                  "coordinates": [
+                    0,
+                    30
+                  ],
+                  "expected": 0.0107421875,
+                  "actual": 0.027099609375
+                },
+                {
+                  "flat_index": 31,
+                  "coordinates": [
+                    0,
+                    31
+                  ],
+                  "expected": 0.028076171875,
+                  "actual": 0.037841796875
+                }
+              ],
+              "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+            }
+          ]
+        },
+        "replay2": {
+          "status": "FAIL",
+          "comparisons": {
+            "raw": {
+              "shape": [
+                16,
+                512
+              ],
+              "dtype": "torch.bfloat16",
+              "exact": false,
+              "finite": true,
+              "max_abs": 0.13671875,
+              "max_rel": 1195.7228915662652,
+              "status": "FAIL",
+              "error": "odd_long_repeat/replay2/raw: Tensor-likes are not close!\n\nMismatched elements: 250 / 8192 (3.1%)\nGreatest absolute difference: 0.13671875 at index (0, 174) (up to 0.001 allowed)\nGreatest relative difference: 1200.0 at index (0, 244) (up to 0.001 allowed)"
+            },
+            "state": {
+              "shape": [
+                2,
+                2,
+                4096
+              ],
+              "dtype": "torch.uint8",
+              "exact": true
+            }
+          },
+          "max_abs_by_row": [
+            0.13671875,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exact_by_row": [
+            false,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "failures": [
+            {
+              "label": "odd_long_repeat/replay2",
+              "tensor": "raw",
+              "metrics": {
+                "shape": [
+                  16,
+                  512
+                ],
+                "dtype": "torch.bfloat16",
+                "exact": false,
+                "finite": true,
+                "max_abs": 0.13671875,
+                "max_rel": 1195.7228915662652
+              },
+              "expected_sample": [
+                -0.052978515625,
+                -0.05126953125,
+                -0.00689697265625,
+                -0.0242919921875,
+                0.11181640625,
+                0.0050048828125,
+                0.0257568359375,
+                0.058837890625,
+                -0.00494384765625,
+                -0.0693359375,
+                -0.01312255859375,
+                -0.00011968612670898438
+              ],
+              "actual_sample": [
+                -0.052978515625,
+                -0.05126953125,
+                -0.00689697265625,
+                -0.0242919921875,
+                0.11181640625,
+                0.0050048828125,
+                0.0257568359375,
+                0.058837890625,
+                -0.00494384765625,
+                -0.0693359375,
+                -0.01312255859375,
+                -0.00011968612670898438
+              ],
+              "mismatch_samples": [
+                {
+                  "flat_index": 128,
+                  "coordinates": [
+                    0,
+                    128
+                  ],
+                  "expected": -0.01190185546875,
+                  "actual": 0.0400390625
+                },
+                {
+                  "flat_index": 129,
+                  "coordinates": [
+                    0,
+                    129
+                  ],
+                  "expected": -0.048583984375,
+                  "actual": -0.0050048828125
+                },
+                {
+                  "flat_index": 130,
+                  "coordinates": [
+                    0,
+                    130
+                  ],
+                  "expected": 0.054931640625,
+                  "actual": -0.01409912109375
+                },
+                {
+                  "flat_index": 131,
+                  "coordinates": [
+                    0,
+                    131
+                  ],
+                  "expected": 0.022216796875,
+                  "actual": -0.004150390625
+                },
+                {
+                  "flat_index": 132,
+                  "coordinates": [
+                    0,
+                    132
+                  ],
+                  "expected": -0.056884765625,
+                  "actual": 0.00274658203125
+                },
+                {
+                  "flat_index": 133,
+                  "coordinates": [
+                    0,
+                    133
+                  ],
+                  "expected": -0.030517578125,
+                  "actual": 0.0859375
+                },
+                {
+                  "flat_index": 134,
+                  "coordinates": [
+                    0,
+                    134
+                  ],
+                  "expected": -0.0235595703125,
+                  "actual": 0.0322265625
+                },
+                {
+                  "flat_index": 135,
+                  "coordinates": [
+                    0,
+                    135
+                  ],
+                  "expected": 0.006988525390625,
+                  "actual": 0.08544921875
+                },
+                {
+                  "flat_index": 136,
+                  "coordinates": [
+                    0,
+                    136
+                  ],
+                  "expected": -0.0181884765625,
+                  "actual": 0.0179443359375
+                },
+                {
+                  "flat_index": 137,
+                  "coordinates": [
+                    0,
+                    137
+                  ],
+                  "expected": -0.0291748046875,
+                  "actual": -0.09228515625
+                },
+                {
+                  "flat_index": 138,
+                  "coordinates": [
+                    0,
+                    138
+                  ],
+                  "expected": -0.0113525390625,
+                  "actual": 0.0296630859375
+                },
+                {
+                  "flat_index": 139,
+                  "coordinates": [
+                    0,
+                    139
+                  ],
+                  "expected": -0.004852294921875,
+                  "actual": -0.032470703125
+                },
+                {
+                  "flat_index": 140,
+                  "coordinates": [
+                    0,
+                    140
+                  ],
+                  "expected": 0.0194091796875,
+                  "actual": -0.0294189453125
+                },
+                {
+                  "flat_index": 141,
+                  "coordinates": [
+                    0,
+                    141
+                  ],
+                  "expected": 0.07470703125,
+                  "actual": 0.02099609375
+                },
+                {
+                  "flat_index": 142,
+                  "coordinates": [
+                    0,
+                    142
+                  ],
+                  "expected": -0.080078125,
+                  "actual": -0.06103515625
+                },
+                {
+                  "flat_index": 143,
+                  "coordinates": [
+                    0,
+                    143
+                  ],
+                  "expected": 0.003753662109375,
+                  "actual": -0.0235595703125
+                },
+                {
+                  "flat_index": 144,
+                  "coordinates": [
+                    0,
+                    144
+                  ],
+                  "expected": -0.00799560546875,
+                  "actual": 0.0264892578125
+                },
+                {
+                  "flat_index": 145,
+                  "coordinates": [
+                    0,
+                    145
+                  ],
+                  "expected": -0.0113525390625,
+                  "actual": 0.038818359375
+                },
+                {
+                  "flat_index": 146,
+                  "coordinates": [
+                    0,
+                    146
+                  ],
+                  "expected": 0.04150390625,
+                  "actual": -0.02099609375
+                },
+                {
+                  "flat_index": 147,
+                  "coordinates": [
+                    0,
+                    147
+                  ],
+                  "expected": -0.042724609375,
+                  "actual": -0.0986328125
+                },
+                {
+                  "flat_index": 148,
+                  "coordinates": [
+                    0,
+                    148
+                  ],
+                  "expected": 0.0303955078125,
+                  "actual": 0.059814453125
+                },
+                {
+                  "flat_index": 149,
+                  "coordinates": [
+                    0,
+                    149
+                  ],
+                  "expected": -0.04248046875,
+                  "actual": -0.03125
+                },
+                {
+                  "flat_index": 150,
+                  "coordinates": [
+                    0,
+                    150
+                  ],
+                  "expected": 0.03515625,
+                  "actual": 0.00811767578125
+                },
+                {
+                  "flat_index": 151,
+                  "coordinates": [
+                    0,
+                    151
+                  ],
+                  "expected": -0.07177734375,
+                  "actual": -0.0125732421875
+                },
+                {
+                  "flat_index": 152,
+                  "coordinates": [
+                    0,
+                    152
+                  ],
+                  "expected": -0.1357421875,
+                  "actual": -0.1015625
+                },
+                {
+                  "flat_index": 153,
+                  "coordinates": [
+                    0,
+                    153
+                  ],
+                  "expected": -0.03515625,
+                  "actual": 0.09619140625
+                },
+                {
+                  "flat_index": 154,
+                  "coordinates": [
+                    0,
+                    154
+                  ],
+                  "expected": 0.0263671875,
+                  "actual": 0.020751953125
+                },
+                {
+                  "flat_index": 155,
+                  "coordinates": [
+                    0,
+                    155
+                  ],
+                  "expected": 0.056884765625,
+                  "actual": 0.1259765625
+                },
+                {
+                  "flat_index": 156,
+                  "coordinates": [
+                    0,
+                    156
+                  ],
+                  "expected": -0.0302734375,
+                  "actual": -0.003631591796875
+                },
+                {
+                  "flat_index": 157,
+                  "coordinates": [
+                    0,
+                    157
+                  ],
+                  "expected": 0.035400390625,
+                  "actual": -0.028564453125
+                },
+                {
+                  "flat_index": 158,
+                  "coordinates": [
+                    0,
+                    158
+                  ],
+                  "expected": 0.0035858154296875,
+                  "actual": -0.00188446044921875
+                },
+                {
+                  "flat_index": 159,
+                  "coordinates": [
+                    0,
+                    159
+                  ],
+                  "expected": -0.01611328125,
+                  "actual": 0.057373046875
+                }
+              ],
+              "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "comparison_failure": {
+    "label": "same first pair/replay2",
+    "tensor": "raw",
+    "metrics": {
+      "shape": [
+        1,
+        512
+      ],
+      "dtype": "torch.bfloat16",
+      "exact": false,
+      "finite": true,
+      "max_abs": 0.13671875,
+      "max_rel": 1195.7228915662652
+    },
+    "expected_sample": [
+      -0.052978515625,
+      -0.05126953125,
+      -0.00689697265625,
+      -0.0242919921875,
+      0.11181640625,
+      0.0050048828125,
+      0.0257568359375,
+      0.058837890625,
+      -0.00494384765625,
+      -0.0693359375,
+      -0.01312255859375,
+      -0.00011968612670898438
+    ],
+    "actual_sample": [
+      0.039794921875,
+      0.006561279296875,
+      -0.0142822265625,
+      0.02978515625,
+      0.053466796875,
+      -0.04345703125,
+      0.0615234375,
+      -0.05517578125,
+      -0.06689453125,
+      -0.02001953125,
+      0.0169677734375,
+      0.0174560546875
+    ],
+    "mismatch_samples": [
+      {
+        "flat_index": 0,
+        "coordinates": [
+          0,
+          0
+        ],
+        "expected": -0.052978515625,
+        "actual": 0.039794921875
+      },
+      {
+        "flat_index": 1,
+        "coordinates": [
+          0,
+          1
+        ],
+        "expected": -0.05126953125,
+        "actual": 0.006561279296875
+      },
+      {
+        "flat_index": 2,
+        "coordinates": [
+          0,
+          2
+        ],
+        "expected": -0.00689697265625,
+        "actual": -0.0142822265625
+      },
+      {
+        "flat_index": 3,
+        "coordinates": [
+          0,
+          3
+        ],
+        "expected": -0.0242919921875,
+        "actual": 0.02978515625
+      },
+      {
+        "flat_index": 4,
+        "coordinates": [
+          0,
+          4
+        ],
+        "expected": 0.11181640625,
+        "actual": 0.053466796875
+      },
+      {
+        "flat_index": 5,
+        "coordinates": [
+          0,
+          5
+        ],
+        "expected": 0.0050048828125,
+        "actual": -0.04345703125
+      },
+      {
+        "flat_index": 6,
+        "coordinates": [
+          0,
+          6
+        ],
+        "expected": 0.0257568359375,
+        "actual": 0.0615234375
+      },
+      {
+        "flat_index": 7,
+        "coordinates": [
+          0,
+          7
+        ],
+        "expected": 0.058837890625,
+        "actual": -0.05517578125
+      },
+      {
+        "flat_index": 8,
+        "coordinates": [
+          0,
+          8
+        ],
+        "expected": -0.00494384765625,
+        "actual": -0.06689453125
+      },
+      {
+        "flat_index": 9,
+        "coordinates": [
+          0,
+          9
+        ],
+        "expected": -0.0693359375,
+        "actual": -0.02001953125
+      },
+      {
+        "flat_index": 10,
+        "coordinates": [
+          0,
+          10
+        ],
+        "expected": -0.01312255859375,
+        "actual": 0.0169677734375
+      },
+      {
+        "flat_index": 11,
+        "coordinates": [
+          0,
+          11
+        ],
+        "expected": -0.00011968612670898438,
+        "actual": 0.0174560546875
+      },
+      {
+        "flat_index": 12,
+        "coordinates": [
+          0,
+          12
+        ],
+        "expected": -0.0634765625,
+        "actual": -0.0859375
+      },
+      {
+        "flat_index": 13,
+        "coordinates": [
+          0,
+          13
+        ],
+        "expected": 0.1240234375,
+        "actual": 0.0634765625
+      },
+      {
+        "flat_index": 14,
+        "coordinates": [
+          0,
+          14
+        ],
+        "expected": -0.0162353515625,
+        "actual": 0.00189971923828125
+      },
+      {
+        "flat_index": 15,
+        "coordinates": [
+          0,
+          15
+        ],
+        "expected": -0.054443359375,
+        "actual": -0.09619140625
+      },
+      {
+        "flat_index": 16,
+        "coordinates": [
+          0,
+          16
+        ],
+        "expected": 0.0123291015625,
+        "actual": -0.025390625
+      },
+      {
+        "flat_index": 17,
+        "coordinates": [
+          0,
+          17
+        ],
+        "expected": 0.0118408203125,
+        "actual": 0.0074462890625
+      },
+      {
+        "flat_index": 18,
+        "coordinates": [
+          0,
+          18
+        ],
+        "expected": 0.008544921875,
+        "actual": -0.032958984375
+      },
+      {
+        "flat_index": 19,
+        "coordinates": [
+          0,
+          19
+        ],
+        "expected": 0.032470703125,
+        "actual": -0.00982666015625
+      },
+      {
+        "flat_index": 20,
+        "coordinates": [
+          0,
+          20
+        ],
+        "expected": -0.026611328125,
+        "actual": -0.043212890625
+      },
+      {
+        "flat_index": 21,
+        "coordinates": [
+          0,
+          21
+        ],
+        "expected": 0.03857421875,
+        "actual": 0.04736328125
+      },
+      {
+        "flat_index": 22,
+        "coordinates": [
+          0,
+          22
+        ],
+        "expected": 0.107421875,
+        "actual": 0.07080078125
+      },
+      {
+        "flat_index": 23,
+        "coordinates": [
+          0,
+          23
+        ],
+        "expected": 0.034423828125,
+        "actual": 0.031005859375
+      },
+      {
+        "flat_index": 24,
+        "coordinates": [
+          0,
+          24
+        ],
+        "expected": 0.0034027099609375,
+        "actual": -0.0228271484375
+      },
+      {
+        "flat_index": 25,
+        "coordinates": [
+          0,
+          25
+        ],
+        "expected": 0.09326171875,
+        "actual": 0.07861328125
+      },
+      {
+        "flat_index": 26,
+        "coordinates": [
+          0,
+          26
+        ],
+        "expected": 0.0341796875,
+        "actual": 0.06298828125
+      },
+      {
+        "flat_index": 27,
+        "coordinates": [
+          0,
+          27
+        ],
+        "expected": -0.027587890625,
+        "actual": -0.0615234375
+      },
+      {
+        "flat_index": 28,
+        "coordinates": [
+          0,
+          28
+        ],
+        "expected": -0.03466796875,
+        "actual": 0.002471923828125
+      },
+      {
+        "flat_index": 29,
+        "coordinates": [
+          0,
+          29
+        ],
+        "expected": -0.0252685546875,
+        "actual": -0.026123046875
+      },
+      {
+        "flat_index": 30,
+        "coordinates": [
+          0,
+          30
+        ],
+        "expected": 0.0107421875,
+        "actual": 0.027099609375
+      },
+      {
+        "flat_index": 31,
+        "coordinates": [
+          0,
+          31
+        ],
+        "expected": 0.028076171875,
+        "actual": 0.037841796875
+      }
+    ],
+    "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+  },
+  "first_pair_invariance": {
+    "eager1": {
+      "status": "FAIL",
+      "comparisons": {
+        "raw": {
+          "shape": [
+            1,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.13671875,
+          "max_rel": 1195.7228915662652,
+          "status": "FAIL",
+          "error": "same first pair/eager1/raw: Tensor-likes are not close!\n\nMismatched elements: 249 / 512 (48.6%)\nGreatest absolute difference: 0.13671875 at index (0, 174) (up to 0.001 allowed)\nGreatest relative difference: 1200.0 at index (0, 244) (up to 0.001 allowed)"
+        }
+      },
+      "max_abs_by_row": [
+        0.13671875
+      ],
+      "exact_by_row": [
+        false
+      ],
+      "failures": [
+        {
+          "label": "same first pair/eager1",
+          "tensor": "raw",
+          "metrics": {
+            "shape": [
+              1,
+              512
+            ],
+            "dtype": "torch.bfloat16",
+            "exact": false,
+            "finite": true,
+            "max_abs": 0.13671875,
+            "max_rel": 1195.7228915662652
+          },
+          "expected_sample": [
+            -0.052978515625,
+            -0.05126953125,
+            -0.00689697265625,
+            -0.0242919921875,
+            0.11181640625,
+            0.0050048828125,
+            0.0257568359375,
+            0.058837890625,
+            -0.00494384765625,
+            -0.0693359375,
+            -0.01312255859375,
+            -0.00011968612670898438
+          ],
+          "actual_sample": [
+            -0.052978515625,
+            -0.05126953125,
+            -0.00689697265625,
+            -0.0242919921875,
+            0.11181640625,
+            0.0050048828125,
+            0.0257568359375,
+            0.058837890625,
+            -0.00494384765625,
+            -0.0693359375,
+            -0.01312255859375,
+            -0.00011968612670898438
+          ],
+          "mismatch_samples": [
+            {
+              "flat_index": 128,
+              "coordinates": [
+                0,
+                128
+              ],
+              "expected": -0.01190185546875,
+              "actual": 0.0400390625
+            },
+            {
+              "flat_index": 129,
+              "coordinates": [
+                0,
+                129
+              ],
+              "expected": -0.048583984375,
+              "actual": -0.0050048828125
+            },
+            {
+              "flat_index": 130,
+              "coordinates": [
+                0,
+                130
+              ],
+              "expected": 0.054931640625,
+              "actual": -0.01409912109375
+            },
+            {
+              "flat_index": 131,
+              "coordinates": [
+                0,
+                131
+              ],
+              "expected": 0.022216796875,
+              "actual": -0.004150390625
+            },
+            {
+              "flat_index": 132,
+              "coordinates": [
+                0,
+                132
+              ],
+              "expected": -0.056884765625,
+              "actual": 0.00274658203125
+            },
+            {
+              "flat_index": 133,
+              "coordinates": [
+                0,
+                133
+              ],
+              "expected": -0.030517578125,
+              "actual": 0.0859375
+            },
+            {
+              "flat_index": 134,
+              "coordinates": [
+                0,
+                134
+              ],
+              "expected": -0.0235595703125,
+              "actual": 0.0322265625
+            },
+            {
+              "flat_index": 135,
+              "coordinates": [
+                0,
+                135
+              ],
+              "expected": 0.006988525390625,
+              "actual": 0.08544921875
+            },
+            {
+              "flat_index": 136,
+              "coordinates": [
+                0,
+                136
+              ],
+              "expected": -0.0181884765625,
+              "actual": 0.0179443359375
+            },
+            {
+              "flat_index": 137,
+              "coordinates": [
+                0,
+                137
+              ],
+              "expected": -0.0291748046875,
+              "actual": -0.09228515625
+            },
+            {
+              "flat_index": 138,
+              "coordinates": [
+                0,
+                138
+              ],
+              "expected": -0.0113525390625,
+              "actual": 0.0296630859375
+            },
+            {
+              "flat_index": 139,
+              "coordinates": [
+                0,
+                139
+              ],
+              "expected": -0.004852294921875,
+              "actual": -0.032470703125
+            },
+            {
+              "flat_index": 140,
+              "coordinates": [
+                0,
+                140
+              ],
+              "expected": 0.0194091796875,
+              "actual": -0.0294189453125
+            },
+            {
+              "flat_index": 141,
+              "coordinates": [
+                0,
+                141
+              ],
+              "expected": 0.07470703125,
+              "actual": 0.02099609375
+            },
+            {
+              "flat_index": 142,
+              "coordinates": [
+                0,
+                142
+              ],
+              "expected": -0.080078125,
+              "actual": -0.06103515625
+            },
+            {
+              "flat_index": 143,
+              "coordinates": [
+                0,
+                143
+              ],
+              "expected": 0.003753662109375,
+              "actual": -0.0235595703125
+            },
+            {
+              "flat_index": 144,
+              "coordinates": [
+                0,
+                144
+              ],
+              "expected": -0.00799560546875,
+              "actual": 0.0264892578125
+            },
+            {
+              "flat_index": 145,
+              "coordinates": [
+                0,
+                145
+              ],
+              "expected": -0.0113525390625,
+              "actual": 0.038818359375
+            },
+            {
+              "flat_index": 146,
+              "coordinates": [
+                0,
+                146
+              ],
+              "expected": 0.04150390625,
+              "actual": -0.02099609375
+            },
+            {
+              "flat_index": 147,
+              "coordinates": [
+                0,
+                147
+              ],
+              "expected": -0.042724609375,
+              "actual": -0.0986328125
+            },
+            {
+              "flat_index": 148,
+              "coordinates": [
+                0,
+                148
+              ],
+              "expected": 0.0303955078125,
+              "actual": 0.059814453125
+            },
+            {
+              "flat_index": 149,
+              "coordinates": [
+                0,
+                149
+              ],
+              "expected": -0.04248046875,
+              "actual": -0.03125
+            },
+            {
+              "flat_index": 150,
+              "coordinates": [
+                0,
+                150
+              ],
+              "expected": 0.03515625,
+              "actual": 0.00811767578125
+            },
+            {
+              "flat_index": 151,
+              "coordinates": [
+                0,
+                151
+              ],
+              "expected": -0.07177734375,
+              "actual": -0.0125732421875
+            },
+            {
+              "flat_index": 152,
+              "coordinates": [
+                0,
+                152
+              ],
+              "expected": -0.1357421875,
+              "actual": -0.1015625
+            },
+            {
+              "flat_index": 153,
+              "coordinates": [
+                0,
+                153
+              ],
+              "expected": -0.03515625,
+              "actual": 0.09619140625
+            },
+            {
+              "flat_index": 154,
+              "coordinates": [
+                0,
+                154
+              ],
+              "expected": 0.0263671875,
+              "actual": 0.020751953125
+            },
+            {
+              "flat_index": 155,
+              "coordinates": [
+                0,
+                155
+              ],
+              "expected": 0.056884765625,
+              "actual": 0.1259765625
+            },
+            {
+              "flat_index": 156,
+              "coordinates": [
+                0,
+                156
+              ],
+              "expected": -0.0302734375,
+              "actual": -0.003631591796875
+            },
+            {
+              "flat_index": 157,
+              "coordinates": [
+                0,
+                157
+              ],
+              "expected": 0.035400390625,
+              "actual": -0.028564453125
+            },
+            {
+              "flat_index": 158,
+              "coordinates": [
+                0,
+                158
+              ],
+              "expected": 0.0035858154296875,
+              "actual": -0.00188446044921875
+            },
+            {
+              "flat_index": 159,
+              "coordinates": [
+                0,
+                159
+              ],
+              "expected": -0.01611328125,
+              "actual": 0.057373046875
+            }
+          ],
+          "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+        }
+      ]
+    },
+    "eager2": {
+      "status": "FAIL",
+      "comparisons": {
+        "raw": {
+          "shape": [
+            1,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.118896484375,
+          "max_rel": 386.15315315315314,
+          "status": "FAIL",
+          "error": "same first pair/eager2/raw: Tensor-likes are not close!\n\nMismatched elements: 251 / 512 (49.0%)\nGreatest absolute difference: 0.119140625 at index (0, 120) (up to 0.001 allowed)\nGreatest relative difference: 386.0 at index (0, 492) (up to 0.001 allowed)"
+        }
+      },
+      "max_abs_by_row": [
+        0.118896484375
+      ],
+      "exact_by_row": [
+        false
+      ],
+      "failures": [
+        {
+          "label": "same first pair/eager2",
+          "tensor": "raw",
+          "metrics": {
+            "shape": [
+              1,
+              512
+            ],
+            "dtype": "torch.bfloat16",
+            "exact": false,
+            "finite": true,
+            "max_abs": 0.118896484375,
+            "max_rel": 386.15315315315314
+          },
+          "expected_sample": [
+            -0.052978515625,
+            -0.05126953125,
+            -0.00689697265625,
+            -0.0242919921875,
+            0.11181640625,
+            0.0050048828125,
+            0.0257568359375,
+            0.058837890625,
+            -0.00494384765625,
+            -0.0693359375,
+            -0.01312255859375,
+            -0.00011968612670898438
+          ],
+          "actual_sample": [
+            0.039794921875,
+            0.006561279296875,
+            -0.0142822265625,
+            0.02978515625,
+            0.053466796875,
+            -0.04345703125,
+            0.0615234375,
+            -0.05517578125,
+            -0.06689453125,
+            -0.02001953125,
+            0.0169677734375,
+            0.0174560546875
+          ],
+          "mismatch_samples": [
+            {
+              "flat_index": 0,
+              "coordinates": [
+                0,
+                0
+              ],
+              "expected": -0.052978515625,
+              "actual": 0.039794921875
+            },
+            {
+              "flat_index": 1,
+              "coordinates": [
+                0,
+                1
+              ],
+              "expected": -0.05126953125,
+              "actual": 0.006561279296875
+            },
+            {
+              "flat_index": 2,
+              "coordinates": [
+                0,
+                2
+              ],
+              "expected": -0.00689697265625,
+              "actual": -0.0142822265625
+            },
+            {
+              "flat_index": 3,
+              "coordinates": [
+                0,
+                3
+              ],
+              "expected": -0.0242919921875,
+              "actual": 0.02978515625
+            },
+            {
+              "flat_index": 4,
+              "coordinates": [
+                0,
+                4
+              ],
+              "expected": 0.11181640625,
+              "actual": 0.053466796875
+            },
+            {
+              "flat_index": 5,
+              "coordinates": [
+                0,
+                5
+              ],
+              "expected": 0.0050048828125,
+              "actual": -0.04345703125
+            },
+            {
+              "flat_index": 6,
+              "coordinates": [
+                0,
+                6
+              ],
+              "expected": 0.0257568359375,
+              "actual": 0.0615234375
+            },
+            {
+              "flat_index": 7,
+              "coordinates": [
+                0,
+                7
+              ],
+              "expected": 0.058837890625,
+              "actual": -0.05517578125
+            },
+            {
+              "flat_index": 8,
+              "coordinates": [
+                0,
+                8
+              ],
+              "expected": -0.00494384765625,
+              "actual": -0.06689453125
+            },
+            {
+              "flat_index": 9,
+              "coordinates": [
+                0,
+                9
+              ],
+              "expected": -0.0693359375,
+              "actual": -0.02001953125
+            },
+            {
+              "flat_index": 10,
+              "coordinates": [
+                0,
+                10
+              ],
+              "expected": -0.01312255859375,
+              "actual": 0.0169677734375
+            },
+            {
+              "flat_index": 11,
+              "coordinates": [
+                0,
+                11
+              ],
+              "expected": -0.00011968612670898438,
+              "actual": 0.0174560546875
+            },
+            {
+              "flat_index": 12,
+              "coordinates": [
+                0,
+                12
+              ],
+              "expected": -0.0634765625,
+              "actual": -0.0859375
+            },
+            {
+              "flat_index": 13,
+              "coordinates": [
+                0,
+                13
+              ],
+              "expected": 0.1240234375,
+              "actual": 0.0634765625
+            },
+            {
+              "flat_index": 14,
+              "coordinates": [
+                0,
+                14
+              ],
+              "expected": -0.0162353515625,
+              "actual": 0.00189971923828125
+            },
+            {
+              "flat_index": 15,
+              "coordinates": [
+                0,
+                15
+              ],
+              "expected": -0.054443359375,
+              "actual": -0.09619140625
+            },
+            {
+              "flat_index": 16,
+              "coordinates": [
+                0,
+                16
+              ],
+              "expected": 0.0123291015625,
+              "actual": -0.025390625
+            },
+            {
+              "flat_index": 17,
+              "coordinates": [
+                0,
+                17
+              ],
+              "expected": 0.0118408203125,
+              "actual": 0.0074462890625
+            },
+            {
+              "flat_index": 18,
+              "coordinates": [
+                0,
+                18
+              ],
+              "expected": 0.008544921875,
+              "actual": -0.032958984375
+            },
+            {
+              "flat_index": 19,
+              "coordinates": [
+                0,
+                19
+              ],
+              "expected": 0.032470703125,
+              "actual": -0.00982666015625
+            },
+            {
+              "flat_index": 20,
+              "coordinates": [
+                0,
+                20
+              ],
+              "expected": -0.026611328125,
+              "actual": -0.043212890625
+            },
+            {
+              "flat_index": 21,
+              "coordinates": [
+                0,
+                21
+              ],
+              "expected": 0.03857421875,
+              "actual": 0.04736328125
+            },
+            {
+              "flat_index": 22,
+              "coordinates": [
+                0,
+                22
+              ],
+              "expected": 0.107421875,
+              "actual": 0.07080078125
+            },
+            {
+              "flat_index": 23,
+              "coordinates": [
+                0,
+                23
+              ],
+              "expected": 0.034423828125,
+              "actual": 0.031005859375
+            },
+            {
+              "flat_index": 24,
+              "coordinates": [
+                0,
+                24
+              ],
+              "expected": 0.0034027099609375,
+              "actual": -0.0228271484375
+            },
+            {
+              "flat_index": 25,
+              "coordinates": [
+                0,
+                25
+              ],
+              "expected": 0.09326171875,
+              "actual": 0.07861328125
+            },
+            {
+              "flat_index": 26,
+              "coordinates": [
+                0,
+                26
+              ],
+              "expected": 0.0341796875,
+              "actual": 0.06298828125
+            },
+            {
+              "flat_index": 27,
+              "coordinates": [
+                0,
+                27
+              ],
+              "expected": -0.027587890625,
+              "actual": -0.0615234375
+            },
+            {
+              "flat_index": 28,
+              "coordinates": [
+                0,
+                28
+              ],
+              "expected": -0.03466796875,
+              "actual": 0.002471923828125
+            },
+            {
+              "flat_index": 29,
+              "coordinates": [
+                0,
+                29
+              ],
+              "expected": -0.0252685546875,
+              "actual": -0.026123046875
+            },
+            {
+              "flat_index": 30,
+              "coordinates": [
+                0,
+                30
+              ],
+              "expected": 0.0107421875,
+              "actual": 0.027099609375
+            },
+            {
+              "flat_index": 31,
+              "coordinates": [
+                0,
+                31
+              ],
+              "expected": 0.028076171875,
+              "actual": 0.037841796875
+            }
+          ],
+          "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+        }
+      ]
+    },
+    "replay1": {
+      "status": "FAIL",
+      "comparisons": {
+        "raw": {
+          "shape": [
+            1,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.11279296875,
+          "max_rel": 386.15315315315314,
+          "status": "FAIL",
+          "error": "same first pair/replay1/raw: Tensor-likes are not close!\n\nMismatched elements: 251 / 512 (49.0%)\nGreatest absolute difference: 0.11279296875 at index (0, 276) (up to 0.001 allowed)\nGreatest relative difference: 386.0 at index (0, 492) (up to 0.001 allowed)"
+        }
+      },
+      "max_abs_by_row": [
+        0.11279296875
+      ],
+      "exact_by_row": [
+        false
+      ],
+      "failures": [
+        {
+          "label": "same first pair/replay1",
+          "tensor": "raw",
+          "metrics": {
+            "shape": [
+              1,
+              512
+            ],
+            "dtype": "torch.bfloat16",
+            "exact": false,
+            "finite": true,
+            "max_abs": 0.11279296875,
+            "max_rel": 386.15315315315314
+          },
+          "expected_sample": [
+            -0.052978515625,
+            -0.05126953125,
+            -0.00689697265625,
+            -0.0242919921875,
+            0.11181640625,
+            0.0050048828125,
+            0.0257568359375,
+            0.058837890625,
+            -0.00494384765625,
+            -0.0693359375,
+            -0.01312255859375,
+            -0.00011968612670898438
+          ],
+          "actual_sample": [
+            -0.052978515625,
+            -0.05126953125,
+            -0.00689697265625,
+            -0.0242919921875,
+            0.11181640625,
+            0.0050048828125,
+            0.0257568359375,
+            0.058837890625,
+            -0.00494384765625,
+            -0.0693359375,
+            -0.01312255859375,
+            -0.00011968612670898438
+          ],
+          "mismatch_samples": [
+            {
+              "flat_index": 256,
+              "coordinates": [
+                0,
+                256
+              ],
+              "expected": -0.0103759765625,
+              "actual": 0.0216064453125
+            },
+            {
+              "flat_index": 257,
+              "coordinates": [
+                0,
+                257
+              ],
+              "expected": 0.05859375,
+              "actual": 0.044677734375
+            },
+            {
+              "flat_index": 258,
+              "coordinates": [
+                0,
+                258
+              ],
+              "expected": 0.016845703125,
+              "actual": 0.025390625
+            },
+            {
+              "flat_index": 259,
+              "coordinates": [
+                0,
+                259
+              ],
+              "expected": 0.031005859375,
+              "actual": 0.01513671875
+            },
+            {
+              "flat_index": 260,
+              "coordinates": [
+                0,
+                260
+              ],
+              "expected": 0.004730224609375,
+              "actual": 0.0169677734375
+            },
+            {
+              "flat_index": 261,
+              "coordinates": [
+                0,
+                261
+              ],
+              "expected": -0.03759765625,
+              "actual": 0.001708984375
+            },
+            {
+              "flat_index": 262,
+              "coordinates": [
+                0,
+                262
+              ],
+              "expected": 0.1005859375,
+              "actual": 0.06298828125
+            },
+            {
+              "flat_index": 263,
+              "coordinates": [
+                0,
+                263
+              ],
+              "expected": -0.01300048828125,
+              "actual": -0.060302734375
+            },
+            {
+              "flat_index": 264,
+              "coordinates": [
+                0,
+                264
+              ],
+              "expected": -0.00927734375,
+              "actual": 0.0167236328125
+            },
+            {
+              "flat_index": 265,
+              "coordinates": [
+                0,
+                265
+              ],
+              "expected": -0.0198974609375,
+              "actual": -0.01470947265625
+            },
+            {
+              "flat_index": 266,
+              "coordinates": [
+                0,
+                266
+              ],
+              "expected": 0.0419921875,
+              "actual": -0.0247802734375
+            },
+            {
+              "flat_index": 267,
+              "coordinates": [
+                0,
+                267
+              ],
+              "expected": 0.0294189453125,
+              "actual": 0.007415771484375
+            },
+            {
+              "flat_index": 268,
+              "coordinates": [
+                0,
+                268
+              ],
+              "expected": 0.059814453125,
+              "actual": 0.057373046875
+            },
+            {
+              "flat_index": 269,
+              "coordinates": [
+                0,
+                269
+              ],
+              "expected": -0.044677734375,
+              "actual": 0.013427734375
+            },
+            {
+              "flat_index": 270,
+              "coordinates": [
+                0,
+                270
+              ],
+              "expected": 0.02490234375,
+              "actual": -0.0223388671875
+            },
+            {
+              "flat_index": 271,
+              "coordinates": [
+                0,
+                271
+              ],
+              "expected": -0.0098876953125,
+              "actual": 0.0244140625
+            },
+            {
+              "flat_index": 272,
+              "coordinates": [
+                0,
+                272
+              ],
+              "expected": -0.041259765625,
+              "actual": -0.01507568359375
+            },
+            {
+              "flat_index": 273,
+              "coordinates": [
+                0,
+                273
+              ],
+              "expected": 0.039794921875,
+              "actual": 0.07275390625
+            },
+            {
+              "flat_index": 274,
+              "coordinates": [
+                0,
+                274
+              ],
+              "expected": 0.021240234375,
+              "actual": 0.05908203125
+            },
+            {
+              "flat_index": 275,
+              "coordinates": [
+                0,
+                275
+              ],
+              "expected": 0.01239013671875,
+              "actual": 0.04833984375
+            },
+            {
+              "flat_index": 276,
+              "coordinates": [
+                0,
+                276
+              ],
+              "expected": -0.05029296875,
+              "actual": 0.0625
+            },
+            {
+              "flat_index": 277,
+              "coordinates": [
+                0,
+                277
+              ],
+              "expected": 0.0247802734375,
+              "actual": -0.0439453125
+            },
+            {
+              "flat_index": 278,
+              "coordinates": [
+                0,
+                278
+              ],
+              "expected": 0.00372314453125,
+              "actual": 0.00390625
+            },
+            {
+              "flat_index": 279,
+              "coordinates": [
+                0,
+                279
+              ],
+              "expected": 0.03173828125,
+              "actual": 0.018310546875
+            },
+            {
+              "flat_index": 280,
+              "coordinates": [
+                0,
+                280
+              ],
+              "expected": 0.00408935546875,
+              "actual": -0.09326171875
+            },
+            {
+              "flat_index": 281,
+              "coordinates": [
+                0,
+                281
+              ],
+              "expected": 0.0206298828125,
+              "actual": 0.0458984375
+            },
+            {
+              "flat_index": 282,
+              "coordinates": [
+                0,
+                282
+              ],
+              "expected": 0.0196533203125,
+              "actual": 0.0186767578125
+            },
+            {
+              "flat_index": 283,
+              "coordinates": [
+                0,
+                283
+              ],
+              "expected": -0.0023651123046875,
+              "actual": -0.0128173828125
+            },
+            {
+              "flat_index": 284,
+              "coordinates": [
+                0,
+                284
+              ],
+              "expected": -0.0277099609375,
+              "actual": -0.00909423828125
+            },
+            {
+              "flat_index": 285,
+              "coordinates": [
+                0,
+                285
+              ],
+              "expected": -0.00994873046875,
+              "actual": 0.057373046875
+            },
+            {
+              "flat_index": 286,
+              "coordinates": [
+                0,
+                286
+              ],
+              "expected": -0.076171875,
+              "actual": -0.07958984375
+            },
+            {
+              "flat_index": 287,
+              "coordinates": [
+                0,
+                287
+              ],
+              "expected": 0.030517578125,
+              "actual": 0.0223388671875
+            }
+          ],
+          "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+        }
+      ]
+    },
+    "replay2": {
+      "status": "FAIL",
+      "comparisons": {
+        "raw": {
+          "shape": [
+            1,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.13671875,
+          "max_rel": 1195.7228915662652,
+          "status": "FAIL",
+          "error": "same first pair/replay2/raw: Tensor-likes are not close!\n\nMismatched elements: 375 / 512 (73.2%)\nGreatest absolute difference: 0.13671875 at index (0, 174) (up to 0.001 allowed)\nGreatest relative difference: 1200.0 at index (0, 244) (up to 0.001 allowed)"
+        }
+      },
+      "max_abs_by_row": [
+        0.13671875
+      ],
+      "exact_by_row": [
+        false
+      ],
+      "failures": [
+        {
+          "label": "same first pair/replay2",
+          "tensor": "raw",
+          "metrics": {
+            "shape": [
+              1,
+              512
+            ],
+            "dtype": "torch.bfloat16",
+            "exact": false,
+            "finite": true,
+            "max_abs": 0.13671875,
+            "max_rel": 1195.7228915662652
+          },
+          "expected_sample": [
+            -0.052978515625,
+            -0.05126953125,
+            -0.00689697265625,
+            -0.0242919921875,
+            0.11181640625,
+            0.0050048828125,
+            0.0257568359375,
+            0.058837890625,
+            -0.00494384765625,
+            -0.0693359375,
+            -0.01312255859375,
+            -0.00011968612670898438
+          ],
+          "actual_sample": [
+            0.039794921875,
+            0.006561279296875,
+            -0.0142822265625,
+            0.02978515625,
+            0.053466796875,
+            -0.04345703125,
+            0.0615234375,
+            -0.05517578125,
+            -0.06689453125,
+            -0.02001953125,
+            0.0169677734375,
+            0.0174560546875
+          ],
+          "mismatch_samples": [
+            {
+              "flat_index": 0,
+              "coordinates": [
+                0,
+                0
+              ],
+              "expected": -0.052978515625,
+              "actual": 0.039794921875
+            },
+            {
+              "flat_index": 1,
+              "coordinates": [
+                0,
+                1
+              ],
+              "expected": -0.05126953125,
+              "actual": 0.006561279296875
+            },
+            {
+              "flat_index": 2,
+              "coordinates": [
+                0,
+                2
+              ],
+              "expected": -0.00689697265625,
+              "actual": -0.0142822265625
+            },
+            {
+              "flat_index": 3,
+              "coordinates": [
+                0,
+                3
+              ],
+              "expected": -0.0242919921875,
+              "actual": 0.02978515625
+            },
+            {
+              "flat_index": 4,
+              "coordinates": [
+                0,
+                4
+              ],
+              "expected": 0.11181640625,
+              "actual": 0.053466796875
+            },
+            {
+              "flat_index": 5,
+              "coordinates": [
+                0,
+                5
+              ],
+              "expected": 0.0050048828125,
+              "actual": -0.04345703125
+            },
+            {
+              "flat_index": 6,
+              "coordinates": [
+                0,
+                6
+              ],
+              "expected": 0.0257568359375,
+              "actual": 0.0615234375
+            },
+            {
+              "flat_index": 7,
+              "coordinates": [
+                0,
+                7
+              ],
+              "expected": 0.058837890625,
+              "actual": -0.05517578125
+            },
+            {
+              "flat_index": 8,
+              "coordinates": [
+                0,
+                8
+              ],
+              "expected": -0.00494384765625,
+              "actual": -0.06689453125
+            },
+            {
+              "flat_index": 9,
+              "coordinates": [
+                0,
+                9
+              ],
+              "expected": -0.0693359375,
+              "actual": -0.02001953125
+            },
+            {
+              "flat_index": 10,
+              "coordinates": [
+                0,
+                10
+              ],
+              "expected": -0.01312255859375,
+              "actual": 0.0169677734375
+            },
+            {
+              "flat_index": 11,
+              "coordinates": [
+                0,
+                11
+              ],
+              "expected": -0.00011968612670898438,
+              "actual": 0.0174560546875
+            },
+            {
+              "flat_index": 12,
+              "coordinates": [
+                0,
+                12
+              ],
+              "expected": -0.0634765625,
+              "actual": -0.0859375
+            },
+            {
+              "flat_index": 13,
+              "coordinates": [
+                0,
+                13
+              ],
+              "expected": 0.1240234375,
+              "actual": 0.0634765625
+            },
+            {
+              "flat_index": 14,
+              "coordinates": [
+                0,
+                14
+              ],
+              "expected": -0.0162353515625,
+              "actual": 0.00189971923828125
+            },
+            {
+              "flat_index": 15,
+              "coordinates": [
+                0,
+                15
+              ],
+              "expected": -0.054443359375,
+              "actual": -0.09619140625
+            },
+            {
+              "flat_index": 16,
+              "coordinates": [
+                0,
+                16
+              ],
+              "expected": 0.0123291015625,
+              "actual": -0.025390625
+            },
+            {
+              "flat_index": 17,
+              "coordinates": [
+                0,
+                17
+              ],
+              "expected": 0.0118408203125,
+              "actual": 0.0074462890625
+            },
+            {
+              "flat_index": 18,
+              "coordinates": [
+                0,
+                18
+              ],
+              "expected": 0.008544921875,
+              "actual": -0.032958984375
+            },
+            {
+              "flat_index": 19,
+              "coordinates": [
+                0,
+                19
+              ],
+              "expected": 0.032470703125,
+              "actual": -0.00982666015625
+            },
+            {
+              "flat_index": 20,
+              "coordinates": [
+                0,
+                20
+              ],
+              "expected": -0.026611328125,
+              "actual": -0.043212890625
+            },
+            {
+              "flat_index": 21,
+              "coordinates": [
+                0,
+                21
+              ],
+              "expected": 0.03857421875,
+              "actual": 0.04736328125
+            },
+            {
+              "flat_index": 22,
+              "coordinates": [
+                0,
+                22
+              ],
+              "expected": 0.107421875,
+              "actual": 0.07080078125
+            },
+            {
+              "flat_index": 23,
+              "coordinates": [
+                0,
+                23
+              ],
+              "expected": 0.034423828125,
+              "actual": 0.031005859375
+            },
+            {
+              "flat_index": 24,
+              "coordinates": [
+                0,
+                24
+              ],
+              "expected": 0.0034027099609375,
+              "actual": -0.0228271484375
+            },
+            {
+              "flat_index": 25,
+              "coordinates": [
+                0,
+                25
+              ],
+              "expected": 0.09326171875,
+              "actual": 0.07861328125
+            },
+            {
+              "flat_index": 26,
+              "coordinates": [
+                0,
+                26
+              ],
+              "expected": 0.0341796875,
+              "actual": 0.06298828125
+            },
+            {
+              "flat_index": 27,
+              "coordinates": [
+                0,
+                27
+              ],
+              "expected": -0.027587890625,
+              "actual": -0.0615234375
+            },
+            {
+              "flat_index": 28,
+              "coordinates": [
+                0,
+                28
+              ],
+              "expected": -0.03466796875,
+              "actual": 0.002471923828125
+            },
+            {
+              "flat_index": 29,
+              "coordinates": [
+                0,
+                29
+              ],
+              "expected": -0.0252685546875,
+              "actual": -0.026123046875
+            },
+            {
+              "flat_index": 30,
+              "coordinates": [
+                0,
+                30
+              ],
+              "expected": 0.0107421875,
+              "actual": 0.027099609375
+            },
+            {
+              "flat_index": 31,
+              "coordinates": [
+                0,
+                31
+              ],
+              "expected": 0.028076171875,
+              "actual": 0.037841796875
+            }
+          ],
+          "mismatch_sample_rule": "First 32 exact inequalities; not a tolerance filter."
+        }
+      ]
+    }
+  },
+  "bound_input_pointers": {
+    "x": 19792490659840,
+    "wkv": 19792492756992,
+    "wgate": 19792496951296,
+    "state": 19792491184128,
+    "cu": 19792491208704,
+    "used": 19792491209216,
+    "start": 19792491209728,
+    "bank": 19792491210240
+  },
+  "error": "AssertionError: Compressor boundary comparison failed; all repeats and row diagnostics retained",
+  "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1727, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1689, in dispatch_probe\n    probe_compressor_boundary()\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1676, in probe_compressor_boundary\n    raise AssertionError(\"Compressor boundary comparison failed; all repeats and row diagnostics retained\")\nAssertionError: Compressor boundary comparison failed; all repeats and row diagnostics retained\n",
+  "elapsed_seconds": 10.547,
+  "returncode": 1,
+  "wall_seconds": 15.204
+}

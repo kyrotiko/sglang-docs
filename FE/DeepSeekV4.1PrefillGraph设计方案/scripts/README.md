@@ -6,11 +6,17 @@
 
 首两轮 [run1](../validation/a5-20261116-run1/findings.md) / [run2](../validation/a5-20261116-run2/findings.md) 与 [randgun 合并记录](../analysis/randgun_merge_20261117.md)保留为对应旧环境/代码的历史快照。第三轮的硬件和 SDK 内容均有变化，即使包版本号相同也不自动等同。
 
-## 本轮只定位 compressor 边界
+## 当前结论：独立 compressor 的 eager 重复也失败
+
+[第七轮](../validation/a5-20261117-run7/findings.md)已完成。相同 GPU x/state、同 stream 且显式同步，奇数 prefix 的长 extend 在 eager 重复中已发生有效 row 0 差异；偶数 prefix 长 extend 和奇数 prefix 单 token 对照通过。合成链 replay 前加同步仍失败。这里的 eager 调用发生在同进程 capture 之后，尚未排除 capture 初始化或全局 workspace 的影响。
+
+现有数据已可转交算子方核对 CYCLE 的 ABI/状态容量和首 pair 读写顺序，见[复现材料](../analysis/compressor_odd_prefix_reproducer.md)。不用再原样重复这些探针，也不据此禁用 idle、放宽阈值或改服务算法。脚本仍为 revision 7，留作算子方复现及对应修复后的回归。
+
+## 第七轮已完成命令（保留复现）
 
 [第六轮](../validation/a5-20261117-run6/findings.md)已经完成有无 idle 对照，两组都在 odd-prefix 失败，最早差异在 compressor 原始输出。两轮 idle 状态保护通过。机器换成了 950PR / driver 25.1.rc3，不能与第五轮 DT 的字节数量直接作同环境比较。
 
-revision 7 本轮运行以下三组，不重跑 ratio 0/1 或全量矩阵：
+以下三组已完成，无需原样重跑；算子方复现或对应实现修复后回归可使用：
 
 ```bash
 python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py" \

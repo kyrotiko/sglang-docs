@@ -1,0 +1,2 @@
+# Preserve evidence hashes across platforms.
+raw/** -text -whitespace

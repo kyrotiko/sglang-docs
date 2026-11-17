@@ -1,0 +1,84 @@
+{
+  "source_directory": "C:/Users/admin/Desktop/file7",
+  "source_sha": "24deba1e5f631ba0459dd23292881a3f9239bbbb",
+  "expected_source_baseline": "d3700bf0a9",
+  "source_status": "",
+  "script_revision": 7,
+  "returned_script_sha256": "3822f139c464f81229fd37b76176020f308165866f7343a127c9811b3dd6d12c",
+  "reported_script_sha256": "3822f139c464f81229fd37b76176020f308165866f7343a127c9811b3dd6d12c",
+  "script_matches_manifest": true,
+  "script_matches_local_at_intake_after_lf_normalization": true,
+  "runtime": {
+    "device": "Ascend950PR_9589",
+    "packages": {
+      "torch": "2.13.0+cpu",
+      "torch-npu": "2.13.0",
+      "sglang": "0.5.23.dev636+gd0a756543",
+      "sgl-kernel-npu": "2026.11.0.post4",
+      "triton": "3.6.0",
+      "numpy": "2.2.6"
+    },
+    "driver": "| npu-smi 25.1.rc3                                 Version: 25.1.rc3                                               |",
+    "compared_python_api_hashes": 10,
+    "changed_python_api_hashes": []
+  },
+  "note": "Raw JSON/log/Markdown preserved byte-for-byte. Returned Python was hashed as data only.",
+  "files": [
+    {
+      "file": "raw/active_chain_r2.json",
+      "bytes": 68167,
+      "sha256": "77b01bbc699a1e316b2dfebf1866b00170c9370010db2d1da7204224d089557e"
+    },
+    {
+      "file": "raw/active_chain_r2.log",
+      "bytes": 3116,
+      "sha256": "e78d199e56469d9a00567300763f0e4bfafbf6e46ceacd53502fc4c2a5c68c3e"
+    },
+    {
+      "file": "raw/active_chain_r2_sync.json",
+      "bytes": 66921,
+      "sha256": "d715884a97e0aeca79fca363c9746295cd0f40252f3018a0df4bd4fa399a2d1d"
+    },
+    {
+      "file": "raw/active_chain_r2_sync.log",
+      "bytes": 3231,
+      "sha256": "89482d63bb102c09b563e7f08e6ab10f56730d084b592c6d1e78ed12405a3e28"
+    },
+    {
+      "file": "raw/compressor_boundary.json",
+      "bytes": 169365,
+      "sha256": "bbc9eec2f7ce373404e6196172cc90a5ad106469e440367c59ad22ed61a85396"
+    },
+    {
+      "file": "raw/compressor_boundary.log",
+      "bytes": 3376,
+      "sha256": "8f3fb9bc1da413364c63713a117333b06ba4361ece5591cfc3f10e4a92a33850"
+    },
+    {
+      "file": "raw/environment.json",
+      "bytes": 33774,
+      "sha256": "a02ded6271c4fa9c7af3911a9fcfd5d1933a0837b249f6ac122b142e3425ad6e"
+    },
+    {
+      "file": "raw/environment.log",
+      "bytes": 1108,
+      "sha256": "0670d5faa3510b8e76592ef252f4cc9e7f55d3cb418a7b57feacb994cb0b2472"
+    },
+    {
+      "file": "raw/report.json",
+      "bytes": 387527,
+      "sha256": "b6b978b6d44abf092acef016fe19fe11da539dd07f0b4584880805347d248d4a"
+    },
+    {
+      "file": "raw/report.md",
+      "bytes": 1678,
+      "sha256": "58c714c56ec563d4b3301224850d145c2fda7881ffc6ab0dd059dd7f6e1af418"
+    },
+    {
+      "file": "raw/script_revision7.py.txt",
+      "bytes": 103472,
+      "sha256": "3822f139c464f81229fd37b76176020f308165866f7343a127c9811b3dd6d12c",
+      "origin": "Trusted matching local source, LF normalized; returned Python was not executed or imported."
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+[compressor_boundary] start
+[compressor_boundary] history_prefix:0
+[compressor_boundary] history_prefix:1
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:13: FutureWarning: triton.language.extra.cann.extension.atan2 is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.atan2 instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.atan2")
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:35: FutureWarning: triton.language.extra.cann.extension.isfinited is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.isfinited instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.isfinited")
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:49: FutureWarning: triton.language.extra.cann.extension.finitef is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.finitef instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.finitef")
+[compressor_boundary] history_prefix:2
+[compressor_boundary] history_prefix:3
+[compressor_boundary] warmup
+[compressor_boundary] capture_begin
+[compressor_boundary] capture_end
+[compressor_boundary] eager1:even_full
+[compressor_boundary] eager2:even_full
+[compressor_boundary] replay1:even_full
+[compressor_boundary] replay2:even_full
+[compressor_boundary] collected:even_full
+[compressor_boundary] eager1:odd_one
+[compressor_boundary] eager2:odd_one
+[compressor_boundary] replay1:odd_one
+[compressor_boundary] replay2:odd_one
+[compressor_boundary] collected:odd_one
+[compressor_boundary] eager1:odd_long
+[compressor_boundary] eager2:odd_long
+[compressor_boundary] replay1:odd_long
+[compressor_boundary] replay2:odd_long
+[compressor_boundary] collected:odd_long
+[compressor_boundary] eager1:even_long
+[compressor_boundary] eager2:even_long
+[compressor_boundary] replay1:even_long
+[compressor_boundary] replay2:even_long
+[compressor_boundary] collected:even_long
+[compressor_boundary] eager1:shifted_odd_long
+[compressor_boundary] eager2:shifted_odd_long
+[compressor_boundary] replay1:shifted_odd_long
+[compressor_boundary] replay2:shifted_odd_long
+[compressor_boundary] collected:shifted_odd_long
+[compressor_boundary] eager1:odd_long_repeat
+[compressor_boundary] eager2:odd_long_repeat
+[compressor_boundary] replay1:odd_long_repeat
+[compressor_boundary] replay2:odd_long_repeat
+[compressor_boundary] collected:odd_long_repeat
+Traceback (most recent call last):
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1727, in worker
+    dispatch_probe(options.worker)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1689, in dispatch_probe
+    probe_compressor_boundary()
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1676, in probe_compressor_boundary
+    raise AssertionError("Compressor boundary comparison failed; all repeats and row diagnostics retained")
+AssertionError: Compressor boundary comparison failed; all repeats and row diagnostics retained
+
