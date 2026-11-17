@@ -2,13 +2,34 @@
 
 运行文件：[verify_dsv41_prefill_graph.py](verify_dsv41_prefill_graph.py)。只需复制这个 `.py`，不下载或加载模型权重。
 
-**当前 revision 4，预期主仓 `dsv41-a5@9898f7ce9a`。** [第三轮事实](../validation/a5-20261117-run3/findings.md)已确认 compressor、公开 writer、mHC premix 和其他已捕获探针的对照 exact。writer→attention 三项在 capture 前暴露了脚本 dtype 视图问题，revision 4 已修复：FP8 writer 取 float8 view，attention 保留 uint8 view，二者共享同一存储，不做数值转换。
+**当前 revision 5，预期主仓 `dsv41-a5-graph-gpt@d3700bf0a9`。** 新增三组 idle 本地链探针，尚未取得设备结果；不修改服务代码或决定 idle 回退策略。原 17 组保留：[第三轮](../validation/a5-20261117-run3/findings.md)取得新基元证据，[第四轮](../validation/a5-20261117-run4/findings.md)已确认 dtype 修复生效，writer 产出缓存后 MQSMLA 的 15 轮有效输出 graph/eager exact。独立 CPU FP32 reference 仍 FAIL，诊断与手工缓存一致；不把该结果改写为独立精度通过。
 
 首两轮 [run1](../validation/a5-20261116-run1/findings.md) / [run2](../validation/a5-20261116-run2/findings.md) 与 [randgun 合并记录](../analysis/randgun_merge_20261117.md)保留为对应旧环境/代码的历史快照。第三轮的硬件和 SDK 内容均有变化，即使包版本号相同也不自动等同。
 
-## 当前只需重跑三组
+## 本轮先验证 idle 本地链
 
-在第三轮相同的 A5 serving 环境替换脚本后运行：
+主仓保持已推送的 `d3700bf0a9`。只替换这一个验证脚本，不应用 idle veto / 整组 eager 草稿。无需加载权重或先重跑原 17 组：
+
+```bash
+python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py" \
+  --sglang-root /mnt/share/y00627667/repos/sglang \
+  --device 0 --tokens 64 \
+  --probes environment,idle_chain_r0,idle_chain_r1,idle_chain_r2 \
+  --timeout 1200 \
+  --output-dir "./dsv41-idle-chain-$(date +%Y%m%d-%H%M%S)"
+```
+
+每组使用同一固定 bucket，依次执行 live full → idle → live odd-prefix/short → idle → live full；每轮先从相同初始状态跑 eager，再 replay，并将本轮状态带到下一轮。三个组分别覆盖 window-only、ratio-1 投影/writer/index-K/QLI→QSLI/attention、ratio-2 compressor/writer/index-K/QLI/attention 的合成图内链。
+
+验证的 idle 候选协议来自当前 dummy EXTEND 物理几何：`cu=[0,T_cap]`、`KV length=T_cap`，但 `seqused=0`、bank 0、compressed/index 写入 loc 全 `-1`、SWA loc 0、window/cmp 有效长度 0，QLI/QSLI 仍执行。它不是在宣称该协议已经合法；metadata planning 或 compute 不接受时，保留失败阶段和日志。该命令不验证另一种 `cu=[0,0]` 的零物理 query ABI。
+
+idle 必须保持所有非零 request-bank 和所有真实 SWA 页不变，compressed/index cache 全部不变，按字节检查。SWA 保留 page 0 允许 dummy 写入。idle 输出本身被忽略，只记录 finite/未写入情况，不要求无效输出为零。前后 live 的有效输出、top-k、缓存和状态仍与 eager 比较。
+
+**该探针是单卡、本地合成链、identity RoPE。** 不绕过主仓 metadata 的异常保护，不验证实际 source-group、mHC、多流、DeepEP 或 DP8 一致通信。三个组 PASS 后再用真实模型验证多 rank 混合 live/idle；任何单卡结果都不直接决定服务是否支持 idle replay。继续回传 `dsv41-prefill-evidence.tar.gz`，FAIL/BLOCKED 也保留。
+
+## 已完成的第四轮（保留复现命令）
+
+下面三组已完成，当前无需重复。若后续 SDK、形状或实现变化，需要复现时使用新目录：
 
 ```bash
 python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py" \
@@ -22,7 +43,7 @@ python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计
 
 运行结束回传输出目录中的 `dsv41-prefill-evidence.tar.gz`，FAIL/BLOCKED 也保留。若真实服务额外加载注册模块，显式使用 `--import-module MODULE`，不猜测模块或切换代际接口。
 
-## 全量 17 组命令（复现或新环境使用）
+## 全量 20 组命令（复现或新环境使用）
 
 ```bash
 python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py" \
@@ -35,7 +56,7 @@ python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计
   --output-dir "./dsv41-prefill-full-$(date +%Y%m%d-%H%M%S)"
 ```
 
-不通过 torchrun，不需要 HCCL 初始化。全量是 17 组单卡 synthetic 探针，不是整模或多卡验收。默认每组最长 600 秒（可用 `--timeout` 调整）；各组独立子进程，失败、超时、崩溃均尽量保留 checkpoint 和已完成 case，并继续其他组。
+不通过 torchrun，不需要 HCCL 初始化。全量是 20 组单卡 synthetic 探针，不是整模或多卡验收。默认每组最长 600 秒（可用 `--timeout` 调整）；各组独立子进程，失败、超时、崩溃均尽量保留 checkpoint 和已完成 case，并继续其他组。
 
 ## 结果内容
 
@@ -57,6 +78,7 @@ python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计
 | candidate_chain | ratio-1 QLI→QSLI 图内数据流，candidate 内容/长度及 top-k |
 | attention_r0/r1/r2 | 手工合法缓存的 MQSMLA，多轮 graph/eager 及部分行/head 的 CPU FP32 reference |
 | writer_attention_r0/r1/r2 | 公开 writer 在 replay 前准备缓存，CPU 按 544/320B ABI 解码，captured MQSMLA 消费；writer 与 consumer 的 dtype view 共享存储 |
+| idle_chain_r0/r1/r2 | 同 bucket live→idle→live；公开 writer、c1 投影/c2 compressor、index-K/QLI/QSLI 与 attention 合成图内链，检查 idle 对真实 cache/state 的字节级保护；未验证多卡 |
 | engram_break | 小型真实 hasher fallback、固定输出、共享 break、history 和 verify 延迟提交 |
 | mhc_premix | 指定 `cann_recipes_infer_cann920` 的公开 premix、previous-pre 折叠、triplet、同 X 改 previous-pre 的系数不变性 |
 
@@ -86,4 +108,4 @@ index PA page 与 candidate block 不同；`--index-page-size` 必须整除 `--p
 python verify_dsv41_prefill_graph.py --self-test
 ```
 
-需要 CPU torch，覆盖计数边界、KV pack/unpack、页表与 record、padding、BF16 诊断及 writer/consumer 视图 alias；不输出 NPU 已通过结论。dtype 回归已在本地验证 revision 3 失败、revision 4 通过，但实际 writer→attention 仍需上述三组设备重跑。
+需要 CPU torch，覆盖计数边界、KV pack/unpack、页表与 record、padding、BF16 诊断及 writer/consumer 视图 alias；不输出 NPU 已通过结论。dtype 回归已在本地验证修复前失败、修复后通过，第四轮也已取得真实 writer→attention 的设备 graph/eager 对照证据，独立精度状态另行保留。

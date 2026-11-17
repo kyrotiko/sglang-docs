@@ -1,0 +1,56 @@
+{
+  "source_directory": "C:/Users/admin/Desktop/file4",
+  "expected_source_sha": "9898f7ce9a",
+  "script_revision": 4,
+  "returned_script_sha256": "cea42129e530a00f9d8206fe7a982db8c8e427a2b62243f2ed8e06c9eb0e900f",
+  "reported_script_sha256": "cea42129e530a00f9d8206fe7a982db8c8e427a2b62243f2ed8e06c9eb0e900f",
+  "script_matches_manifest": true,
+  "script_matches_local_at_intake_after_lf_normalization": true,
+  "devices": [
+    "Ascend950DT_9582"
+  ],
+  "source_observation_note": "Only writer_attention probes ran; this run did not independently collect git status, package inventory or SDK source hashes.",
+  "note": "Returned Python was hashed only, never executed or imported. Raw JSON/log/Markdown preserved byte-for-byte.",
+  "files": [
+    {
+      "file": "raw/report.json",
+      "bytes": 155395,
+      "sha256": "c6cbcc39502b51637e75294357bbe897d6039eee3078e2508264c9262a34ac33"
+    },
+    {
+      "file": "raw/report.md",
+      "bytes": 1706,
+      "sha256": "f48ed6a6165f3aa269fd33e5e8ab8165e354d5d637ccca8d9a0a2af753e9d8fe"
+    },
+    {
+      "file": "raw/writer_attention_r0.json",
+      "bytes": 45713,
+      "sha256": "96fcc39c4afb4252e17705dbf18ddcb24d80ad9761bcd84d3fbd04c5db057a93"
+    },
+    {
+      "file": "raw/writer_attention_r0.log",
+      "bytes": 2121,
+      "sha256": "54739b07a5102475cd2afed9edb66ab3bcea4e6f93419750dc074b9c6ae65de5"
+    },
+    {
+      "file": "raw/writer_attention_r1.json",
+      "bytes": 46053,
+      "sha256": "63cb2b16119aef898587d03e50ddfcbd24e326d219f265981d0654bcb59a56a9"
+    },
+    {
+      "file": "raw/writer_attention_r1.log",
+      "bytes": 2121,
+      "sha256": "d251d5422702f6caa3efa087f5e7ca41a97b43102e54919e832c56e613ee443f"
+    },
+    {
+      "file": "raw/writer_attention_r2.json",
+      "bytes": 46001,
+      "sha256": "bcecdd89987bb51e02b07d278c8cbdcf4473ac01ee5c4e48484abd21f57bd396"
+    },
+    {
+      "file": "raw/writer_attention_r2.log",
+      "bytes": 2121,
+      "sha256": "1625ef49d544fc5c64ffcddc9fa033889843dde20c33331825544bf824b7b948"
+    }
+  ]
+}

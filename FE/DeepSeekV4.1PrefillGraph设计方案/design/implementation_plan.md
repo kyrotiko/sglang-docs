@@ -2,7 +2,9 @@
 
 开发基线：`sglang/dsv41-a5@9898f7ce9a`；2026-11-17。已保留先前 11 个入图提交并合入 randgun 的 13 个新提交，281 项 CPU 回归全部通过；本次变化和定向设备复验见 [合并记录](../analysis/randgun_merge_20261117.md)。writer/mHC 已迁到公开 SDK wrapper，但 V4.1 prefill 固定状态和下面的使能闸门仍未实现，新主仓尚未做 A5 整模验证。
 
-前两轮 A5 [run1](../validation/a5-20261116-run1/findings.md) / [run2](../validation/a5-20261116-run2/findings.md)已验证几何、metadata、prologue、Engram 和 QLI/QSLI/MQSMLA 对照。[第三轮](../validation/a5-20261117-run3/findings.md)在新 950DT/SDK 环境进一步实际验证 compressor、公开 544/320B writer、mHC premix 的多轮图回放 exact；旧接口阻塞不再适用于该环境。writer→attention 探针的 dtype 视图已修复待重跑，独立 FP32 精度仍保留失败。可以继续固定 metadata/模型数据流接入，但这些单卡证据不等于整模图实现或完整状态验收。
+前两轮 A5 [run1](../validation/a5-20261116-run1/findings.md) / [run2](../validation/a5-20261116-run2/findings.md)已验证几何、metadata、prologue、Engram 和 QLI/QSLI/MQSMLA 对照。[第三轮](../validation/a5-20261117-run3/findings.md)验证当前 950DT/SDK 的 compressor、公开 writer、mHC premix；[第四轮](../validation/a5-20261117-run4/findings.md)验证 writer→attention 的 15 个 graph/eager case exact，dtype/storage 相容且诊断延续原精度差异。单算子复验已可收敛到实现阶段，继续固定 metadata/模型数据流接入；独立 FP32 精度、真实模型状态和多卡/整模仍单独验收。
+
+本轮拟改文件、函数、capture/replay 顺序及测试落点见[代码改动清单](code_change_plan.md)。该清单为待审阅方案，主仓尚未实施；本轮直接闭合固定 metadata 与 source/index/attention，第 2 节的 eager 过渡仅在完整路径暂不能闭合时采用，不作为又一轮重复探针的前置。
 
 ## 1. 复用边界与首版范围
 

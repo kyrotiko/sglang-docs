@@ -1,6 +1,6 @@
 # 合入 randgun/dsv41-a5 后的验证调整
 
-日期：2026-11-17。本文是合并时的验证计划快照；随后[第三轮全量 A5 结果](../validation/a5-20261117-run3/findings.md)已取得 compressor、公开 writer 和 mHC 的正面证据。当前只需用 revision 4 修复后的脚本补三组 writer 消费链，下面的“尚未验证”描述保留其合并时语境。
+日期：2026-11-17。本文是合并时的验证计划快照；随后[第三轮](../validation/a5-20261117-run3/findings.md)取得新基元正面证据，[第四轮](../validation/a5-20261117-run4/findings.md)完成 writer 消费链的 capture/eager-replay exact。当前无需重复原探针；下面的“尚未验证”描述保留合并时语境，独立精度和主仓模型接入仍按最新记录验收。
 
 ## 1. 合并结果
 

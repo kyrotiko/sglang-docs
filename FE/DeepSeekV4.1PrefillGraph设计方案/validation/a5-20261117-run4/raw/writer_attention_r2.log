@@ -1,0 +1,39 @@
+[writer_attention_r2] start
+[writer_attention_r2] public_writer_prepare:full_A
+[writer_attention_r2] warmup
+[writer_attention_r2] capture_begin
+[writer_attention_r2] capture_end
+[writer_attention_r2] prepare:full_A
+[writer_attention_r2] public_writer_prepare:full_A
+[writer_attention_r2] eager:full_A
+[writer_attention_r2] replay:full_A
+[writer_attention_r2] passed:full_A
+[writer_attention_r2] prepare:short_B
+[writer_attention_r2] public_writer_prepare:short_B
+[writer_attention_r2] eager:short_B
+[writer_attention_r2] replay:short_B
+[writer_attention_r2] passed:short_B
+[writer_attention_r2] prepare:page_boundary_C
+[writer_attention_r2] public_writer_prepare:page_boundary_C
+[writer_attention_r2] eager:page_boundary_C
+[writer_attention_r2] replay:page_boundary_C
+[writer_attention_r2] passed:page_boundary_C
+[writer_attention_r2] prepare:different_prefix_D
+[writer_attention_r2] public_writer_prepare:different_prefix_D
+[writer_attention_r2] eager:different_prefix_D
+[writer_attention_r2] replay:different_prefix_D
+[writer_attention_r2] passed:different_prefix_D
+[writer_attention_r2] prepare:repeat_A
+[writer_attention_r2] public_writer_prepare:repeat_A
+[writer_attention_r2] eager:repeat_A
+[writer_attention_r2] replay:repeat_A
+[writer_attention_r2] passed:repeat_A
+Traceback (most recent call last):
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1315, in worker
+    dispatch_probe(options.worker)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1295, in dispatch_probe
+    probe_attention(int(name[-1]), use_writer=True)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1090, in probe_attention
+    raise AssertionError("Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.")
+AssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.
+

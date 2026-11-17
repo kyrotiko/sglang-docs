@@ -1,5 +1,7 @@
 # A5 第三轮全量探针结论
 
+后续[第四轮](../a5-20261117-run4/findings.md)已验证 dtype 修复并完成三组消费链图对照；本文保留第三轮当时的错误和下一轮计划，当前无需重复下文重跑命令。
+
 结果时间：2026-11-17 03:36:43 UTC。主仓 `9898f7ce9af12fec5e2ef57d1adaa2b7533992ef`，工作树干净。原始结果见 [raw/report.md](raw/report.md)、[raw/report.json](raw/report.json)，来源见 [manifest.json](manifest.json)。回传脚本仅校验 hash/文本，没有运行或导入。
 
 ## 1. 核心结论

@@ -1,0 +1,1330 @@
+{
+  "probe": "writer_attention_r2",
+  "status": "FAIL",
+  "phase": "passed:repeat_A",
+  "started": "2026-11-17T04:01:35+0000",
+  "script_revision": 4,
+  "rtol": 0.001,
+  "atol": 0.001,
+  "reference_rtol": 0.001,
+  "reference_atol": 0.001,
+  "registration_imports": [],
+  "device": "Ascend950DT_9582",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "writer_entrypoint": "sgl_kernel_npu.operators.mem_cache.kv_compress_epilog_v2",
+  "writer_profile": "public wrapper used by merged SGLang; no custom namespace fallback",
+  "apis": {
+    "kv_compress_epilog_v2": {
+      "signature": "(cache, x, slot_mapping, quant_group_size=32, quant_mode='mxfp8_bf16', round_scale=True, x_scale=1.0, *, impl='auto')",
+      "module": "sgl_kernel_npu.operators.mem_cache.kv_compress_epilog_v2",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/mem_cache/kv_compress_epilog_v2.py"
+    },
+    "mixed_quant_sparse_flash_mla_dsl": {
+      "signature": "(q, *, ori_kv=None, cmp_kv=None, ori_sparse_indices=None, cmp_sparse_indices=None, ori_block_table=None, cmp_block_table=None, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, ori_topk_length=None, cmp_topk_length=None, sinks=None, metadata=None, quant_mode, softmax_scale=None, layout_q='TND', layout_kv='PA_BBND', return_softmax_lse=False, out, lse, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_dsl.py"
+    },
+    "mixed_quant_sparse_flash_mla_metadata_dsl": {
+      "signature": "(ori_topk_length, cmp_topk_length, *, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, batch_size=None, max_seqlen_q=None, max_seqlen_ori_kv=None, max_seqlen_cmp_kv=None, num_heads_q, num_heads_kv, head_dim, quant_mode, layout_q='TND', layout_kv='PA_BBND', has_ori_kv=True, has_cmp_kv=True, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_metadata_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_metadata_dsl.py"
+    }
+  },
+  "writer_quantization_diagnostics": {
+    "full_A": {
+      "original": {
+        "row_bytes": 544,
+        "quant_group": 32,
+        "writer_dtype": "torch.float8_e4m3fn",
+        "attention_view_dtype": "torch.uint8",
+        "same_storage": true,
+        "max_abs_input_to_decoded": 0.0,
+        "note": "Recorded error, not a quantization-accuracy acceptance threshold."
+      },
+      "compressed": {
+        "row_bytes": 320,
+        "quant_group": 16,
+        "writer_dtype": "torch.uint8",
+        "attention_view_dtype": "torch.uint8",
+        "same_storage": true,
+        "max_abs_input_to_decoded": 0.0,
+        "note": "Recorded error, not a quantization-accuracy acceptance threshold."
+      }
+    },
+    "short_B": {
+      "original": {
+        "row_bytes": 544,
+        "quant_group": 32,
+        "writer_dtype": "torch.float8_e4m3fn",
+        "attention_view_dtype": "torch.uint8",
+        "same_storage": true,
+        "max_abs_input_to_decoded": 0.0,
+        "note": "Recorded error, not a quantization-accuracy acceptance threshold."
+      },
+      "compressed": {
+        "row_bytes": 320,
+        "quant_group": 16,
+        "writer_dtype": "torch.uint8",
+        "attention_view_dtype": "torch.uint8",
+        "same_storage": true,
+        "max_abs_input_to_decoded": 0.0,
+        "note": "Recorded error, not a quantization-accuracy acceptance threshold."
+      }
+    },
+    "page_boundary_C": {
+      "original": {
+        "row_bytes": 544,
+        "quant_group": 32,
+        "writer_dtype": "torch.float8_e4m3fn",
+        "attention_view_dtype": "torch.uint8",
+        "same_storage": true,
+        "max_abs_input_to_decoded": 0.0,
+        "note": "Recorded error, not a quantization-accuracy acceptance threshold."
+      },
+      "compressed": {
+        "row_bytes": 320,
+        "quant_group": 16,
+        "writer_dtype": "torch.uint8",
+        "attention_view_dtype": "torch.uint8",
+        "same_storage": true,
+        "max_abs_input_to_decoded": 0.0,
+        "note": "Recorded error, not a quantization-accuracy acceptance threshold."
+      }
+    },
+    "different_prefix_D": {
+      "original": {
+        "row_bytes": 544,
+        "quant_group": 32,
+        "writer_dtype": "torch.float8_e4m3fn",
+        "attention_view_dtype": "torch.uint8",
+        "same_storage": true,
+        "max_abs_input_to_decoded": 0.0,
+        "note": "Recorded error, not a quantization-accuracy acceptance threshold."
+      },
+      "compressed": {
+        "row_bytes": 320,
+        "quant_group": 16,
+        "writer_dtype": "torch.uint8",
+        "attention_view_dtype": "torch.uint8",
+        "same_storage": true,
+        "max_abs_input_to_decoded": 0.0,
+        "note": "Recorded error, not a quantization-accuracy acceptance threshold."
+      }
+    },
+    "repeat_A": {
+      "original": {
+        "row_bytes": 544,
+        "quant_group": 32,
+        "writer_dtype": "torch.float8_e4m3fn",
+        "attention_view_dtype": "torch.uint8",
+        "same_storage": true,
+        "max_abs_input_to_decoded": 0.0,
+        "note": "Recorded error, not a quantization-accuracy acceptance threshold."
+      },
+      "compressed": {
+        "row_bytes": 320,
+        "quant_group": 16,
+        "writer_dtype": "torch.uint8",
+        "attention_view_dtype": "torch.uint8",
+        "same_storage": true,
+        "max_abs_input_to_decoded": 0.0,
+        "note": "Recorded error, not a quantization-accuracy acceptance threshold."
+      }
+    }
+  },
+  "capture_supported": true,
+  "checks": {
+    "capture": "PASS",
+    "eager_replay": "PASS",
+    "cpu_reference": "FAIL"
+  },
+  "cases": [
+    {
+      "name": "full_A",
+      "parameters": {
+        "name": "full_A",
+        "live": 64,
+        "prefix": 768,
+        "page_shift": 0,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            64,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "short_B",
+      "parameters": {
+        "name": "short_B",
+        "live": 31,
+        "prefix": 1,
+        "page_shift": 1,
+        "seed": 20261117
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            31,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "page_boundary_C",
+      "parameters": {
+        "name": "page_boundary_C",
+        "live": 16,
+        "prefix": 127,
+        "page_shift": 2,
+        "seed": 20261118
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            16,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "different_prefix_D",
+      "parameters": {
+        "name": "different_prefix_D",
+        "live": 61,
+        "prefix": 513,
+        "page_shift": 1,
+        "seed": 20261119
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            61,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "repeat_A",
+      "parameters": {
+        "name": "repeat_A",
+        "live": 64,
+        "prefix": 768,
+        "page_shift": 0,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            64,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    }
+  ],
+  "cpu_reference": {
+    "full_A": {
+      "row0_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00013217702507972717,
+          "max_rel": 0.5265589383666596
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 2.9681115526762137e-05,
+          "normalized_l2": 0.0019820133611317277,
+          "fp32_to_bf16_rounding_max_abs": 0.00011196359992027283,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 73,
+          "within_one_bf16_ulp": 465,
+          "elements": 512,
+          "largest_error": {
+            "index": 107,
+            "reference_fp32": 0.03185024484992027,
+            "reference_bf16": 0.03173828125,
+            "actual": 0.031982421875,
+            "abs_error": 0.00013217702507972717
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00012589618563652039,
+          "max_rel": 2.442344676893628
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.169591289692782e-05,
+          "normalized_l2": 0.002118314509623343,
+          "fp32_to_bf16_rounding_max_abs": 0.00011874362826347351,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 28404,
+          "within_one_bf16_ulp": 463,
+          "elements": 512,
+          "largest_error": {
+            "index": 107,
+            "reference_fp32": 0.03185652568936348,
+            "reference_bf16": 0.03173828125,
+            "actual": 0.031982421875,
+            "abs_error": 0.00012589618563652039
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00014675408601760864,
+          "max_rel": 0.27046872745052847
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.188949431686546e-05,
+          "normalized_l2": 0.0021333507659366487,
+          "fp32_to_bf16_rounding_max_abs": 0.00011044740676879883,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 45,
+          "within_one_bf16_ulp": 477,
+          "elements": 512,
+          "largest_error": {
+            "index": 328,
+            "reference_fp32": 0.03481472283601761,
+            "reference_bf16": 0.034912109375,
+            "actual": 0.03466796875,
+            "abs_error": 0.00014675408601760864
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row63_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00014488771557807922,
+          "max_rel": 0.4428633321130743
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.1014527588134033e-05,
+          "normalized_l2": 0.0020292219525461478,
+          "fp32_to_bf16_rounding_max_abs": 0.00010676681995391846,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 111,
+          "within_one_bf16_ulp": 463,
+          "elements": 512,
+          "largest_error": {
+            "index": 240,
+            "reference_fp32": 0.03720862790942192,
+            "reference_bf16": 0.037109375,
+            "actual": 0.037353515625,
+            "abs_error": 0.00014488771557807922
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row63_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001334063708782196,
+          "max_rel": 0.20178219026692248
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.1532128833854896e-05,
+          "normalized_l2": 0.0020711236229073696,
+          "fp32_to_bf16_rounding_max_abs": 0.00012016668915748596,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 41,
+          "within_one_bf16_ulp": 468,
+          "elements": 512,
+          "largest_error": {
+            "index": 339,
+            "reference_fp32": -0.03187168762087822,
+            "reference_bf16": -0.031982421875,
+            "actual": -0.03173828125,
+            "abs_error": 0.0001334063708782196
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row63_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00010894238948822021,
+          "max_rel": 0.474336247792982
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.0297766145591618e-05,
+          "normalized_l2": 0.0019905857216969422,
+          "fp32_to_bf16_rounding_max_abs": 0.00010894238948822021,
+          "actual_to_rounded_reference_max_abs": 0.0001220703125,
+          "max_bf16_ulp_distance": 73,
+          "within_one_bf16_ulp": 470,
+          "elements": 512,
+          "largest_error": {
+            "index": 423,
+            "reference_fp32": -0.03257964551448822,
+            "reference_bf16": -0.032470703125,
+            "actual": -0.032470703125,
+            "abs_error": 0.00010894238948822021
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      }
+    },
+    "short_B": {
+      "row0_head0": {
+        "status": "FAIL",
+        "error": "CPU attention reference/reference: Tensor-likes are not close!\n\nMismatched elements: 1 / 512 (0.2%)\nGreatest absolute difference: 0.0013743340969085693 at index (299,) (up to 0.001 allowed)\nGreatest relative difference: 0.004809820093214512 at index (299,) (up to 0.001 allowed)",
+        "details": {
+          "label": "CPU attention reference",
+          "tensor": "reference",
+          "metrics": {
+            "shape": [
+              512
+            ],
+            "dtype": "torch.float32",
+            "exact": false,
+            "finite": true,
+            "max_abs": 0.0013743340969085693,
+            "max_rel": 0.7158705701078583
+          },
+          "expected_sample": [
+            0.1487453281879425,
+            0.12862330675125122,
+            -0.012884324416518211,
+            0.24678383767604828,
+            -0.17881028354167938,
+            0.2170781046152115,
+            -0.12658919394016266,
+            -0.21078690886497498,
+            -0.0440305657684803,
+            0.030481021851301193,
+            0.1509169191122055,
+            0.19484269618988037
+          ],
+          "actual_sample": [
+            0.1484375,
+            0.12890625,
+            -0.0128173828125,
+            0.2470703125,
+            -0.1787109375,
+            0.2177734375,
+            -0.126953125,
+            -0.2109375,
+            -0.044189453125,
+            0.0303955078125,
+            0.1513671875,
+            0.1953125
+          ]
+        },
+        "rounded_softmax_hypothesis_max_abs": 0.001953125,
+        "hypothesis_note": "Diagnostic alternate arithmetic; not substituted for the FP32 oracle.",
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 0.0003448719526080196,
+          "normalized_l2": 0.0020292504795608635,
+          "fp32_to_bf16_rounding_max_abs": 0.0009757578372955322,
+          "actual_to_rounded_reference_max_abs": 0.001953125,
+          "max_bf16_ulp_distance": 99,
+          "within_one_bf16_ulp": 476,
+          "elements": 512,
+          "largest_error": {
+            "index": 299,
+            "reference_fp32": -0.28573504090309143,
+            "reference_bf16": -0.28515625,
+            "actual": -0.287109375,
+            "abs_error": 0.0013743340969085693
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0011224150657653809,
+          "max_rel": 0.7032325068155264
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 0.0003041797266371112,
+          "normalized_l2": 0.0017750102829900407,
+          "fp32_to_bf16_rounding_max_abs": 0.0009723305702209473,
+          "actual_to_rounded_reference_max_abs": 0.001953125,
+          "max_bf16_ulp_distance": 92,
+          "within_one_bf16_ulp": 486,
+          "elements": 512,
+          "largest_error": {
+            "index": 346,
+            "reference_fp32": 0.2547369599342346,
+            "reference_bf16": 0.25390625,
+            "actual": 0.255859375,
+            "abs_error": 0.0011224150657653809
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0009834766387939453,
+          "max_rel": 0.1919125149089655
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 0.00030879784984062277,
+          "normalized_l2": 0.0018151337645570147,
+          "fp32_to_bf16_rounding_max_abs": 0.0009696483612060547,
+          "actual_to_rounded_reference_max_abs": 0.001953125,
+          "max_bf16_ulp_distance": 39,
+          "within_one_bf16_ulp": 473,
+          "elements": 512,
+          "largest_error": {
+            "index": 141,
+            "reference_fp32": -0.34667277336120605,
+            "reference_bf16": -0.345703125,
+            "actual": -0.34765625,
+            "abs_error": 0.0009834766387939453
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row30_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0005737543106079102,
+          "max_rel": 0.1653910837749832
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 9.017965639386056e-05,
+          "normalized_l2": 0.0020959724142829888,
+          "fp32_to_bf16_rounding_max_abs": 0.00040280818939208984,
+          "actual_to_rounded_reference_max_abs": 0.0009765625,
+          "max_bf16_ulp_distance": 41,
+          "within_one_bf16_ulp": 473,
+          "elements": 512,
+          "largest_error": {
+            "index": 93,
+            "reference_fp32": 0.1324096918106079,
+            "reference_bf16": 0.1328125,
+            "actual": 0.1318359375,
+            "abs_error": 0.0005737543106079102
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row30_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0004511028528213501,
+          "max_rel": 0.581086557174856
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 8.974793059409544e-05,
+          "normalized_l2": 0.0020844736614952656,
+          "fp32_to_bf16_rounding_max_abs": 0.0004511028528213501,
+          "actual_to_rounded_reference_max_abs": 0.00048828125,
+          "max_bf16_ulp_distance": 92,
+          "within_one_bf16_ulp": 464,
+          "elements": 512,
+          "largest_error": {
+            "index": 110,
+            "reference_fp32": -0.13033391535282135,
+            "reference_bf16": -0.1298828125,
+            "actual": -0.1298828125,
+            "abs_error": 0.0004511028528213501
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row30_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0002989768981933594,
+          "max_rel": 0.32654114759367664
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 8.155312753710906e-05,
+          "normalized_l2": 0.001892259326095327,
+          "fp32_to_bf16_rounding_max_abs": 0.00024396181106567383,
+          "actual_to_rounded_reference_max_abs": 0.00048828125,
+          "max_bf16_ulp_distance": 60,
+          "within_one_bf16_ulp": 466,
+          "elements": 512,
+          "largest_error": {
+            "index": 8,
+            "reference_fp32": -0.09638071060180664,
+            "reference_bf16": -0.09619140625,
+            "actual": -0.0966796875,
+            "abs_error": 0.0002989768981933594
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      }
+    },
+    "page_boundary_C": {
+      "row0_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00023622065782546997,
+          "max_rel": 3.4686810142765823
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.27956356679251e-05,
+          "normalized_l2": 0.002022734290198212,
+          "fp32_to_bf16_rounding_max_abs": 0.00023622065782546997,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 283,
+          "within_one_bf16_ulp": 461,
+          "elements": 512,
+          "largest_error": {
+            "index": 390,
+            "reference_fp32": 0.06615418940782547,
+            "reference_bf16": 0.06591796875,
+            "actual": 0.06591796875,
+            "abs_error": 0.00023622065782546997
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0002765357494354248,
+          "max_rel": 0.473757118175691
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.257124161131704e-05,
+          "normalized_l2": 0.0020139692104512393,
+          "fp32_to_bf16_rounding_max_abs": 0.0002117455005645752,
+          "actual_to_rounded_reference_max_abs": 0.00048828125,
+          "max_bf16_ulp_distance": 78,
+          "within_one_bf16_ulp": 460,
+          "elements": 512,
+          "largest_error": {
+            "index": 184,
+            "reference_fp32": -0.06521794199943542,
+            "reference_bf16": -0.0654296875,
+            "actual": -0.06494140625,
+            "abs_error": 0.0002765357494354248
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001867637038230896,
+          "max_rel": 0.34457222658053893
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.3556354953361084e-05,
+          "normalized_l2": 0.0020583878494269026,
+          "fp32_to_bf16_rounding_max_abs": 0.0001867637038230896,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 45,
+          "within_one_bf16_ulp": 455,
+          "elements": 512,
+          "largest_error": {
+            "index": 390,
+            "reference_fp32": 0.06426636129617691,
+            "reference_bf16": 0.064453125,
+            "actual": 0.064453125,
+            "abs_error": 0.0001867637038230896
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row15_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001808367669582367,
+          "max_rel": 0.9474688745950132
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.530502803491385e-05,
+          "normalized_l2": 0.0021478367819315193,
+          "fp32_to_bf16_rounding_max_abs": 0.00016640126705169678,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 124,
+          "within_one_bf16_ulp": 458,
+          "elements": 512,
+          "largest_error": {
+            "index": 342,
+            "reference_fp32": 0.03302228823304176,
+            "reference_bf16": 0.032958984375,
+            "actual": 0.033203125,
+            "abs_error": 0.0001808367669582367
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row15_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0002459287643432617,
+          "max_rel": 0.2264421877753859
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.402619913797303e-05,
+          "normalized_l2": 0.0020878473107426598,
+          "fp32_to_bf16_rounding_max_abs": 0.00024235248565673828,
+          "actual_to_rounded_reference_max_abs": 0.00048828125,
+          "max_bf16_ulp_distance": 43,
+          "within_one_bf16_ulp": 466,
+          "elements": 512,
+          "largest_error": {
+            "index": 214,
+            "reference_fp32": 0.06811344623565674,
+            "reference_bf16": 0.06787109375,
+            "actual": 0.068359375,
+            "abs_error": 0.0002459287643432617
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row15_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00013807415962219238,
+          "max_rel": 0.5650438116159509
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.335491035452077e-05,
+          "normalized_l2": 0.002063654688339705,
+          "fp32_to_bf16_rounding_max_abs": 0.00012183189392089844,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 158,
+          "within_one_bf16_ulp": 468,
+          "elements": 512,
+          "largest_error": {
+            "index": 160,
+            "reference_fp32": -0.03868028521537781,
+            "reference_bf16": -0.03857421875,
+            "actual": -0.038818359375,
+            "abs_error": 0.00013807415962219238
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      }
+    },
+    "different_prefix_D": {
+      "row0_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001525580883026123,
+          "max_rel": 3.9091711932714213
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.711519231401325e-05,
+          "normalized_l2": 0.0021188478359774263,
+          "fp32_to_bf16_rounding_max_abs": 0.00012150406837463379,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 288,
+          "within_one_bf16_ulp": 459,
+          "elements": 512,
+          "largest_error": {
+            "index": 232,
+            "reference_fp32": 0.03134158253669739,
+            "reference_bf16": 0.03125,
+            "actual": 0.031494140625,
+            "abs_error": 0.0001525580883026123
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001398622989654541,
+          "max_rel": 0.6856865143404598
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.689680971854183e-05,
+          "normalized_l2": 0.0021067799112786437,
+          "fp32_to_bf16_rounding_max_abs": 0.00012176483869552612,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 206,
+          "within_one_bf16_ulp": 464,
+          "elements": 512,
+          "largest_error": {
+            "index": 275,
+            "reference_fp32": 0.033063262701034546,
+            "reference_bf16": 0.032958984375,
+            "actual": 0.033203125,
+            "abs_error": 0.0001398622989654541
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00013100355863571167,
+          "max_rel": 0.5424431027288568
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.6430473163919316e-05,
+          "normalized_l2": 0.00207331861007603,
+          "fp32_to_bf16_rounding_max_abs": 0.00011996924877166748,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 147,
+          "within_one_bf16_ulp": 466,
+          "elements": 512,
+          "largest_error": {
+            "index": 398,
+            "reference_fp32": -0.03772865980863571,
+            "reference_bf16": -0.037841796875,
+            "actual": -0.03759765625,
+            "abs_error": 0.00013100355863571167
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row60_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001431480050086975,
+          "max_rel": 0.48626913153849116
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.496566600258312e-05,
+          "normalized_l2": 0.002105478893379282,
+          "fp32_to_bf16_rounding_max_abs": 0.00011768937110900879,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 80,
+          "within_one_bf16_ulp": 449,
+          "elements": 512,
+          "largest_error": {
+            "index": 411,
+            "reference_fp32": -0.0445345863699913,
+            "reference_bf16": -0.04443359375,
+            "actual": -0.044677734375,
+            "abs_error": 0.0001431480050086975
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row60_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00014890357851982117,
+          "max_rel": 2.180275011853959
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.538895502152666e-05,
+          "normalized_l2": 0.0021360089052887255,
+          "fp32_to_bf16_rounding_max_abs": 0.00011602789163589478,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 222,
+          "within_one_bf16_ulp": 452,
+          "elements": 512,
+          "largest_error": {
+            "index": 141,
+            "reference_fp32": 0.03652585670351982,
+            "reference_bf16": 0.03662109375,
+            "actual": 0.036376953125,
+            "abs_error": 0.00014890357851982117
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row60_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00015792623162269592,
+          "max_rel": 0.829907976977986
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.29174112264928e-05,
+          "normalized_l2": 0.0019863208488179822,
+          "fp32_to_bf16_rounding_max_abs": 0.00010370835661888123,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 300,
+          "within_one_bf16_ulp": 458,
+          "elements": 512,
+          "largest_error": {
+            "index": 486,
+            "reference_fp32": 0.041590120643377304,
+            "reference_bf16": 0.04150390625,
+            "actual": 0.041748046875,
+            "abs_error": 0.00015792623162269592
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      }
+    },
+    "repeat_A": {
+      "row0_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00013217702507972717,
+          "max_rel": 0.5265589383666596
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 2.9681115526762137e-05,
+          "normalized_l2": 0.0019820133611317277,
+          "fp32_to_bf16_rounding_max_abs": 0.00011196359992027283,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 73,
+          "within_one_bf16_ulp": 465,
+          "elements": 512,
+          "largest_error": {
+            "index": 107,
+            "reference_fp32": 0.03185024484992027,
+            "reference_bf16": 0.03173828125,
+            "actual": 0.031982421875,
+            "abs_error": 0.00013217702507972717
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00012589618563652039,
+          "max_rel": 2.442344676893628
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.169591289692782e-05,
+          "normalized_l2": 0.002118314509623343,
+          "fp32_to_bf16_rounding_max_abs": 0.00011874362826347351,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 28404,
+          "within_one_bf16_ulp": 463,
+          "elements": 512,
+          "largest_error": {
+            "index": 107,
+            "reference_fp32": 0.03185652568936348,
+            "reference_bf16": 0.03173828125,
+            "actual": 0.031982421875,
+            "abs_error": 0.00012589618563652039
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00014675408601760864,
+          "max_rel": 0.27046872745052847
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.188949431686546e-05,
+          "normalized_l2": 0.0021333507659366487,
+          "fp32_to_bf16_rounding_max_abs": 0.00011044740676879883,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 45,
+          "within_one_bf16_ulp": 477,
+          "elements": 512,
+          "largest_error": {
+            "index": 328,
+            "reference_fp32": 0.03481472283601761,
+            "reference_bf16": 0.034912109375,
+            "actual": 0.03466796875,
+            "abs_error": 0.00014675408601760864
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row63_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00014488771557807922,
+          "max_rel": 0.4428633321130743
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.1014527588134033e-05,
+          "normalized_l2": 0.0020292219525461478,
+          "fp32_to_bf16_rounding_max_abs": 0.00010676681995391846,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 111,
+          "within_one_bf16_ulp": 463,
+          "elements": 512,
+          "largest_error": {
+            "index": 240,
+            "reference_fp32": 0.03720862790942192,
+            "reference_bf16": 0.037109375,
+            "actual": 0.037353515625,
+            "abs_error": 0.00014488771557807922
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row63_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001334063708782196,
+          "max_rel": 0.20178219026692248
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.1532128833854896e-05,
+          "normalized_l2": 0.0020711236229073696,
+          "fp32_to_bf16_rounding_max_abs": 0.00012016668915748596,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 41,
+          "within_one_bf16_ulp": 468,
+          "elements": 512,
+          "largest_error": {
+            "index": 339,
+            "reference_fp32": -0.03187168762087822,
+            "reference_bf16": -0.031982421875,
+            "actual": -0.03173828125,
+            "abs_error": 0.0001334063708782196
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row63_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00010894238948822021,
+          "max_rel": 0.474336247792982
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 3.0297766145591618e-05,
+          "normalized_l2": 0.0019905857216969422,
+          "fp32_to_bf16_rounding_max_abs": 0.00010894238948822021,
+          "actual_to_rounded_reference_max_abs": 0.0001220703125,
+          "max_bf16_ulp_distance": 73,
+          "within_one_bf16_ulp": 470,
+          "elements": 512,
+          "largest_error": {
+            "index": 423,
+            "reference_fp32": -0.03257964551448822,
+            "reference_bf16": -0.032470703125,
+            "actual": -0.032470703125,
+            "abs_error": 0.00010894238948822021
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      }
+    }
+  },
+  "padding_observations": {
+    "full_A": {
+      "rows": 0,
+      "finite_values": 0,
+      "elements": 0,
+      "zero_values": 0,
+      "max_abs_finite": null,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    },
+    "short_B": {
+      "rows": 33,
+      "finite_values": 1081344,
+      "elements": 1081344,
+      "zero_values": 1081344,
+      "max_abs_finite": 0.0,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    },
+    "page_boundary_C": {
+      "rows": 48,
+      "finite_values": 1572864,
+      "elements": 1572864,
+      "zero_values": 1572864,
+      "max_abs_finite": 0.0,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    },
+    "different_prefix_D": {
+      "rows": 3,
+      "finite_values": 98304,
+      "elements": 98304,
+      "zero_values": 98304,
+      "max_abs_finite": 0.0,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    },
+    "repeat_A": {
+      "rows": 0,
+      "finite_values": 0,
+      "elements": 0,
+      "zero_values": 0,
+      "max_abs_finite": null,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    }
+  },
+  "comparison_failure": {
+    "label": "CPU attention reference",
+    "tensor": "reference",
+    "metrics": {
+      "shape": [
+        512
+      ],
+      "dtype": "torch.float32",
+      "exact": false,
+      "finite": true,
+      "max_abs": 0.0013743340969085693,
+      "max_rel": 0.7158705701078583
+    },
+    "expected_sample": [
+      0.1487453281879425,
+      0.12862330675125122,
+      -0.012884324416518211,
+      0.24678383767604828,
+      -0.17881028354167938,
+      0.2170781046152115,
+      -0.12658919394016266,
+      -0.21078690886497498,
+      -0.0440305657684803,
+      0.030481021851301193,
+      0.1509169191122055,
+      0.19484269618988037
+    ],
+    "actual_sample": [
+      0.1484375,
+      0.12890625,
+      -0.0128173828125,
+      0.2470703125,
+      -0.1787109375,
+      0.2177734375,
+      -0.126953125,
+      -0.2109375,
+      -0.044189453125,
+      0.0303955078125,
+      0.1513671875,
+      0.1953125
+    ]
+  },
+  "cpu_reference_failures": {
+    "short_B": true
+  },
+  "bound_input_pointers": {
+    "positions": 19792490826240,
+    "cu": 19792490826752,
+    "kv_lengths": 19792490827264,
+    "window": 19792490827776,
+    "window_length": 19792490860544,
+    "cmp_length": 19792490861056,
+    "sparse": 19792490861568,
+    "block_table": 19792490660352,
+    "original": 19792491549696,
+    "compressed": 19792491156480,
+    "compressed_lengths": 19792490660864,
+    "q": 19792496951296,
+    "sinks": 19792490661376,
+    "metadata": 19792490665984
+  },
+  "replay_count": 5,
+  "observed_output_changed": true,
+  "scope": "Real MQSMLA eager/replay, varying lengths/page IDs/Q/KV, with CPU float32 reference on selected rows/heads.",
+  "packing": "Public V4.1 writer produced the cache before replay; CPU oracle decodes its 544/320B bytes. Writer executes outside this consumer graph.",
+  "cpu_reference_scope": "Six or fewer row/head samples per case, not all output elements; sinks fixed at -10000.",
+  "error": "AssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.",
+  "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1315, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1295, in dispatch_probe\n    probe_attention(int(name[-1]), use_writer=True)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1090, in probe_attention\n    raise AssertionError(\"Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.\")\nAssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.\n",
+  "elapsed_seconds": 118.67,
+  "returncode": 1,
+  "wall_seconds": 121.554
+}

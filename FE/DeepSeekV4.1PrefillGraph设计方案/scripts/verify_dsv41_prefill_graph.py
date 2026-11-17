@@ -27,13 +27,14 @@ import traceback
 from types import SimpleNamespace
 
 
-BASELINE = "9898f7ce9a"
-SCRIPT_REVISION = 4
+BASELINE = "d3700bf0a9"
+SCRIPT_REVISION = 5
 PROBES = (
     "environment", "geometry", "metadata", "compressor", "epilog_fp8",
     "epilog_fp4", "prologue", "qli_c2", "candidate_chain",
     "attention_r0", "attention_r1", "attention_r2", "engram_break", "mhc_premix",
     "writer_attention_r0", "writer_attention_r1", "writer_attention_r2",
+    "idle_chain_r0", "idle_chain_r1", "idle_chain_r2",
 )
 API_NAMES = {
     "attention": (
@@ -735,7 +736,7 @@ def attention_metadata(function, buffers, ratio):
     )
 
 
-def index_metadata(function, qsli_function, buffers, case, ratio, candidate):
+def index_metadata(function, qsli_function, buffers, case, ratio, candidate, *, zero_padding=False):
     common = dict(cu_seqlens_q=buffers["cu"], seqused_q=None,
                   seqused_k=buffers["index_kv_lengths"],
                   cmp_residual_k=None if ratio == 1 else buffers["residual"],
@@ -746,7 +747,7 @@ def index_metadata(function, qsli_function, buffers, case, ratio, candidate):
     stage(buffers, "qli_metadata", function(**common, **kwargs))
     if candidate:
         visible = [min(O.candidate_blocks, (case["prefix"] + i + 8) // 8)
-                   if i < case["live"] else 1 for i in range(O.tokens)]
+                   if i < case["live"] else (0 if zero_padding else 1) for i in range(O.tokens)]
         stage(buffers, "candidate_bound", device_tensor(visible, T.int32).view(O.tokens, 1))
         stage(buffers, "qsli_metadata", qsli_function(
             candidate_block_length=buffers["candidate_bound"], **common,
@@ -1272,6 +1273,202 @@ def probe_mhc_premix():
     R["scope"] = "Merged mHC public premix call, fixed-shape eager/replay and previous-pre folding. No external RMSNorm, post kernel, full HcState chain or multi-stream test."
 
 
+def idle_chain_layout(case, ratio, tokens, page_size):
+    live, prefix = case["live"], case["prefix"]
+    if not 0 <= live <= tokens:
+        raise ValueError("Idle probe live rows exceed the static bucket")
+    positions = [prefix + i if i < live else 0 for i in range(tokens)]
+    swa_locs = [page_size + prefix + i if i < live else 0 for i in range(tokens)]
+    capacity = min(tokens, tokens // ratio + 1) if ratio else 0
+    if ratio == 1:
+        cmp_locs = [loc if i < live else -1 for i, loc in enumerate(swa_locs)]
+    elif ratio == 2:
+        cmp_locs = [swa_locs[i] // ratio for i in range(live) if positions[i] % ratio == ratio - 1]
+        cmp_locs += [-1] * (capacity - len(cmp_locs))
+    else:
+        cmp_locs = []
+    return {"positions": positions, "swa_locs": swa_locs, "cmp_locs": cmp_locs,
+            "used": live, "query_rows": live if live else tokens,
+            "kv_length": prefix + live if live else tokens,
+            "bank": case["bank"] if live else 0}
+
+
+def idle_chain_protected(persistent):
+    protected = {name: value for name, value in persistent.items() if name != "original"}
+    protected["original"] = persistent["original"][1:]
+    protected["state"] = persistent["state"][1:].contiguous().view(T.uint8)
+    return protected
+
+
+def prepare_idle_chain(buffers, case, ratio, functions):
+    layout = idle_chain_layout(case, ratio, O.tokens, O.page_size)
+    for name, value in query_geometry(case, ratio).items():
+        stage(buffers, name, value)
+    stage(buffers, "cu", device_tensor([0, layout["query_rows"]], T.int32))
+    stage(buffers, "kv_lengths", device_tensor([layout["kv_length"]], T.int32))
+    if not case["live"]:
+        buffers["window"][:, :, 0].zero_()
+    stage(buffers, "used", device_tensor([layout["used"]], T.int32))
+    stage(buffers, "start", device_tensor([case["prefix"] if case["live"] else 0], T.int32))
+    stage(buffers, "bank", device_tensor([layout["bank"]], T.int32))
+    stage(buffers, "swa_locs", device_tensor(layout["swa_locs"], T.int64))
+    cols = math.ceil(O.tokens / O.page_size)
+    full = T.tensor([list(range(1, cols + 1)) if case["live"] else [0] * cols], dtype=T.int32)
+    stage(buffers, "block_table", full.to(f"npu:{O.device}"))
+    stage(buffers, "x", random_tensor((O.tokens, O.hidden_size), case["seed"]))
+    stage(buffers, "swa_input", random_tensor((O.tokens, 512), case["seed"] + 1))
+    stage(buffers, "q", random_tensor((O.tokens, 64, 512), case["seed"] + 2))
+    stage(buffers, "metadata", attention_metadata(functions.attention_metadata, buffers, ratio))
+    if ratio:
+        stage(buffers, "cmp_locs", device_tensor(layout["cmp_locs"], T.int64))
+        stage(buffers, "compressed_lengths", buffers["kv_lengths"] // ratio)
+        stage(buffers, "index_kv_lengths", buffers["kv_lengths"] // ratio)
+        stage(buffers, "residual", buffers["kv_lengths"] % ratio)
+        factor = (O.page_size // ratio) // O.index_page_size
+        table = (full.unsqueeze(-1) * factor + T.arange(factor, dtype=T.int32)).reshape(1, -1)
+        stage(buffers, "index_table", table.to(f"npu:{O.device}"))
+        q, scale = index_fixture(O.tokens * 32, case["seed"] + 3)
+        stage(buffers, "index_q", q.view(O.tokens, 32, 64).to(f"npu:{O.device}"))
+        stage(buffers, "index_qscale", scale.view(O.tokens, 32, 2, 2).to(f"npu:{O.device}"))
+        index = dict(buffers, q=buffers["index_q"], qscale=buffers["index_qscale"],
+                     block_table=buffers["index_table"])
+        index_metadata(functions.qli_metadata, functions.qsli_metadata, index,
+                       case, ratio, candidate=ratio == 1, zero_padding=True)
+        for key in ("qli_metadata", "candidate_bound", "qsli_metadata"):
+            if key in index:
+                stage(buffers, key, index[key])
+    R.setdefault("idle_layouts", {})[case["name"]] = {
+        "physical_rows": O.tokens, "effective_rows": case["live"],
+        "cu": [0, layout["query_rows"]], "kv_length": layout["kv_length"],
+        "seqused": layout["used"], "bank": layout["bank"],
+        "window_length_zero": not bool(case["live"]),
+        "cmp_skip_rows": layout["cmp_locs"].count(-1),
+    }
+    return addresses(buffers)
+
+
+def run_idle_chain(buffers, ratio, functions):
+    writer = functions.writer
+    original = writer_cache_view(buffers["original"], "fp8")
+    writer(original.view(-1, 544), buffers["swa_input"], buffers["swa_locs"],
+           quant_group_size=32, quant_mode="mxfp8_bf16", round_scale=True, x_scale=1.0)
+    if ratio:
+        if ratio == 2:
+            latent = functions.compressor(
+                x=buffers["x"], wkv=buffers["wkv"], wgate=buffers["wgate"],
+                seqused=buffers["used"], start_pos=buffers["start"], cmp_ratio=2,
+                cu_seqlens=buffers["cu"], state_cache=buffers["state"], state_block_table=buffers["bank"])
+        else:
+            latent = T.nn.functional.linear(buffers["x"], buffers["wkv"])
+        latent = N.npu_rms_norm(latent, buffers["kv_norm"], 1e-6)[0]
+        if latent.shape[0] != buffers["cmp_locs"].numel():
+            raise AssertionError("Compressor output rows do not match the fixed writer capacity")
+        writer(buffers["compressed"].view(-1, 320), latent, buffers["cmp_locs"],
+               quant_group_size=16, quant_mode="mxfp4_bf16", round_scale=True, x_scale=1.0)
+        common = dict(latent=latent, wk=N.npu_format_cast(buffers["wk"], N.Format.FRACTAL_NZ),
+                      norm_weight=buffers["index_norm"], rope_sin=buffers["sin"], rope_cos=buffers["cos"],
+                      cache_index=buffers["cmp_locs"], norm_eps=1e-6)
+        functions.prologue(**common, k_cache=buffers["key"],
+                           k_scale_cache=buffers["key_scale"].view(*buffers["key_scale"].shape[:3], 4), storage_mode=0)
+        if ratio == 1:
+            functions.prologue(**common, k_cache=buffers["combined_key"].unsqueeze(-2),
+                               k_scale_cache=None, storage_mode=1, combined_block_size=8)
+        index = dict(buffers, q=buffers["index_q"], qscale=buffers["index_qscale"],
+                     block_table=buffers["index_table"])
+        result = run_qli(functions.qli, index, ratio, candidate=ratio == 1)
+        topk = run_qsli(functions.qsli, index, result[2], result[3])[0] if ratio == 1 else result[0]
+    output = T.full_like(buffers["q"], float("nan"))
+    kwargs = dict(ori_kv=buffers["original"], ori_sparse_indices=buffers["window"],
+                  ori_topk_length=buffers["window_length"], ori_block_table=buffers["block_table"],
+                  cu_seqlens_q=buffers["cu"], seqused_q=None, seqused_ori_kv=buffers["kv_lengths"],
+                  sinks=buffers["sinks"], metadata=buffers["metadata"], quant_mode=1,
+                  softmax_scale=1 / math.sqrt(512), layout_q="TND", layout_kv="PA_BBND", return_softmax_lse=False)
+    if ratio:
+        kwargs.update(cmp_kv=buffers["compressed"], cmp_sparse_indices=topk.to(T.int32).view(O.tokens, 1, 512),
+                      cmp_block_table=buffers["block_table"], seqused_cmp_kv=buffers["compressed_lengths"],
+                      cmp_topk_length=buffers["cmp_length"])
+    functions.attention(buffers["q"], out=output,
+                        lse=T.empty((0,), dtype=T.float32, device=output.device), **kwargs)
+    result = {"output": output}
+    if ratio:
+        result["topk"] = topk
+    return result
+
+
+def probe_idle_chain(ratio):
+    load_device()
+    functions = SimpleNamespace(
+        writer=epilog(), attention=api("attention", "mixed_quant_sparse_flash_mla_dsl"),
+        attention_metadata=api("attention", "mixed_quant_sparse_flash_mla_metadata_dsl"))
+    if ratio:
+        functions.compressor = api("attention", "compressor_v2") if ratio == 2 else None
+        functions.prologue = api("indexer", "indexer_prologue_k_dsl")
+        functions.qli = api("indexer", "quant_lightning_indexer_dsl")
+        functions.qli_metadata = api("indexer", "quant_lightning_indexer_metadata_dsl")
+        functions.qsli = api("indexer", "quant_sparse_lightning_indexer_dsl") if ratio == 1 else None
+        functions.qsli_metadata = api("indexer", "quant_sparse_lightning_indexer_metadata_dsl") if ratio == 1 else None
+    n, pages = O.tokens, math.ceil(O.tokens / O.page_size) + 2
+    original, _ = packed_cache("fp8", pages * O.page_size, O.seed)
+    buffers = {"original": original.view(pages, O.page_size, 1, 544).to(f"npu:{O.device}"),
+               "state": random_tensor((3, O.state_ring_size, 1024), O.seed + 1, dtype=T.float32),
+               "sinks": device_tensor([-10000.0] * 64, T.float32)}
+    persistent = {key: buffers[key] for key in ("original", "state")}
+    if ratio:
+        rows, capacity = pages * (O.page_size // ratio), min(n, n // ratio + 1)
+        compressed, _ = packed_cache("fp4", rows, O.seed + 2)
+        buffers["compressed"] = compressed.view(pages, O.page_size // ratio, 1, 320).to(f"npu:{O.device}")
+        key, scale = index_fixture(rows, O.seed + 3)
+        for name, value in index_cache_views(key, scale, O.index_page_size).items():
+            buffers[name] = value.to(f"npu:{O.device}")
+        buffers.update(wkv=random_tensor((512, O.hidden_size), O.seed + 4, scale=0.01),
+                       wgate=random_tensor((512, O.hidden_size), O.seed + 5, scale=0.01),
+                       wk=random_tensor((128, 512), O.seed + 6, scale=0.03),
+                       kv_norm=device_tensor([1.0] * 512, T.bfloat16),
+                       index_norm=device_tensor([1.0] * 128, T.float32),
+                       sin=device_tensor([[0.0] * 64] * capacity, T.float32),
+                       cos=device_tensor([[1.0] * 64] * capacity, T.float32),
+                       weights=random_tensor((n, 32), O.seed + 7, dtype=T.float32).abs() + 0.01)
+        persistent.update({key: buffers[key] for key in ("compressed", "key", "key_scale", "combined_key")})
+    cases = [
+        {"name": "live_full", "live": n, "prefix": 0, "bank": 1, "seed": O.seed},
+        {"name": "idle_after_full", "live": 0, "prefix": 0, "bank": 0, "seed": O.seed + 10},
+        {"name": "live_odd_prefix", "live": n // 2 - 1, "prefix": 1, "bank": 2, "seed": O.seed + 11},
+        {"name": "idle_after_short", "live": 0, "prefix": 0, "bank": 0, "seed": O.seed + 12},
+        {"name": "live_again", "live": n, "prefix": 0, "bank": 1, "seed": O.seed},
+    ]
+    saved = {}
+
+    def prepare(case):
+        return prepare_idle_chain(buffers, case, ratio, functions)
+
+    def reset(case):
+        if case["name"] not in saved:
+            saved[case["name"]] = snapshot(persistent)
+        for name, value in saved[case["name"]].items():
+            persistent[name].copy_(value.to(persistent[name].device))
+
+    def observe(out, case):
+        values = snapshot(idle_chain_protected(persistent))
+        if not case["live"]:
+            reference = idle_chain_protected(saved[case["name"]])
+            for name, value in values.items():
+                if not T.equal(value, reference[name].cpu()):
+                    raise AssertionError("Idle replay changed protected real state/cache: " + name)
+            R.setdefault("ignored_idle_output", {}).setdefault(case["name"], []).append({
+                "phase": R["phase"], "finite": int(T.isfinite(out["output"]).sum().cpu()),
+                "elements": out["output"].numel(), "comparison": "ignored; all effective lengths are zero"})
+        values["attention_live"] = out["output"][:case["live"]]
+        if ratio:
+            values["topk_live"] = checked_topk(out["topk"], case, ratio, "idle-chain indexer")
+        return values
+
+    R["scope"] = "Single-NPU synthetic live/idle/live chain, identity RoPE, physical bucket queries on idle. Not real metadata-hook admission, multi-stream, DeepEP, or full-model validation."
+    R["idle_protocol"] = "cu=[0,T_cap], KV=T_cap, seqused=0, state bank=0, c-loc=-1, SWA loc=0, sparse lengths=0; QLI/QSLI still run over dummy rows."
+    R["capture_writer_indexer_attention_together"] = True
+    matrix(cases, prepare, reset, lambda: run_idle_chain(buffers, ratio, functions), observe)
+    R.setdefault("checks", {})["idle_real_state_unchanged"] = "PASS"
+
+
 def dispatch_probe(name):
     if name == "environment":
         probe_environment()
@@ -1293,6 +1490,8 @@ def dispatch_probe(name):
         probe_attention(int(name[-1]))
     elif name.startswith("writer_attention_r"):
         probe_attention(int(name[-1]), use_writer=True)
+    elif name.startswith("idle_chain_r"):
+        probe_idle_chain(int(name[-1]))
     elif name == "engram_break":
         probe_engram()
     elif name == "mhc_premix":
@@ -1398,9 +1597,9 @@ def finish_report(options, results, interrupted=False):
             "Full model, real checkpoint/tokenizer/Engram lookup tables",
             "Full mHC state/post/external norm chain and multi-stream joins",
             "Real serving allocator/source-group lifetime and cache sharing",
-            "Complete compressor/RoPE/cache/indexer/attention integration",
+            "Real model compressor/RoPE/cache/indexer/attention integration",
             "DSpark packed aux hidden and draft KV injection",
-            "DP/TP/EP collectives, admission consensus, idle ranks",
+            "DP/TP/EP collectives, multi-rank idle replay and admission consensus",
             "End-to-end accuracy, throughput, latency and capture memory budget",
         ],
         "interpretation": (
@@ -1497,7 +1696,21 @@ def self_test(options):
     fp4 = T.zeros((4, 320), dtype=T.uint8)
     assert writer_cache_view(fp4, "fp4").dtype == T.uint8
     assert writer_cache_view(fp4, "fp4").data_ptr() == fp4.data_ptr()
-    print("CPU self-test passed: count boundaries, KV packing, index PA/record separation, BF16 diagnostics and writer/consumer dtype aliasing.")
+    for ratio in (0, 1, 2):
+        case = {"live": 0, "prefix": 0, "bank": 2}
+        idle = idle_chain_layout(case, ratio, 64, options.page_size)
+        assert idle["query_rows"] == 64 and idle["kv_length"] == 64
+        assert idle["used"] == 0 and idle["bank"] == 0
+        assert idle["swa_locs"] == [0] * 64
+        assert all(loc == -1 for loc in idle["cmp_locs"])
+        if ratio:
+            case = {"live": 31, "prefix": 1, "bank": 2}
+            layout = idle_chain_layout(case, ratio, 64, options.page_size)
+            expected = [options.page_size + 1 + i for i in range(31)
+                        if (1 + i + 1) % ratio == 0]
+            expected = [loc // ratio for loc in expected]
+            assert [loc for loc in layout["cmp_locs"] if loc >= 0] == expected
+    print("CPU self-test passed: count boundaries, KV packing, index PA/record separation, BF16 diagnostics, dtype aliasing and idle protocol geometry.")
     print("This is a script/oracle check, not NPU graph evidence.")
     return 0
 

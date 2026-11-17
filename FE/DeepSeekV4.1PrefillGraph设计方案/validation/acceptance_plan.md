@@ -1,6 +1,6 @@
 # DeepSeek V4.1 Prefill Graph 验收计划
 
-开发基线：`sglang@9898f7ce9a`；2026-11-17。[合入 randgun 后](../analysis/randgun_merge_20261117.md)的 CPU 回归 281 项通过。旧基线设备证据见 [run1](a5-20261116-run1/findings.md) / [run2](a5-20261116-run2/findings.md)；[run3](a5-20261117-run3/findings.md)在 950DT 和实际内容已变化的 SDK 中验证了 compressor、公开 writer 和 mHC premix。revision 4 只修正 writer→attention 的脚本 dtype 视图，待三组重跑；独立精度和整模/多卡仍待验收。
+开发基线：`sglang@9898f7ce9a`；2026-11-17。CPU 回归 281 项通过；[run1](a5-20261116-run1/findings.md) / [run2](a5-20261116-run2/findings.md)为旧环境历史证据，[run3](a5-20261117-run3/findings.md)取得新基元证据，[run4](a5-20261117-run4/findings.md)完成 writer→attention dtype/storage 与多轮图对照。第四轮三组 capture/eager-replay 全部 exact，CPU FP32 参考仍保留原 FAIL；无需重复同类探针，后续聚焦真实模型 metadata/状态接入和独立精度/整模验收。
 
 ## 1. 实验环境记录
 
@@ -113,6 +113,6 @@ context 验收记录页表容量来源和有效 `prefill.max_seq_len`。当超�
 python verify_dsv41_prefill_graph.py --output-dir ./dsv41-prefill-evidence
 ```
 
-如需指定 checkout，增加 `--sglang-root /path/to/sglang`。revision 4 仍为 17 组；第三轮已完成全量，当前按[三组最小重跑命令](a5-20261117-run3/findings.md)补 writer 消费链即可。每组独立进程并设超时，回传输出目录中的 `dsv41-prefill-evidence.tar.gz`，失败或 BLOCKED 也保留。
+如需指定 checkout，增加 `--sglang-root /path/to/sglang`。revision 4 仍为 17 组；[第四轮](a5-20261117-run4/findings.md)已完成 writer 消费链的 15 轮 graph/eager exact，对当前 case 无需重复。后续在实现/SDK/形状变化后按受影响范围回归，输出目录中的 `dsv41-prefill-evidence.tar.gz` 保留全部结果。
 
-Python 编译、CPU 自检和记录/归档回归已通过；revision 3 的第三轮全量 A5 结果已归档，新增 compressor/writer/mHC 图对照 exact。revision 4 的 dtype 视图回归已在本地验证修复前失败、修复后通过，实际 writer 消费链待三组设备复跑。独立 CPU reference、整模、真实 source/多流状态、DSpark KV 注入和多卡 collective 仍按各自范围验收。
+Python 编译、CPU 自检、记录/归档及 dtype 回归已通过；第三轮基元和第四轮 writer 消费链均取得对应设备对照证据。当前不需要重复同一探针。独立 CPU reference 继续保留 FAIL，后续整模、真实 source/request-bank、多流状态、DSpark 和 collective 仍各自验收，不能由单卡合成结果自动推导通过。
