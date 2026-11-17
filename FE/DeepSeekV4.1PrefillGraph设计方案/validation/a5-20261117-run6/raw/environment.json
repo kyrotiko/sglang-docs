@@ -1,0 +1,266 @@
+{
+  "probe": "environment",
+  "status": "PASS",
+  "phase": "complete",
+  "started": "2026-11-17T20:42:02+0000",
+  "script_revision": 6,
+  "rtol": 0.001,
+  "atol": 0.001,
+  "reference_rtol": 0.001,
+  "reference_atol": 0.001,
+  "python": "3.12.15 (main, Oct 20 2026, 05:34:52) [GCC 11.4.0]",
+  "platform": "Linux-6.6.0-159.4.7.160.oe2403sp4.aarch64-aarch64-with-glibc2.35",
+  "executable": "/usr/local/python3.12.15/bin/python",
+  "packages": {
+    "torch": "2.13.0+cpu",
+    "torch-npu": "2.13.0",
+    "sglang": "0.5.23.dev636+gd0a756543",
+    "sgl-kernel-npu": "2026.11.0.post4",
+    "triton": "3.6.0",
+    "numpy": "2.2.6"
+  },
+  "npu_smi": {
+    "returncode": 0,
+    "stdout": "+------------------------------------------------------------------------------------------------------------------+\n| npu-smi 25.1.rc3                                 Version: 25.1.rc3                                               |\n+--------+------------------+---------------+----------------------------------------------------------------------+\n| NPU ID | Name             | Health        | Power(W)              Temp(C)                  Hugepages-Usage(page) |\n|        |                  | Bus-Id        | NPU Util(%)           Memory-Usage(MB)         HBM-Usage(MB)         |\n+========+==================+===============+======================================================================+\n| 0      | Ascend950PR      | OK            | 319.6                 51                       0     / 0             |\n|        |                  | NA            | 0                     0     / 0                10765 / 131072        |\n+===========================+===============+======================================================================+\n| 1      | Ascend950PR      | Alarm         | 307.0                 50                       0     / 0             |\n|        |                  | NA            | 0                     0     / 0                10646 / 131072        |\n+===========================+===============+======================================================================+\n| 2      | Ascend950PR      | Alarm         | 291.6                 47                       0     / 0             |\n|        |                  | NA            | 0                     0     / 0                10615 / 131072        |\n+===========================+===============+======================================================================+\n| 3      | Ascend950PR      | Alarm         | 287.4                 49                       0     / 0             |\n|        |                  | NA            | 0                     0     / 0                10633 / 131072        |\n+===========================+===============+======================================================================+\n| 4      | Ascend950PR      | OK            | 295.9                 51                       0     / 0             |\n|        |                  | NA            | 0                     0     / 0                10587 / 131072        |\n+===========================+===============+======================================================================+\n| 5      | Ascend950PR      | OK            | 289.1                 49                       0     / 0             |\n|        |                  | NA            | 0                     0     / 0                10596 / 131072        |\n+===========================+===============+======================================================================+\n| 6      | Ascend950PR      | OK            | 287.0                 52                       0     / 0             |\n|        |                  | NA            | 0                     0     / 0                10589 / 131072        |\n+===========================+===============+======================================================================+\n| 7      | Ascend950PR      | OK            | 283.1                 49                       0     / 0             |\n|        |                  | NA            | 0                     0     / 0                10581 / 131072        |\n+===========================+===============+======================================================================+\n+---------------------------+---------------+----------------------------------------------------------------------+\n| NPU ID                    | Process id    | Process name       | Process memory(MB)    | Process id in container |\n+===========================+===============+======================================================================+\n| 0                         | 3543553       |                    | 5279                  | 3750339                 |\n+===========================+===============+======================================================================+\n| 1                         | 3543555       |                    | 5279                  | 3750340                 |\n+===========================+===============+======================================================================+\n| 2                         | 3543559       |                    | 5279                  | 3750341                 |\n+===========================+===============+======================================================================+\n| 3                         | 3543560       |                    | 5279                  | 3750342                 |\n+===========================+===============+======================================================================+\n| 4                         | 3543561       |                    | 5279                  | 3750343                 |\n+===========================+===============+======================================================================+\n| 5                         | 3543563       |                    | 5279                  | 3750344                 |\n+===========================+===============+======================================================================+\n| 6                         | 3543564       |                    | 5279                  | 3750345                 |\n+===========================+===============+======================================================================+\n| 7                         | 3543567       |                    | 5279                  | 3750346                 |\n+===========================+===============+======================================================================+\n",
+    "stderr": ""
+  },
+  "cann_files": {},
+  "registration_imports": [],
+  "device": "Ascend950PR_9589",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "sglang_file": "/mnt/share/y00627667/repos/sglang/python/sglang/__init__.py",
+  "source": {
+    "root": "/mnt/share/y00627667/repos/sglang",
+    "git": {
+      "returncode": 0,
+      "stdout": "24deba1e5f631ba0459dd23292881a3f9239bbbb\n",
+      "stderr": ""
+    },
+    "status": {
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  "apis": {
+    "compressor_v2": {
+      "signature": "(x, wkv, wgate, state_cache, cmp_ratio=4, *, state_block_table=None, cu_seqlens=None, seqused=None, start_pos=None, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.compressor_v2",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/compressor_v2.py",
+      "source_sha256": "b8da9f4d14a1465bcd5bc17b4fb74de4ba62b4c2be919fb23178a875b26c4710"
+    },
+    "mixed_quant_sparse_flash_mla_dsl": {
+      "signature": "(q, *, ori_kv=None, cmp_kv=None, ori_sparse_indices=None, cmp_sparse_indices=None, ori_block_table=None, cmp_block_table=None, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, ori_topk_length=None, cmp_topk_length=None, sinks=None, metadata=None, quant_mode, softmax_scale=None, layout_q='TND', layout_kv='PA_BBND', return_softmax_lse=False, out, lse, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_dsl.py",
+      "source_sha256": "6f4684a03a22a002cbc7389bf9bdcc99c84522e87471a8d7bdae1e8d8681a3d8"
+    },
+    "mixed_quant_sparse_flash_mla_metadata_dsl": {
+      "signature": "(ori_topk_length, cmp_topk_length, *, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, batch_size=None, max_seqlen_q=None, max_seqlen_ori_kv=None, max_seqlen_cmp_kv=None, num_heads_q, num_heads_kv, head_dim, quant_mode, layout_q='TND', layout_kv='PA_BBND', has_ori_kv=True, has_cmp_kv=True, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_metadata_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_metadata_dsl.py",
+      "source_sha256": "b433325803d3453ef445e3ab6edf5cf4f7a514dd07dd67d1befa53b9ae05dea9"
+    },
+    "indexer_prologue_k_dsl": {
+      "signature": "(latent: 'torch.Tensor', wk: 'torch.Tensor', norm_weight: 'torch.Tensor', rope_sin: 'torch.Tensor', rope_cos: 'torch.Tensor', k_cache: 'torch.Tensor', k_scale_cache: 'torch.Tensor | None' = None, *, cache_index: 'torch.Tensor', storage_mode: 'int', norm_eps: 'float', combined_block_size: 'int' = -1, impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.indexer_prologue_k_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/indexer_prologue_k_dsl.py",
+      "source_sha256": "08246dd0bca05045f537e1d549255667ae28d4ba23bc12b8cf2192db0329b9b1"
+    },
+    "quant_lightning_indexer_dsl": {
+      "signature": "(q: 'torch.Tensor', k: 'torch.Tensor', w: 'torch.Tensor', descale_q: 'torch.Tensor', descale_k: 'torch.Tensor', cu_seqlens_q: 'Optional[torch.Tensor]' = None, cu_seqlens_k: 'Optional[torch.Tensor]' = None, seqused_q: 'Optional[torch.Tensor]' = None, seqused_k: 'Optional[torch.Tensor]' = None, cmp_residual_k: 'Optional[torch.Tensor]' = None, block_table: 'Optional[torch.Tensor]' = None, output_idx_offset: 'Optional[torch.Tensor]' = None, metadata: 'Optional[torch.Tensor]' = None, *, topk: 'int', quant_mode: 'int', max_seqlen_q: 'int' = -1, mask_mode: 'int' = 0, cmp_ratio: 'int' = 1, layout_q: 'str' = 'TND', layout_k: 'str' = 'TND', return_value: 'bool' = False, candidate_topk_blocks: 'int' = -1, candidate_block_size: 'int' = -1, impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py",
+      "source_sha256": "bb5d1da7cd85a6cda8cbb7026bcdcca755612bd84e6757ca8f4207c1f786ccc4"
+    },
+    "quant_lightning_indexer_metadata_dsl": {
+      "signature": "(cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', candidate_topk_blocks=-1, candidate_block_size=-1, impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_metadata_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_metadata_dsl.py",
+      "source_sha256": "53ec103db4e474e2cfc35faca212803e75b22c98fd95ab99fa81a5f70d49ced4"
+    },
+    "quant_sparse_lightning_indexer_dsl": {
+      "signature": "(q: 'torch.Tensor', k: 'torch.Tensor', w: 'torch.Tensor', descale_q: 'torch.Tensor', candidate_block_indices: 'torch.Tensor', candidate_block_length: 'torch.Tensor', cu_seqlens_q: 'Optional[torch.Tensor]' = None, cu_seqlens_k: 'Optional[torch.Tensor]' = None, seqused_q: 'Optional[torch.Tensor]' = None, seqused_k: 'Optional[torch.Tensor]' = None, cmp_residual_k: 'Optional[torch.Tensor]' = None, block_table: 'Optional[torch.Tensor]' = None, output_idx_offset: 'Optional[torch.Tensor]' = None, metadata: 'Optional[torch.Tensor]' = None, *, descale_k: 'Optional[torch.Tensor]' = None, topk: 'int', candidate_block_size: 'int', quant_mode: 'int', max_seqlen_q: 'int' = -1, mask_mode: 'int' = 0, cmp_ratio: 'int' = 1, layout_q: 'str' = 'TND', layout_k: 'str' = 'TND', return_value: 'bool' = False, impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.quant_sparse_lightning_indexer_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_sparse_lightning_indexer_dsl.py",
+      "source_sha256": "774600852d819cb9b11fc757dc28dc1d04389294bf7923be569283316d3fb2e0"
+    },
+    "quant_sparse_lightning_indexer_metadata_dsl": {
+      "signature": "(candidate_block_length, cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, quant_mode, candidate_block_size, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.quant_sparse_lightning_indexer_metadata_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_sparse_lightning_indexer_metadata_dsl.py",
+      "source_sha256": "efbfff1fadecf7820f9786db1f8f7d37689dba0506a114b0fec13f35ca0d6f4d"
+    },
+    "kv_compress_epilog_v2": {
+      "signature": "(cache, x, slot_mapping, quant_group_size=32, quant_mode='mxfp8_bf16', round_scale=True, x_scale=1.0, *, impl='auto')",
+      "module": "sgl_kernel_npu.operators.mem_cache.kv_compress_epilog_v2",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/mem_cache/kv_compress_epilog_v2.py",
+      "source_sha256": "ffecb664d740adb98f459d47ec9bf43f15a1ae4ce768ea47155b626ccdfdf27e"
+    },
+    "mhc_pre_dpskv4": {
+      "signature": "(x, fn, scale, base, hc_mult, sinkhorn_iters, hc_eps, rms_norm_eps, *, pre_mix=None, return_pre=False, impl='auto')",
+      "module": "sgl_kernel_npu.operators.hyper_conn.mhc_pre_dpskv4",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/hyper_conn/mhc_pre_dpskv4.py",
+      "source_sha256": "37d3571827fb4a3b8f6b0defcce2897c409119538ca7d0a8a4e4e52e855e489f"
+    }
+  },
+  "custom_op_schemas": {
+    "custom.kv_compress_epilog_v2": "not registered",
+    "custom.npu_hc_pre_v2": "not registered"
+  },
+  "legacy_custom_schema_note": "Historical diagnostics only; merged writer and mHC pre use public wrappers. Missing legacy schemas do not block the new probes.",
+  "operator_inventory": {
+    "sgl_kernel_npu.operators.attention": {
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/__init__.py",
+      "exports": {
+        "compressor": {
+          "signature": "(x, wkv, wgate, state_cache, ape, norm_weight, rope_sin, rope_cos, state_block_table=None, cu_seqlens=None, seqused=None, start_pos=None, rope_head_dim=64, cmp_ratio=4, coff=1, norm_eps=1e-06, rotary_mode=2, cache_mode=1, state_cache_stride_dim0=0, *, impl='auto')",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/compressor.py",
+          "doc": "Compress KV groups, apply RMSNorm/RoPE, and update state_cache in place.\n\n``auto`` uses the repository's fused Ascend C operator on A3 and A5:\n``ascendc`` on CANN 9.1, its ``cann_ops_transformers_cann920`` alias on 9.2.\nAll tensors are contiguous on the same NPU.\nArgs:\n    x: FP16/BF16 input [B, S, H] or packed [T, H].\n    wkv: Same dtype as x, projection [coff*D, H].\n    wgate: Same shape/dtype as wkv, score projection.\n    state_cache: FP32 mutable cache [P, L, 2*coff*D], KV then scores.\n    ape: FP32 position bias [cmp_ratio, coff*D].\n    norm_weight: FP32 RMSNorm scale [D], D=128 or 512.\n    rope_sin: FP32 sine [B, ceil(S/r), 64] or [min(T,T//r+B), 64].\n    rope_cos: FP32 cosine, same shape as rope_sin.\n    state_block_table: Required INT32 cache locations; paged [B, M],\n        or explicit physical state rows [B, coff*r+capacity] on both\n        architectures. Legacy arch22 mode-1 single-page [B] is also accepted.\n    cu_seqlens: INT32 cumulative token offsets [B+1], required only for TH.\n    seqused: Optional INT32 used lengths [B]; None uses input capacities.\n    start_pos: Optional INT32 absolute starting positions [B]; None means 0.\n    rope_head_dim: Integer rotary width, must be 64 (default 64).\n    cmp_ratio: Integer group size r in {2,4,8,16,32,64,128} (default 4).\n    coff: Integer overlap factor 1 or 2 (default 1).\n    norm_eps: Float RMSNorm epsilon (default 1e-6).\n    rotary_mode: Integer RoPE mode, default 2 (interleaved). Only 2 has\n        a compiled kernel; other values are rejected before launch.\n    cache_mode: Integer 1 for paged cache or 2 for explicit state rows.\n    state_cache_stride_dim0: Integer cache stride; 0 derives L*2*coff*D.\n    impl: Backend name, default \"auto\"; also \"ascendc\",\n        \"cann_ops_transformers_cann920\" (CANN 9.2), or \"torch_native\".\nReturns:\n    Same dtype as x, [B, ceil(S/r), D] or [min(T,T//r+B), D]. Only\n    completed groups are written; remaining output rows are unspecified."
+        },
+        "compressor_v2": {
+          "signature": "(x, wkv, wgate, state_cache, cmp_ratio=4, *, state_block_table=None, cu_seqlens=None, seqused=None, start_pos=None, impl='auto')",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/compressor_v2.py",
+          "doc": "Compress completed token groups and update state_cache in place.\n\nThe default auto implementation uses bundled CANN 9.2.0 operators on A3.\n\nArgs:\n    x (Tensor): Contiguous fp16/bf16 [B,S,H] or packed [T,H] activations.\n    wkv (Tensor): Projection weights [D,H], with the dtype of x; D=128/512.\n    wgate (Tensor): Gate weights with the shape and dtype of wkv.\n    state_cache (Tensor): FP32 circular history [P,C,2*D], updated in place.\n    cmp_ratio (int): Tokens per compressed group, a power of two in 2..128.\n    state_block_table (Tensor): Required int32 [B] physical cache block IDs.\n    cu_seqlens (Tensor | None): Int32 [B+1] cumulative TH boundaries.\n    seqused (Tensor | None): Int32 [B] valid lengths; None uses all tokens.\n    start_pos (Tensor | None): Int32 [B] absolute positions; None means zero.\n    impl (str): auto, cann_ops_transformers_cann920, or torch_native.\n\nAll tensors share x.device. Returns x.dtype compressed rows [B,ceil(S/r),D]\nor [min(T,T//r+B),D], where r=cmp_ratio. Only completed groups are valid;\nunused output padding is unspecified. The Torch reference requires C>=r."
+        }
+      }
+    },
+    "sgl_kernel_npu.operators.mem_cache": {
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/mem_cache/__init__.py",
+      "exports": {
+        "kpool_write_tail_and_maybe_compress": {
+          "signature": "(index_k_cache: torch.Tensor, key: torch.Tensor, score: torch.Tensor, tail_k: torch.Tensor, tail_score: torch.Tensor, ape: torch.Tensor, req_pool_indices: torch.Tensor, write_start: torch.Tensor, tail_logical_start: torch.Tensor, write_loc: torch.Tensor, out_cache_loc: torch.Tensor, num_draft_tokens: int, effective_n_per_batch: Optional[torch.Tensor] = None, *, num_programs: Optional[int] = None, impl='auto') -> None",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/mem_cache/kpool_write_tail_and_maybe_compress.py",
+          "doc": "Write draft tokens to tail rings and compress completed pools in place.\n\n``auto`` selects Triton; ``torch_native`` selects independent PyTorch.\n\nArgs:\n    index_k_cache: torch.Tensor, shape Contiguous storage flattenable to [cache_rows, 128], dtype torch.bfloat16. Cache updated in place for completed pools.\n    key: torch.Tensor, shape [B * N, 128], dtype torch.bfloat16. Draft keys.\n    score: torch.Tensor, shape Same as key, dtype torch.float16, torch.bfloat16, or torch.float32. Scores paired with key.\n    tail_k: torch.Tensor, shape [R, pool_size + N, 128], dtype torch.bfloat16. Tail rings updated in place.\n    tail_score: torch.Tensor, shape Same as tail_k, dtype torch.float16, torch.bfloat16, or torch.float32. Score rings updated in place.\n    ape: torch.Tensor, shape [pool_size, 128], dtype torch.float32. Additive pooling-position scores; pool_size > 0.\n    req_pool_indices: torch.Tensor, shape [>= B], dtype torch.int64. Request/ring row for each batch item.\n    write_start: torch.Tensor, shape [>= B], dtype torch.int32 or torch.int64. Logical tail position at which each batch starts.\n    tail_logical_start: torch.Tensor, shape [>= B], dtype torch.int32 or torch.int64. Logical start of the candidate completed pool.\n    write_loc: torch.Tensor, shape [B, ceil(N / pool_size)], dtype torch.int64. Candidate cache rows; read only and must be contiguous.\n    out_cache_loc: torch.Tensor, shape [>= B * N], dtype torch.int32 or torch.int64. Token cache locations; a zero first entry for a batch skips that whole batch. Read only.\n    num_draft_tokens: int, shape —, dtype —. Static N; must be positive and divide key.shape[0].\n    effective_n_per_batch: torch.Tensor or None, shape [>= B] or —, dtype torch.int32 or torch.int64. Optional effective draft count used only for pool-completion decisions.\n    num_programs: int or None, shape —, dtype —. Keyword-only Triton grid size; positive when supplied and capped at B. Defaults to the available Vector Core count capped at B.\n  "
+        },
+        "kv_compress_epilog": {
+          "signature": "(kv_compress_cache, x, slot_mapping, quant_group_size=64, quant_mode=None, round_scale_flag=None, layout=None, *, round_scale=True, x_scale=1.0, impl='auto')",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/mem_cache/kv_compress_epilog.py",
+          "doc": "Quantize and scatter KV rows in place; -1 slots are skipped.\n\nInteger quant_mode=1/2 with round_scale_flag and layout retains the native\nFP8/MXFP8 interface and returns None. Auto uses ascendc for that interface.\nOmitted/string quant_mode selects the DSV4 SDK-specific 608B/640B encoding\nwith 64-element groups and 448+64 input width, returning the mutated cache.\n\nimpl: auto (SDK-selected), ascendc, cann_ops_transformers_cann920, or torch_native.\ntorch_native is an eager correctness reference, not a graph fallback."
+        },
+        "kv_compress_epilog_v2": {
+          "signature": "(cache, x, slot_mapping, quant_group_size=32, quant_mode='mxfp8_bf16', round_scale=True, x_scale=1.0, *, impl='auto')",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/mem_cache/kv_compress_epilog_v2.py",
+          "doc": "Quantize BF16 KV rows and scatter them into the cache in place.\n\nauto selects the bundled CANN 9.2.0 recipes kernel on Ascend 950. x is\ncontiguous BF16 [T, D] with D <= 8192 and D % quant_group_size == 0;\nslot_mapping is int32/int64 [T] and rows with slot < 0 (or beyond the\ncache) are skipped. cache is uint8/FP8 [N, C] (layout 1, rows padded to\n32 bytes) or [B, S, 1, C] (layout 2, compact rows inside 32B-aligned\nblock pages); written rows hold [values | uint16 scales]. MXFP8 requires\nquant_group_size=32 with an FP8 cache; MXFP4 accepts 16 or 32 with a\nuint8 cache. round_scale rounds MXFP8 scales up to a power of two;\nx_scale is reserved and must be 1.0. Returns the mutated cache.\n\nimpl: auto/cann_recipes_infer or torch_native. torch_native is an eager\ncorrectness reference, not a graph fallback."
+        }
+      }
+    },
+    "sgl_kernel_npu.operators.hyper_conn": {
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/hyper_conn/__init__.py",
+      "exports": {
+        "mhc_post": {
+          "signature": "(x, h_res, h_out, h_post, *, impl='auto')",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/hyper_conn/mhc_post.py",
+          "doc": "Return [T,N,D] post-mapped streams; auto selects CANN 9.1.\n\nx is [T,N,D], h_res [T,N,N], h_out [T,D], and h_post [T,N].\nInput constraints and output dtype are delegated to the selected backend.\ny[t,i,d] = h_post[t,i]*h_out[t,d] + sum_j h_res[t,j,i]*x[t,j,d]."
+        },
+        "mhc_post_dpskv4": {
+          "signature": "(x, residual, post, comb, *, impl='auto')",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/hyper_conn/mhc_post_dpskv4.py",
+          "doc": "Mix the layer output and residual streams, preserving the output dtype.\n\nimpl: auto (SDK-selected), cann_recipes_infer_cann910, cann_ops_transformers_cann920, or torch_native.\ntorch_native is an eager correctness reference, not a graph fallback."
+        },
+        "mhc_pre_dpskv4": {
+          "signature": "(x, fn, scale, base, hc_mult, sinkhorn_iters, hc_eps, rms_norm_eps, *, pre_mix=None, return_pre=False, impl='auto')",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/hyper_conn/mhc_pre_dpskv4.py",
+          "doc": "Return mixed activation, post weights and residual mixing matrix; input layernorm remains separate.\n\npre_mix optionally supplies the [T,n] FP32 pre weights, and return_pre\nappends them as a fourth output. Both need impl \"cann_recipes_infer_cann920\"\n(DSV4.1 fused kernel) or \"torch_native\"; auto stays on the DSV4 backend.\ntorch_native is an eager correctness reference, not a graph fallback.\n\nimpl: auto (SDK-selected), cann_ops_transformers_cann920,\ncann_recipes_infer_cann910, cann_recipes_infer_cann920, or torch_native."
+        },
+        "mhc_pre_sinkhorn": {
+          "signature": "(x, phi, alpha, bias, hc_mult=4, num_iters=20, hc_eps=1e-06, norm_eps=1e-06, *, impl='auto')",
+          "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/hyper_conn/mhc_pre_sinkhorn.py",
+          "doc": "Project [T,N,D] streams; auto selects CANN 9.1's public API.\n\nphi has shape [(2+N)*N,N*D], alpha [3], and bias [(2+N)*N].\nReturns (hin [T,D], hpost [T,N], hres [T,N*N]), preserving vendor\noutput dtypes. Input constraints are delegated to the selected backend.\nNo output layer normalization is fused."
+        }
+      }
+    },
+    "registered_schemas": [
+      "npu::compressor(Tensor x, Tensor wkv, Tensor wgate, Tensor($0! -> ) state_cache, Tensor ape, Tensor norm_weight, Tensor rope_sin, Tensor rope_cos, Tensor? state_block_table=None, Tensor? cu_seqlens=None, Tensor? seqused=None, Tensor? start_pos=None, int rope_head_dim=64, int cmp_ratio=4, int coff=1, float norm_eps=9.9999999999999995e-07, int rotary_mode=2, int cache_mode=1, int state_cache_stride_dim0=0) -> Tensor",
+      "npu::kv_compress_epilog(Tensor(a!) kv_compress_cache, Tensor x, Tensor slot_mapping, int quant_group_size, int quant_mode, bool round_scale_flag, int layout) -> ()",
+      "npu::npu_matmul_compress_dequant(Tensor x1, Tensor x2, Tensor compress_index, Tensor bias, Tensor scale, *, Tensor? offsetW=None, int? offsetX=None) -> Tensor",
+      "npu::npu_mhc_post(Tensor x, Tensor? h_res, Tensor h_out, Tensor h_post) -> Tensor",
+      "npu::npu_mhc_post_backward(Tensor grad_y, Tensor x, Tensor? h_res, Tensor h_out, Tensor h_post) -> (Tensor, Tensor, Tensor, Tensor)",
+      "npu::npu_mhc_pre(Tensor x, Tensor phi, Tensor alpha, Tensor bias, *, Tensor? gamma=None, float norm_eps=9.9999999999999995e-07, float hc_eps=9.9999999999999995e-07, int out_flag=0, int inner_precise=0) -> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)",
+      "npu::npu_mhc_pre_backward(Tensor x, Tensor phi, Tensor alpha, Tensor grad_h_in, Tensor grad_h_post, Tensor grad_h_res, Tensor inv_rms, Tensor h_mix, Tensor h_pre, Tensor h_post, Tensor? gamma=None, float hc_eps=9.9999999999999995e-07, Tensor? grad_x_post=None, int inner_precise=0) -> (Tensor, Tensor, Tensor, Tensor, Tensor)",
+      "npu::npu_mhc_sinkhorn(Tensor x, *, float eps=9.9999999999999995e-07, SymInt num_iters=20, int out_flag=0) -> (Tensor, Tensor, Tensor)",
+      "npu::npu_mhc_sinkhorn_backward(Tensor grad_y, Tensor norm, Tensor sum) -> Tensor",
+      "npu::npu_nsa_compress(Tensor input, Tensor weight, int compress_block_size, int compress_stride, *, int[]? actual_seq_len=None) -> Tensor",
+      "npu::npu_nsa_compress_attention(Tensor query, Tensor key, Tensor value, float scale_value, int head_num, int compress_block_size, int compress_stride, int select_block_size, int select_block_count, *, Tensor? topk_mask=None, Tensor? atten_mask=None, int[]? actual_seq_qlen=None, int[]? actual_cmp_seq_kvlen=None, int[]? actual_sel_seq_kvlen=None) -> (Tensor, Tensor, Tensor, Tensor)",
+      "npu::npu_nsa_compress_attention_infer(Tensor query, Tensor key, Tensor value, float scale_value, int head_num, int key_value_head_num, int select_block_size, int select_block_count, int page_block_size, int compress_block_size, int compress_stride, *, str layout=\"TND\", Tensor? atten_mask=None, Tensor? block_table=None, Tensor? topk_mask=None, int[]? actual_seq_qlen=None, int[]? actual_cmp_seq_kvlen=None, int[]? actual_sel_seq_kvlen=None) -> (Tensor, Tensor)",
+      "npu::npu_nsa_compress_grad(Tensor grad, Tensor input, Tensor weight, int compress_block_size, int compress_stride, *, int[]? actual_seq_len=None) -> (Tensor, Tensor)",
+      "npu::npu_nsa_compress_infer.cache(Tensor input, Tensor weight, Tensor slot_mapping, int compress_block_size, int compress_stride, int page_block_size, *, Tensor? block_table=None, int[]? actual_seq_len=None, Tensor(a!) cache) -> Tensor(a!)"
+    ],
+    "auto_resolution_without_execution": {
+      "attention.compressor": {
+        "requested_impl": "auto",
+        "module": "sgl_kernel_npu.operators.attention.compressor",
+        "name": "_auto_impl",
+        "signature": "(*args)"
+      },
+      "attention.compressor_v2": {
+        "requested_impl": "auto",
+        "module": "sgl_kernel_npu.operators.attention.compressor_v2",
+        "name": "_cann_impl",
+        "signature": "(*args, **kwargs)"
+      },
+      "mem_cache.kv_compress_epilog": {
+        "requested_impl": "auto",
+        "module": "sgl_kernel_npu.operators.mem_cache.kv_compress_epilog",
+        "name": "_auto_kv_compress_epilog",
+        "signature": "(cache, x, slot_mapping, **kwargs)"
+      },
+      "mem_cache.kv_compress_epilog_v2": {
+        "requested_impl": "auto",
+        "module": "sgl_kernel_npu.operators.mem_cache.kv_compress_epilog_v2",
+        "name": "_cann_kv_compress_epilog_v2",
+        "signature": "(cache, x, slot_mapping, **kwargs)"
+      },
+      "hyper_conn.mhc_pre_dpskv4": {
+        "requested_impl": "cann_recipes_infer_cann920",
+        "module": "sgl_kernel_npu.operators.hyper_conn.mhc_pre_dpskv4",
+        "name": "_cann_9_2_mhc_pre_v2",
+        "signature": "(x, fn, scale, base, hc_mult, sinkhorn_iters, hc_eps, rms_norm_eps, *, pre_mix=None, return_pre=False)"
+      }
+    }
+  },
+  "probe_index_page_size": 64,
+  "sglang_index_page_size": 64,
+  "kv_layout_contracts": {
+    "V4_BF16": {
+      "width": 512,
+      "dtype": "torch.bfloat16",
+      "quant_mode": null,
+      "quant_group": null
+    },
+    "V4_FP8": {
+      "width": 608,
+      "dtype": "torch.float8_e4m3fn",
+      "quant_mode": null,
+      "quant_group": null
+    },
+    "V41_SWA_FP8": {
+      "width": 544,
+      "dtype": "torch.float8_e4m3fn",
+      "quant_mode": "mxfp8_bf16",
+      "quant_group": 32
+    },
+    "V41_CMP_FP4": {
+      "width": 320,
+      "dtype": "torch.uint8",
+      "quant_mode": "mxfp4_bf16",
+      "quant_group": 16
+    }
+  },
+  "kv_layout_contract_note": "Allocation metadata only; not evidence that writer or draft attention executed.",
+  "device_capabilities": "_NPUDeviceProperties(name='Ascend950PR_9589', total_memory=126208MB, cube_core_num=32, vector_core_num=64, uuid=cc08d80a-d200-0000-0000-00000004b800, L2_cache_size=128MB)",
+  "runtime_environment": {
+    "ASCEND_HOME_PATH": "/usr/local/Ascend/cann-9.2.0",
+    "ASCEND_OPP_PATH": "/usr/local/Ascend/cann-9.2.0/opp",
+    "ASCEND_RT_VISIBLE_DEVICES": null,
+    "ASCEND_LAUNCH_BLOCKING": null,
+    "PYTORCH_NPU_ALLOC_CONF": null
+  },
+  "sglang_prefill_capability_source": "    def _supports_dsv4_prefill_graph_capture(self) -> bool:\n        if not check_cuda_graph_backend(Phase.PREFILL, Backend.BREAKABLE):\n            return False\n        # Draft workers keep the eager prefill metadata path; their graph\n        # coverage is handled by the speculative runner.\n        if self.is_draft_worker:\n            return False\n        parallel = get_parallel()\n        if parallel.attn_cp_size != 1 or parallel.attn_dcp_size != 1:\n            raise ValueError(\n                \"DSV4 breakable prefill graph captures the compressor and \"\n                \"indexer and requires a model without CP/DCP. Disable \"\n                \"--cuda-graph-backend-prefill=breakable for this model.\"\n            )\n        if self._dsv4_has_low_ratio:\n            return self._supports_dsv41_prefill_graph_capture()\n        # Ascend 950 shares the explicit cache_mode=2 compressor state table\n        # and npu.compressor with A3; its arch-specific KV / indexer fused\n        # epilogs write through the same fixed loc buffers inside the segment.\n        return True\n",
+  "low_ratio_prefill_graph": false,
+  "scope": "Inspection only; API presence does not prove operator execution or graph support.",
+  "elapsed_seconds": 23.343,
+  "returncode": 0,
+  "wall_seconds": 26.5
+}

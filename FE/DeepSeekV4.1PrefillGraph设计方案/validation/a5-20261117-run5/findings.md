@@ -48,6 +48,6 @@ revision 5 的比较会在第一个不一致张量停止。因此该 case 后续
 
 另有一个已确认的夹具边界：revision 5 将 private state 初始化为随机值，并在 bank 2 未产生过上一 chunk 的情况下直接使用 prefix=1。该夹具没有建立合法的 pending-pair 历史。它是否导致字节差异尚未证明，不能因此删掉本次 FAIL。
 
-下一轮只定向 ratio 2：先由真实 compressor 产生 bank 2 的 prefix-1 pending pair，补 compressor 原始/归一化有效输出与实际不一致坐标；加入相同输入/state 的不插入 idle 对照，并收集全部张量比较。revision 6 已提供 `idle_chain_r2` 与 `active_chain_r2` 两个入口，见[命令](../../scripts/README.md#当前只需-ratio-2-定向复验)。本地编译、CPU 自检及控制流/故障注入 fixture 通过，未记为设备证据。
+下一轮只定向 ratio 2：先由真实 compressor 产生 bank 2 的 prefix-1 pending pair，补 compressor 原始/归一化有效输出与实际不一致坐标；加入相同输入/state 的不插入 idle 对照，并收集全部张量比较。revision 6 已提供 `idle_chain_r2` 与 `active_chain_r2` 两个入口，见[命令](../../scripts/README.md)。本地编译、CPU 自检及控制流/故障注入 fixture 通过，未记为设备证据。
 
 ratio 0/1 和原 17 组无需因本次结果全量重跑。设备事实闭合前，不选择整组 eager 回退，也不直接宣称多 rank idle 已支持。

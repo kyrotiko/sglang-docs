@@ -28,13 +28,14 @@ from types import SimpleNamespace
 
 
 BASELINE = "d3700bf0a9"
-SCRIPT_REVISION = 6
+SCRIPT_REVISION = 7
 PROBES = (
     "environment", "geometry", "metadata", "compressor", "epilog_fp8",
     "epilog_fp4", "prologue", "qli_c2", "candidate_chain",
     "attention_r0", "attention_r1", "attention_r2", "engram_break", "mhc_premix",
     "writer_attention_r0", "writer_attention_r1", "writer_attention_r2",
     "idle_chain_r0", "idle_chain_r1", "idle_chain_r2", "active_chain_r2",
+    "compressor_boundary", "active_chain_r2_sync",
 )
 API_NAMES = {
     "attention": (
@@ -233,7 +234,8 @@ def capture(body):
     return graph, outputs, stream
 
 
-def matrix(cases, prepare, reset, body, observe, after=None, *, collect_failures=False):
+def matrix(cases, prepare, reset, body, observe, after=None, *, collect_failures=False,
+           sync_before_replay=False):
     prepare(cases[0])
     reset(cases[0])
     graph, outputs, stream = capture(body)
@@ -255,6 +257,8 @@ def matrix(cases, prepare, reset, body, observe, after=None, *, collect_failures
         T.npu.synchronize()
         expected = snapshot(observe(eager, case))
         reset(case)
+        if sync_before_replay:
+            T.npu.synchronize()
         checkpoint("replay:" + case["name"])
         graph.replay()
         T.npu.synchronize()
@@ -1448,7 +1452,7 @@ def prime_idle_chain_pair(buffers, compressor):
     }
 
 
-def probe_idle_chain(ratio, *, include_idle=True):
+def probe_idle_chain(ratio, *, include_idle=True, sync_before_replay=False):
     load_device()
     functions = SimpleNamespace(
         writer=epilog(), attention=api("attention", "mixed_quant_sparse_flash_mla_dsl"),
@@ -1494,6 +1498,7 @@ def probe_idle_chain(ratio, *, include_idle=True):
     if not include_idle:
         cases = [case for case in cases if case["live"]]
     R["insert_idle_steps"] = include_idle
+    R["sync_before_replay"] = sync_before_replay
     saved = {}
 
     def prepare(case):
@@ -1533,7 +1538,7 @@ def probe_idle_chain(ratio, *, include_idle=True):
     idle_names = [case["name"] for case in cases if not case["live"]]
     try:
         matrix(cases, prepare, reset, lambda: run_idle_chain(buffers, ratio, functions),
-               observe, collect_failures=True)
+               observe, collect_failures=True, sync_before_replay=sync_before_replay)
     finally:
         checks = R.setdefault("checks", {})
         statuses = [R.get("idle_state_checks", {}).get(name, {}).get(mode, "INCOMPLETE")
@@ -1541,6 +1546,134 @@ def probe_idle_chain(ratio, *, include_idle=True):
         checks["idle_real_state_unchanged"] = (
             "NOT_RUN" if not statuses else "PASS" if all(value == "PASS" for value in statuses)
             else "FAIL" if "FAIL" in statuses else "INCOMPLETE")
+
+
+def tensor_digest(tensor):
+    return hashlib.sha256(tensor.detach().cpu().contiguous().view(T.uint8).numpy().tobytes()).hexdigest()
+
+
+def compressor_boundary_history(buffers, body):
+    history = {}
+    R["history_setup"] = {}
+    for prefix in (0, 1, 2, 3):
+        checkpoint(f"history_prefix:{prefix}")
+        buffers["state"].zero_()
+        buffers["x"].copy_(random_tensor(buffers["x"].shape, O.seed + 20))
+        buffers["cu"].copy_(device_tensor([0, prefix], T.int32))
+        buffers["used"].fill_(prefix)
+        buffers["start"].zero_()
+        buffers["bank"].fill_(2)
+        if prefix:
+            body()
+        T.npu.synchronize()
+        history[prefix] = buffers["state"].cpu().clone()
+        R["history_setup"][str(prefix)] = {"bank": 2, "valid_prefix": prefix,
+                                          "state_sha256": tensor_digest(history[prefix])}
+    return history
+
+
+def boundary_compare(reference, actual, label):
+    metrics, failures = {}, []
+    for name in reference:
+        try:
+            metrics.update(compare({name: reference[name]}, {name: actual[name]}, label))
+        except AssertionError as exc:
+            detail = dict(R["comparison_failure"])
+            failures.append(detail)
+            metrics[name] = dict(detail["metrics"], status="FAIL", error=str(exc))
+    raw, got = reference["raw"].float(), actual["raw"].float()
+    row_errors = (raw - got).abs().amax(dim=-1)
+    return {"status": "FAIL" if failures else "PASS", "comparisons": metrics,
+            "max_abs_by_row": [float(x) if bool(T.isfinite(x)) else None for x in row_errors],
+            "exact_by_row": [bool(T.equal(a, b)) for a, b in zip(reference["raw"], actual["raw"])],
+            "failures": failures}
+
+
+def probe_compressor_boundary():
+    load_device()
+    function = api("attention", "compressor_v2")
+    n = O.tokens
+    buffers = {
+        "x": random_tensor((n, O.hidden_size), O.seed),
+        "wkv": random_tensor((512, O.hidden_size), O.seed + 4, scale=0.01),
+        "wgate": random_tensor((512, O.hidden_size), O.seed + 5, scale=0.01),
+        "state": device_tensor([[[0.0] * 1024] * O.state_ring_size] * 3, T.float32),
+        "cu": device_tensor([0, n], T.int32), "used": device_tensor([n], T.int32),
+        "start": device_tensor([0], T.int32), "bank": device_tensor([0], T.int32),
+    }
+
+    def body():
+        return function(x=buffers["x"], wkv=buffers["wkv"], wgate=buffers["wgate"],
+                        state_cache=buffers["state"], cmp_ratio=2,
+                        state_block_table=buffers["bank"], cu_seqlens=buffers["cu"],
+                        seqused=buffers["used"], start_pos=buffers["start"])
+
+    history = compressor_boundary_history(buffers, body)
+    buffers["state"].zero_()
+    buffers["x"].copy_(random_tensor(buffers["x"].shape, O.seed))
+    buffers["cu"].copy_(device_tensor([0, n], T.int32))
+    buffers["used"].fill_(n)
+    buffers["start"].zero_()
+    buffers["bank"].zero_()
+    graph, output, stream = capture(body)
+    R["checks"] = {"capture": "PASS"}
+    R["capture_supported"] = True
+    R["scope"] = "Isolated actual compressor_v2; eager repeats and graph repeats share a fully synchronized capture stream. No norm/writer/indexer/attention/collective."
+    R["cases"], observations = [], {}
+    pointers = addresses(buffers)
+    cases = [("even_full", 0, n, O.seed), ("odd_one", 1, 1, O.seed + 11),
+             ("odd_long", 1, n // 2 - 1, O.seed + 11),
+             ("even_long", 2, n // 2 - 1, O.seed + 11),
+             ("shifted_odd_long", 3, n // 2 - 1, O.seed + 11),
+             ("odd_long_repeat", 1, n // 2 - 1, O.seed + 11)]
+    for name, prefix, live, seed in cases:
+        values, inputs = {}, {}
+        for mode in ("eager1", "eager2", "replay1", "replay2"):
+            checkpoint(f"{mode}:{name}")
+            with T.npu.stream(stream):
+                buffers["x"].copy_(random_tensor(buffers["x"].shape, seed))
+                buffers["state"].copy_(history[prefix].to(buffers["state"].device))
+                buffers["cu"].copy_(device_tensor([0, live], T.int32))
+                buffers["used"].fill_(live)
+                buffers["start"].fill_(prefix)
+                buffers["bank"].fill_(2)
+                T.npu.synchronize()
+                inputs[mode] = {"state_sha256": tensor_digest(buffers["state"]),
+                                "x_sha256": tensor_digest(buffers["x"])}
+                if inputs[mode]["state_sha256"] != tensor_digest(history[prefix]):
+                    raise AssertionError("GPU state differs from the intended initial history")
+                if mode.startswith("replay"):
+                    graph.replay()
+                    result = output
+                else:
+                    result = body()
+                T.npu.synchronize()
+                count = compression_count(prefix, live)
+                values[mode] = snapshot({"raw": result[:count],
+                                         "state": buffers["state"][1:].contiguous().view(T.uint8)})
+            if addresses(buffers) != pointers:
+                raise AssertionError("Compressor-boundary input storage was rebound")
+        if len({tuple(sorted(x.items())) for x in inputs.values()}) != 1:
+            raise AssertionError("Repeated calls did not receive identical x/state")
+        comparisons = {mode: boundary_compare(values["eager1"], values[mode], name + "/" + mode)
+                       for mode in ("eager2", "replay1", "replay2")}
+        observations[name] = values
+        R["cases"].append({"name": name, "parameters": {"prefix": prefix, "live": live, "bank": 2, "seed": seed},
+                           "status": "PASS" if all(v["status"] == "PASS" for v in comparisons.values()) else "FAIL",
+                           "input_hashes": inputs, "comparisons": comparisons})
+        checkpoint("collected:" + name)
+    invariance = {}
+    for mode in ("eager1", "eager2", "replay1", "replay2"):
+        a = observations["odd_one"][mode]["raw"][:1]
+        b = observations["odd_long"][mode]["raw"][:1]
+        invariance[mode] = boundary_compare({"raw": a}, {"raw": b}, "same first pair/" + mode)
+    R["first_pair_invariance"] = invariance
+    R["bound_input_pointers"] = pointers
+    R["checks"]["eager_repeat"] = "PASS" if all(c["comparisons"]["eager2"]["status"] == "PASS" for c in R["cases"]) else "FAIL"
+    R["checks"]["eager_replay"] = "PASS" if all(c["comparisons"][m]["status"] == "PASS" for c in R["cases"] for m in ("replay1", "replay2")) else "FAIL"
+    R["checks"]["first_pair_invariance"] = "PASS" if all(v["status"] == "PASS" for v in invariance.values()) else "FAIL"
+    if "FAIL" in R["checks"].values():
+        raise AssertionError("Compressor boundary comparison failed; all repeats and row diagnostics retained")
 
 
 def dispatch_probe(name):
@@ -1552,6 +1685,8 @@ def dispatch_probe(name):
         probe_metadata()
     elif name == "compressor":
         probe_compressor()
+    elif name == "compressor_boundary":
+        probe_compressor_boundary()
     elif name.startswith("epilog_"):
         probe_epilog(name.split("_", 1)[1])
     elif name == "prologue":
@@ -1564,6 +1699,8 @@ def dispatch_probe(name):
         probe_attention(int(name[-1]))
     elif name.startswith("writer_attention_r"):
         probe_attention(int(name[-1]), use_writer=True)
+    elif name == "active_chain_r2_sync":
+        probe_idle_chain(2, include_idle=False, sync_before_replay=True)
     elif name == "active_chain_r2":
         probe_idle_chain(2, include_idle=False)
     elif name.startswith("idle_chain_r"):

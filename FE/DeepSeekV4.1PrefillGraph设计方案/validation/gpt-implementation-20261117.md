@@ -75,5 +75,7 @@ Python 编译、Ruff format、修改文件的基础 lint 和 `git diff --check` 
 
 验证入口改为单文件脚本 revision 5 的 `idle_chain_r0/r1/r2`：同 bucket live→idle→live，公开 writer、ratio-2 compressor、index-K/QLI/QSLI 与 attention 合成链在图内执行。测试采用当前 dummy EXTEND 的物理 bucket cu/KV 长度，logical seqused/sparse lengths 为 0；检查实际 cache/state 的字节级保护。使用私有合成缓存和 identity RoPE，不修改服务代码，不宣称多卡 DeepEP、真实 metadata hooks 或整模已经通过。命令与判读见[运行说明](../scripts/README.md)。
 
-[第五轮](a5-20261117-run5/findings.md)已回传：ratio 0/1 各 5 个 case exact；ratio 2 的 full live 与其后 idle exact，之后 live odd-prefix 的 compressed cache 有 17 字节差异。实际源码为 `24deba1e5f…`（clean），不能当作 `d3700bf0a9` 的整模验收。已保留原 FAIL 并归档证据，revision 6 仅补合法 pending-pair 预热、中间值和无 idle 对照，等待定向复验；没有据此修改服务回退策略。
+[第五轮](a5-20261117-run5/findings.md)已回传：ratio 0/1 各 5 个 case exact；ratio 2 的 full live 与其后 idle exact，之后 live odd-prefix 的 compressed cache 有 17 字节差异。实际源码为 `24deba1e5f…`（clean），不能当作 `d3700bf0a9` 的整模验收。原 FAIL 已归档，未因此修改服务回退策略。
+
+[第六轮](a5-20261117-run6/findings.md)用合法 pending pair 比较有无 idle，两组均在 live odd-prefix 失败，差异已出现在 compressor 原始输出；两轮 idle 状态保护均通过。硬件变为 950PR、driver 25.1.rc3，实际主仓仍是 `24deba1e5f…`。revision 7 只增加独立 compressor 重复执行、逐行/首 pair 对照和合成链 replay 前同步诊断。主源码分支仍保持 `d3700bf0a9`，没有提交 idle veto 或未经设备验证的服务修复。
 

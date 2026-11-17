@@ -1,0 +1,72 @@
+{
+  "source_directory": "C:/Users/admin/Desktop/file6",
+  "source_sha": "24deba1e5f631ba0459dd23292881a3f9239bbbb",
+  "expected_source_baseline": "d3700bf0a9",
+  "source_status": "",
+  "script_revision": 6,
+  "returned_script_sha256": "ea54ee20542244c55b19c7561acd7628291d2b76ed31e5c460e8e4a24e9e0aac",
+  "reported_script_sha256": "ea54ee20542244c55b19c7561acd7628291d2b76ed31e5c460e8e4a24e9e0aac",
+  "script_matches_manifest": true,
+  "script_matches_local_at_intake_after_lf_normalization": true,
+  "runtime": {
+    "device": "Ascend950PR_9589",
+    "packages": {
+      "torch": "2.13.0+cpu",
+      "torch-npu": "2.13.0",
+      "sglang": "0.5.23.dev636+gd0a756543",
+      "sgl-kernel-npu": "2026.11.0.post4",
+      "triton": "3.6.0",
+      "numpy": "2.2.6"
+    },
+    "driver": "| npu-smi 25.1.rc3                                 Version: 25.1.rc3                                               |"
+  },
+  "note": "Raw JSON/log/Markdown preserved byte-for-byte. Returned Python was hashed as data only.",
+  "files": [
+    {
+      "file": "raw/active_chain_r2.json",
+      "bytes": 68116,
+      "sha256": "8830bef10f2641334540d8f342f3958b1e5a6f3409242b7ca464b785f156b3c7"
+    },
+    {
+      "file": "raw/active_chain_r2.log",
+      "bytes": 3116,
+      "sha256": "c3014848f956a7d97fff2f5255ebe27c32a73ab7d38d048049b08a0ae0ebcb87"
+    },
+    {
+      "file": "raw/environment.json",
+      "bytes": 33654,
+      "sha256": "9be96d61c5b94af6377fcf436d0fbda02b630c2d0d35a682f9d929c084218786"
+    },
+    {
+      "file": "raw/environment.log",
+      "bytes": 1108,
+      "sha256": "0670d5faa3510b8e76592ef252f4cc9e7f55d3cb418a7b57feacb994cb0b2472"
+    },
+    {
+      "file": "raw/idle_chain_r2.json",
+      "bytes": 72341,
+      "sha256": "77e2cdd4ad49ac2e511893eeded6635889d70f99c46efaf7713f26a055c04654"
+    },
+    {
+      "file": "raw/idle_chain_r2.log",
+      "bytes": 3388,
+      "sha256": "88d5fe05f2a5684c6e0431ad4dc19fccdd5376357862cdbdf5d0200511af4af6"
+    },
+    {
+      "file": "raw/report.json",
+      "bytes": 199771,
+      "sha256": "9b25a78e927bca58d019ebac1f74668a9b9fbd592b82ba8636c126daffab9fe6"
+    },
+    {
+      "file": "raw/report.md",
+      "bytes": 1446,
+      "sha256": "92f4da4eb895816b6f827531f079ef337a682f54afd1e8b2648b8bec3a4d1742"
+    },
+    {
+      "file": "raw/script_revision6.py.txt",
+      "bytes": 96244,
+      "sha256": "ea54ee20542244c55b19c7561acd7628291d2b76ed31e5c460e8e4a24e9e0aac",
+      "origin": "Trusted matching local source, LF normalized; returned Python was not executed or imported."
+    }
+  ]
+}

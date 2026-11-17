@@ -2,11 +2,32 @@
 
 运行文件：[verify_dsv41_prefill_graph.py](verify_dsv41_prefill_graph.py)。只需复制这个 `.py`，不下载或加载模型权重。
 
-**当前 revision 6，预期主仓 `dsv41-a5-graph-gpt@d3700bf0a9`。** [第五轮](../validation/a5-20261117-run5/findings.md)已取得 ratio 0/1 完整 idle 序列和 ratio 2 首轮 idle 的单卡正面证据；ratio 2 后续 live odd-prefix case 有 17 个 compressed cache 字节差异，仍保留 FAIL。revision 6 只增强合法 pending-pair 建立和差异定位，不修改服务代码或决定 idle 回退策略。原 17 组及第三/四轮独立 CPU FP32 reference FAIL 保留，不能改写为独立精度通过。
+**当前 revision 7，预期主仓 `dsv41-a5-graph-gpt@d3700bf0a9`。** [第五轮](../validation/a5-20261117-run5/findings.md)已取得 ratio 0/1 完整 idle 序列和 ratio 2 首轮 idle 的单卡正面证据；ratio 2 后续 live odd-prefix case 有 17 个 compressed cache 字节差异，仍保留 FAIL。第六轮已确认不插入 idle 也会在 compressor 原始输出出现差异；revision 7 增加隔离和同步诊断，不修改服务代码或决定 idle 回退策略。原 17 组及第三/四轮独立 CPU FP32 reference FAIL 保留，不能改写为独立精度通过。
 
 首两轮 [run1](../validation/a5-20261116-run1/findings.md) / [run2](../validation/a5-20261116-run2/findings.md) 与 [randgun 合并记录](../analysis/randgun_merge_20261117.md)保留为对应旧环境/代码的历史快照。第三轮的硬件和 SDK 内容均有变化，即使包版本号相同也不自动等同。
 
-## 当前只需 ratio-2 定向复验
+## 本轮只定位 compressor 边界
+
+[第六轮](../validation/a5-20261117-run6/findings.md)已经完成有无 idle 对照，两组都在 odd-prefix 失败，最早差异在 compressor 原始输出。两轮 idle 状态保护通过。机器换成了 950PR / driver 25.1.rc3，不能与第五轮 DT 的字节数量直接作同环境比较。
+
+revision 7 本轮运行以下三组，不重跑 ratio 0/1 或全量矩阵：
+
+```bash
+python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py" \
+  --sglang-root /mnt/share/y00627667/repos/sglang \
+  --device 0 --tokens 64 --state-ring-size 2 \
+  --probes environment,compressor_boundary,active_chain_r2,active_chain_r2_sync \
+  --timeout 1200 \
+  --output-dir "./dsv41-compressor-boundary-r7-$(date +%Y%m%d-%H%M%S)"
+```
+
+- `compressor_boundary` 仅运行实际 compressor，去掉 norm/writer/indexer/attention。用真实设备计算建立 prefix 0/1/2/3 的 state，每个 case 都从相同 x/state 各跑两次 eager、两次 replay；全部操作放在同一 capture stream，执行前后显式同步，保存 GPU 初始 state/input hash、逐行误差及最终 state。另检查相同 history 和首 token 下，odd-prefix 的首个 pair 是否会随 live=1→31 改变。
+- `active_chain_r2` 保留 revision 6 无 idle 合成链，作为同轮环境对照。
+- `active_chain_r2_sync` 仅在该合成链的 replay 前增加设备同步，其余计算和输入保持一致。同步只是诊断开关，不修改服务配置，也不据此断言原路径有跨 stream bug。
+
+如果 eager 重复本身不一致，应先区分该算子/环境的非确定性；如果 eager 重复一致而 replay 不一致，则继续定位 graph 差异。对比 `exact_by_row`、`max_abs_by_row` 和 `first_pair_invariance`，不能只看整体最大误差。单卡结果仍不替代主仓 hooks、真实多流或 DP/DeepEP。
+
+## 第六轮 ratio-2 定向命令（历史复现）
 
 第五轮不必全量重跑。新脚本先用真实 compressor 的一个有效 token 建立 bank 2 的合法 prefix-1 pending pair，再执行同一组 live 输入的两种序列：插入 idle，以及不插入 idle。增加有效 compressor 原始/归一化输出、每个张量的比较结果与实际不一致坐标；比较失败会保留 FAIL 并继续收集后续 case，算子异常仍保留原失败阶段。
 
@@ -60,7 +81,7 @@ python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计
 
 运行结束回传输出目录中的 `dsv41-prefill-evidence.tar.gz`，FAIL/BLOCKED 也保留。若真实服务额外加载注册模块，显式使用 `--import-module MODULE`，不猜测模块或切换代际接口。
 
-## 全量 21 组命令（复现或新环境使用）
+## 全量 23 组命令（复现或新环境使用）
 
 ```bash
 python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py" \
@@ -73,7 +94,7 @@ python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计
   --output-dir "./dsv41-prefill-full-$(date +%Y%m%d-%H%M%S)"
 ```
 
-不通过 torchrun，不需要 HCCL 初始化。全量是 21 组单卡 synthetic 探针，不是整模或多卡验收。默认每组最长 600 秒（可用 `--timeout` 调整）；各组独立子进程，失败、超时、崩溃均尽量保留 checkpoint 和已完成 case，并继续其他组。
+不通过 torchrun，不需要 HCCL 初始化。全量是 23 组单卡 synthetic 探针，不是整模或多卡验收。默认每组最长 600 秒（可用 `--timeout` 调整）；各组独立子进程，失败、超时、崩溃均尽量保留 checkpoint 和已完成 case，并继续其他组。
 
 ## 结果内容
 
@@ -96,6 +117,8 @@ python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计
 | attention_r0/r1/r2 | 手工合法缓存的 MQSMLA，多轮 graph/eager 及部分行/head 的 CPU FP32 reference |
 | writer_attention_r0/r1/r2 | 公开 writer 在 replay 前准备缓存，CPU 按 544/320B ABI 解码，captured MQSMLA 消费；writer 与 consumer 的 dtype view 共享存储 |
 | idle_chain_r0/r1/r2 | 同 bucket live→idle→live；公开 writer、c1 投影/c2 compressor、index-K/QLI/QSLI 与 attention 合成图内链，检查 idle 对真实 cache/state 的字节级保护；未验证多卡 |
+| compressor_boundary | 独立 compressor 的合法 prefix 历史、短/长 extend、eager 重复与 replay 重复、GPU 输入 hash 和首 pair 不变性 |
+| active_chain_r2_sync | 与无 idle 合成链相同，仅增加 replay 前显式设备同步的诊断对照 |
 | active_chain_r2 | 与 `idle_chain_r2` 相同的合法 pending pair、输入和初始缓存，仅不插入 idle，辅助区分差异是否依赖 idle |
 | engram_break | 小型真实 hasher fallback、固定输出、共享 break、history 和 verify 延迟提交 |
 | mhc_premix | 指定 `cann_recipes_infer_cann920` 的公开 premix、previous-pre 折叠、triplet、同 X 改 previous-pre 的系数不变性 |
