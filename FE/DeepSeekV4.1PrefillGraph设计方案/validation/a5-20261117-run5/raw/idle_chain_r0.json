@@ -1,0 +1,382 @@
+{
+  "probe": "idle_chain_r0",
+  "status": "PASS",
+  "phase": "complete",
+  "started": "2026-11-17T11:50:28+0000",
+  "script_revision": 5,
+  "rtol": 0.001,
+  "atol": 0.001,
+  "reference_rtol": 0.001,
+  "reference_atol": 0.001,
+  "registration_imports": [],
+  "device": "Ascend950DT_9582",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "writer_entrypoint": "sgl_kernel_npu.operators.mem_cache.kv_compress_epilog_v2",
+  "writer_profile": "public wrapper used by merged SGLang; no custom namespace fallback",
+  "apis": {
+    "kv_compress_epilog_v2": {
+      "signature": "(cache, x, slot_mapping, quant_group_size=32, quant_mode='mxfp8_bf16', round_scale=True, x_scale=1.0, *, impl='auto')",
+      "module": "sgl_kernel_npu.operators.mem_cache.kv_compress_epilog_v2",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/mem_cache/kv_compress_epilog_v2.py"
+    },
+    "mixed_quant_sparse_flash_mla_dsl": {
+      "signature": "(q, *, ori_kv=None, cmp_kv=None, ori_sparse_indices=None, cmp_sparse_indices=None, ori_block_table=None, cmp_block_table=None, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, ori_topk_length=None, cmp_topk_length=None, sinks=None, metadata=None, quant_mode, softmax_scale=None, layout_q='TND', layout_kv='PA_BBND', return_softmax_lse=False, out, lse, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_dsl.py"
+    },
+    "mixed_quant_sparse_flash_mla_metadata_dsl": {
+      "signature": "(ori_topk_length, cmp_topk_length, *, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, batch_size=None, max_seqlen_q=None, max_seqlen_ori_kv=None, max_seqlen_cmp_kv=None, num_heads_q, num_heads_kv, head_dim, quant_mode, layout_q='TND', layout_kv='PA_BBND', has_ori_kv=True, has_cmp_kv=True, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_metadata_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_metadata_dsl.py"
+    }
+  },
+  "scope": "Single-NPU synthetic live/idle/live chain, identity RoPE, physical bucket queries on idle. Not real metadata-hook admission, multi-stream, DeepEP, or full-model validation.",
+  "idle_protocol": "cu=[0,T_cap], KV=T_cap, seqused=0, state bank=0, c-loc=-1, SWA loc=0, sparse lengths=0; QLI/QSLI still run over dummy rows.",
+  "capture_writer_indexer_attention_together": true,
+  "idle_layouts": {
+    "live_full": {
+      "physical_rows": 64,
+      "effective_rows": 64,
+      "cu": [
+        0,
+        64
+      ],
+      "kv_length": 64,
+      "seqused": 64,
+      "bank": 1,
+      "window_length_zero": false,
+      "cmp_skip_rows": 0
+    },
+    "idle_after_full": {
+      "physical_rows": 64,
+      "effective_rows": 0,
+      "cu": [
+        0,
+        64
+      ],
+      "kv_length": 64,
+      "seqused": 0,
+      "bank": 0,
+      "window_length_zero": true,
+      "cmp_skip_rows": 0
+    },
+    "live_odd_prefix": {
+      "physical_rows": 64,
+      "effective_rows": 31,
+      "cu": [
+        0,
+        31
+      ],
+      "kv_length": 32,
+      "seqused": 31,
+      "bank": 2,
+      "window_length_zero": false,
+      "cmp_skip_rows": 0
+    },
+    "idle_after_short": {
+      "physical_rows": 64,
+      "effective_rows": 0,
+      "cu": [
+        0,
+        64
+      ],
+      "kv_length": 64,
+      "seqused": 0,
+      "bank": 0,
+      "window_length_zero": true,
+      "cmp_skip_rows": 0
+    },
+    "live_again": {
+      "physical_rows": 64,
+      "effective_rows": 64,
+      "cu": [
+        0,
+        64
+      ],
+      "kv_length": 64,
+      "seqused": 64,
+      "bank": 1,
+      "window_length_zero": false,
+      "cmp_skip_rows": 0
+    }
+  },
+  "capture_supported": true,
+  "checks": {
+    "capture": "PASS",
+    "eager_replay": "PASS",
+    "idle_real_state_unchanged": "PASS"
+  },
+  "cases": [
+    {
+      "name": "live_full",
+      "parameters": {
+        "name": "live_full",
+        "live": 64,
+        "prefix": 0,
+        "bank": 1,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "state": {
+          "shape": [
+            2,
+            2,
+            4096
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "original": {
+          "shape": [
+            2,
+            128,
+            1,
+            544
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "attention_live": {
+          "shape": [
+            64,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "idle_after_full",
+      "parameters": {
+        "name": "idle_after_full",
+        "live": 0,
+        "prefix": 0,
+        "bank": 0,
+        "seed": 20261126
+      },
+      "status": "PASS",
+      "comparisons": {
+        "state": {
+          "shape": [
+            2,
+            2,
+            4096
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "original": {
+          "shape": [
+            2,
+            128,
+            1,
+            544
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "attention_live": {
+          "shape": [
+            0,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "live_odd_prefix",
+      "parameters": {
+        "name": "live_odd_prefix",
+        "live": 31,
+        "prefix": 1,
+        "bank": 2,
+        "seed": 20261127
+      },
+      "status": "PASS",
+      "comparisons": {
+        "state": {
+          "shape": [
+            2,
+            2,
+            4096
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "original": {
+          "shape": [
+            2,
+            128,
+            1,
+            544
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "attention_live": {
+          "shape": [
+            31,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "idle_after_short",
+      "parameters": {
+        "name": "idle_after_short",
+        "live": 0,
+        "prefix": 0,
+        "bank": 0,
+        "seed": 20261128
+      },
+      "status": "PASS",
+      "comparisons": {
+        "state": {
+          "shape": [
+            2,
+            2,
+            4096
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "original": {
+          "shape": [
+            2,
+            128,
+            1,
+            544
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "attention_live": {
+          "shape": [
+            0,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "live_again",
+      "parameters": {
+        "name": "live_again",
+        "live": 64,
+        "prefix": 0,
+        "bank": 1,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "state": {
+          "shape": [
+            2,
+            2,
+            4096
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "original": {
+          "shape": [
+            2,
+            128,
+            1,
+            544
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "attention_live": {
+          "shape": [
+            64,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    }
+  ],
+  "ignored_idle_output": {
+    "idle_after_full": [
+      {
+        "phase": "eager:idle_after_full",
+        "finite": 2097152,
+        "elements": 2097152,
+        "comparison": "ignored; all effective lengths are zero"
+      },
+      {
+        "phase": "replay:idle_after_full",
+        "finite": 2097152,
+        "elements": 2097152,
+        "comparison": "ignored; all effective lengths are zero"
+      }
+    ],
+    "idle_after_short": [
+      {
+        "phase": "eager:idle_after_short",
+        "finite": 2097152,
+        "elements": 2097152,
+        "comparison": "ignored; all effective lengths are zero"
+      },
+      {
+        "phase": "replay:idle_after_short",
+        "finite": 2097152,
+        "elements": 2097152,
+        "comparison": "ignored; all effective lengths are zero"
+      }
+    ]
+  },
+  "bound_input_pointers": {
+    "original": 19792490659840,
+    "state": 19792490868736,
+    "sinks": 19792490893312,
+    "positions": 19792491060224,
+    "cu": 19792491060736,
+    "kv_lengths": 19792491061248,
+    "window": 19792491061760,
+    "window_length": 19792491094528,
+    "cmp_length": 19792491095040,
+    "sparse": 19792491095552,
+    "used": 19792490894336,
+    "start": 19792490894848,
+    "bank": 19792490895360,
+    "swa_locs": 19792490895872,
+    "block_table": 19792490896384,
+    "x": 19792491750912,
+    "swa_input": 19792492340736,
+    "q": 19792496951296,
+    "metadata": 19792490900992
+  },
+  "replay_count": 5,
+  "observed_output_changed": true,
+  "elapsed_seconds": 88.957,
+  "returncode": 0,
+  "wall_seconds": 92.188
+}

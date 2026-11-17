@@ -1,0 +1,27 @@
+[idle_chain_r1] start
+/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py:1326: UserWarning: Cannot create tensor with internal format while allow_internal_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:406.)
+  stage(buffers, "residual", buffers["kv_lengths"] % ratio)
+[idle_chain_r1] warmup
+[idle_chain_r1] capture_begin
+[idle_chain_r1] capture_end
+[idle_chain_r1] prepare:live_full
+[idle_chain_r1] eager:live_full
+[idle_chain_r1] replay:live_full
+[idle_chain_r1] passed:live_full
+[idle_chain_r1] prepare:idle_after_full
+[idle_chain_r1] eager:idle_after_full
+[idle_chain_r1] replay:idle_after_full
+[idle_chain_r1] passed:idle_after_full
+[idle_chain_r1] prepare:live_odd_prefix
+[idle_chain_r1] eager:live_odd_prefix
+[idle_chain_r1] replay:live_odd_prefix
+[idle_chain_r1] passed:live_odd_prefix
+[idle_chain_r1] prepare:idle_after_short
+[idle_chain_r1] eager:idle_after_short
+[idle_chain_r1] replay:idle_after_short
+[idle_chain_r1] passed:idle_after_short
+[idle_chain_r1] prepare:live_again
+[idle_chain_r1] eager:live_again
+[idle_chain_r1] replay:live_again
+[idle_chain_r1] passed:live_again
+[idle_chain_r1] complete

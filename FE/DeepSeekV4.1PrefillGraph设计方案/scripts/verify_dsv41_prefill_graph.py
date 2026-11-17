@@ -28,13 +28,13 @@ from types import SimpleNamespace
 
 
 BASELINE = "d3700bf0a9"
-SCRIPT_REVISION = 5
+SCRIPT_REVISION = 6
 PROBES = (
     "environment", "geometry", "metadata", "compressor", "epilog_fp8",
     "epilog_fp4", "prologue", "qli_c2", "candidate_chain",
     "attention_r0", "attention_r1", "attention_r2", "engram_break", "mhc_premix",
     "writer_attention_r0", "writer_attention_r1", "writer_attention_r2",
-    "idle_chain_r0", "idle_chain_r1", "idle_chain_r2",
+    "idle_chain_r0", "idle_chain_r1", "idle_chain_r2", "active_chain_r2",
 )
 API_NAMES = {
     "attention": (
@@ -160,6 +160,20 @@ def comparison_failure(label, name, reference, got, metrics):
         return result
     R["comparison_failure"] = {"label": label, "tensor": name, "metrics": metrics,
                                "expected_sample": sample(reference), "actual_sample": sample(got)}
+    if reference.shape == got.shape and reference.numel():
+        left, right = reference.reshape(-1), got.reshape(-1)
+        indices = T.nonzero(left != right, as_tuple=False).reshape(-1)[:32].tolist()
+        points = []
+        for index in indices:
+            offset, coordinates = index, []
+            for size in reversed(reference.shape):
+                coordinates.append(offset % size)
+                offset //= size
+            points.append({"flat_index": index, "coordinates": list(reversed(coordinates)),
+                           "expected": sample(left[index:index + 1])[0],
+                           "actual": sample(right[index:index + 1])[0]})
+        R["comparison_failure"]["mismatch_samples"] = points
+        R["comparison_failure"]["mismatch_sample_rule"] = "First 32 exact inequalities; not a tolerance filter."
 
 
 def compare(expected, actual, label, *, rtol=None, atol=None):
@@ -219,7 +233,7 @@ def capture(body):
     return graph, outputs, stream
 
 
-def matrix(cases, prepare, reset, body, observe, after=None):
+def matrix(cases, prepare, reset, body, observe, after=None, *, collect_failures=False):
     prepare(cases[0])
     reset(cases[0])
     graph, outputs, stream = capture(body)
@@ -245,22 +259,37 @@ def matrix(cases, prepare, reset, body, observe, after=None):
         graph.replay()
         T.npu.synchronize()
         actual = snapshot(observe(outputs, case))
-        metrics = compare(expected, actual, case["name"])
+        metrics, failures = {}, []
+        if collect_failures:
+            for name in expected:
+                try:
+                    metrics.update(compare({name: expected[name]}, {name: actual[name]}, case["name"]))
+                except AssertionError as exc:
+                    detail = dict(R["comparison_failure"])
+                    metrics[name] = dict(detail["metrics"], status="FAIL", error=str(exc))
+                    failures.append(detail)
+            if failures:
+                R.setdefault("case_failures", []).append({"case": case["name"], "failures": failures})
+        else:
+            metrics = compare(expected, actual, case["name"])
         R["cases"].append({"name": case["name"],
                            "parameters": {k: v for k, v in case.items() if not k.startswith("_")},
-                           "status": "PASS", "comparisons": metrics})
+                           "status": "FAIL" if failures else "PASS", "comparisons": metrics})
         observations.append(expected)
         if after is not None:
             after(case, expected)
-        checkpoint("passed:" + case["name"])
+        checkpoint(("failed:" if failures else "passed:") + case["name"])
     R["bound_input_pointers"] = pointers
-    R.setdefault("checks", {})["eager_replay"] = "PASS"
+    R.setdefault("checks", {})["eager_replay"] = "FAIL" if R.get("case_failures") else "PASS"
     R["replay_count"] = len(cases)
     if len(observations) > 1:
         R["observed_output_changed"] = any(
             any(not T.equal(first[k], other[k]) for k in first)
             for first, other in zip(observations, observations[1:])
         )
+    if R.get("case_failures"):
+        checkpoint("comparison_failures_collected")
+        raise AssertionError(f"{len(R['case_failures'])} case(s) failed comparison; all completed comparisons retained")
     return observations
 
 
@@ -1360,6 +1389,7 @@ def run_idle_chain(buffers, ratio, functions):
                 cu_seqlens=buffers["cu"], state_cache=buffers["state"], state_block_table=buffers["bank"])
         else:
             latent = T.nn.functional.linear(buffers["x"], buffers["wkv"])
+        raw_latent = latent
         latent = N.npu_rms_norm(latent, buffers["kv_norm"], 1e-6)[0]
         if latent.shape[0] != buffers["cmp_locs"].numel():
             raise AssertionError("Compressor output rows do not match the fixed writer capacity")
@@ -1392,10 +1422,33 @@ def run_idle_chain(buffers, ratio, functions):
     result = {"output": output}
     if ratio:
         result["topk"] = topk
+        result["source_raw"] = raw_latent
+        result["source_norm"] = latent
     return result
 
 
-def probe_idle_chain(ratio):
+def prime_idle_chain_pair(buffers, compressor):
+    checkpoint("prime_legal_pending_pair")
+    before = snapshot({"other_banks": buffers["state"][:2]})
+    buffers["state"][2].zero_()
+    compressor(
+        x=random_tensor((O.tokens, O.hidden_size), O.seed + 20),
+        wkv=buffers["wkv"], wgate=buffers["wgate"], state_cache=buffers["state"],
+        cmp_ratio=2, state_block_table=device_tensor([2], T.int32),
+        cu_seqlens=device_tensor([0, 1], T.int32), seqused=device_tensor([1], T.int32),
+        start_pos=device_tensor([0], T.int32))
+    T.npu.synchronize()
+    if not T.equal(before["other_banks"], buffers["state"][:2].cpu()):
+        raise AssertionError("Pending-pair setup changed an unrelated bank")
+    raw = buffers["state"][2].cpu().contiguous().view(T.uint8).numpy().tobytes()
+    R["pending_pair_setup"] = {
+        "bank": 2, "prefix_before": 0, "live": 1, "prefix_after": 1,
+        "seed": O.seed + 20, "state_sha256": hashlib.sha256(raw).hexdigest(),
+        "method": "Zero private bank, then call actual compressor_v2 with one valid token before capture.",
+    }
+
+
+def probe_idle_chain(ratio, *, include_idle=True):
     load_device()
     functions = SimpleNamespace(
         writer=epilog(), attention=api("attention", "mixed_quant_sparse_flash_mla_dsl"),
@@ -1429,6 +1482,8 @@ def probe_idle_chain(ratio):
                        cos=device_tensor([[1.0] * 64] * capacity, T.float32),
                        weights=random_tensor((n, 32), O.seed + 7, dtype=T.float32).abs() + 0.01)
         persistent.update({key: buffers[key] for key in ("compressed", "key", "key_scale", "combined_key")})
+    if ratio == 2:
+        prime_idle_chain_pair(buffers, functions.compressor)
     cases = [
         {"name": "live_full", "live": n, "prefix": 0, "bank": 1, "seed": O.seed},
         {"name": "idle_after_full", "live": 0, "prefix": 0, "bank": 0, "seed": O.seed + 10},
@@ -1436,6 +1491,9 @@ def probe_idle_chain(ratio):
         {"name": "idle_after_short", "live": 0, "prefix": 0, "bank": 0, "seed": O.seed + 12},
         {"name": "live_again", "live": n, "prefix": 0, "bank": 1, "seed": O.seed},
     ]
+    if not include_idle:
+        cases = [case for case in cases if case["live"]]
+    R["insert_idle_steps"] = include_idle
     saved = {}
 
     def prepare(case):
@@ -1450,23 +1508,39 @@ def probe_idle_chain(ratio):
     def observe(out, case):
         values = snapshot(idle_chain_protected(persistent))
         if not case["live"]:
+            checks = R.setdefault("idle_state_checks", {}).setdefault(case["name"], {})
+            mode = R["phase"].split(":", 1)[0]
+            checks[mode] = "FAIL"
             reference = idle_chain_protected(saved[case["name"]])
             for name, value in values.items():
                 if not T.equal(value, reference[name].cpu()):
                     raise AssertionError("Idle replay changed protected real state/cache: " + name)
+            checks[mode] = "PASS"
             R.setdefault("ignored_idle_output", {}).setdefault(case["name"], []).append({
                 "phase": R["phase"], "finite": int(T.isfinite(out["output"]).sum().cpu()),
                 "elements": out["output"].numel(), "comparison": "ignored; all effective lengths are zero"})
         values["attention_live"] = out["output"][:case["live"]]
         if ratio:
             values["topk_live"] = checked_topk(out["topk"], case, ratio, "idle-chain indexer")
+            count = compression_count(case["prefix"], case["live"], ratio)
+            values["source_raw_valid"] = out["source_raw"][:count]
+            values["source_norm_valid"] = out["source_norm"][:count]
         return values
 
     R["scope"] = "Single-NPU synthetic live/idle/live chain, identity RoPE, physical bucket queries on idle. Not real metadata-hook admission, multi-stream, DeepEP, or full-model validation."
     R["idle_protocol"] = "cu=[0,T_cap], KV=T_cap, seqused=0, state bank=0, c-loc=-1, SWA loc=0, sparse lengths=0; QLI/QSLI still run over dummy rows."
     R["capture_writer_indexer_attention_together"] = True
-    matrix(cases, prepare, reset, lambda: run_idle_chain(buffers, ratio, functions), observe)
-    R.setdefault("checks", {})["idle_real_state_unchanged"] = "PASS"
+    idle_names = [case["name"] for case in cases if not case["live"]]
+    try:
+        matrix(cases, prepare, reset, lambda: run_idle_chain(buffers, ratio, functions),
+               observe, collect_failures=True)
+    finally:
+        checks = R.setdefault("checks", {})
+        statuses = [R.get("idle_state_checks", {}).get(name, {}).get(mode, "INCOMPLETE")
+                    for name in idle_names for mode in ("eager", "replay")]
+        checks["idle_real_state_unchanged"] = (
+            "NOT_RUN" if not statuses else "PASS" if all(value == "PASS" for value in statuses)
+            else "FAIL" if "FAIL" in statuses else "INCOMPLETE")
 
 
 def dispatch_probe(name):
@@ -1490,6 +1564,8 @@ def dispatch_probe(name):
         probe_attention(int(name[-1]))
     elif name.startswith("writer_attention_r"):
         probe_attention(int(name[-1]), use_writer=True)
+    elif name == "active_chain_r2":
+        probe_idle_chain(2, include_idle=False)
     elif name.startswith("idle_chain_r"):
         probe_idle_chain(int(name[-1]))
     elif name == "engram_break":

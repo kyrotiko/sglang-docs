@@ -73,5 +73,7 @@ Python 编译、Ruff format、修改文件的基础 lint 和 `git diff --check` 
 
 本地新增投票回归确实在旧代码上复现了不支持标记未参与集体决策（True != False），但这只能证明原保护与准入边界不一致，不能证明设备或完整协议不支持 idle，也不能据此决定整组 eager。后续以设备事实决定实现。
 
-验证入口改为单文件脚本 revision 5 的 `idle_chain_r0/r1/r2`：同 bucket live→idle→live，公开 writer、ratio-2 compressor、index-K/QLI/QSLI 与 attention 合成链在图内执行。测试采用当前 dummy EXTEND 的物理 bucket cu/KV 长度，logical seqused/sparse lengths 为 0；检查实际 cache/state 的字节级保护。使用私有合成缓存和 identity RoPE，不修改服务代码，不宣称多卡 DeepEP、真实 metadata hooks 或整模已经通过。命令与判读见[运行说明](../scripts/README.md)。本地编译、CPU 几何自检及三组控制流 fixture 已通过；fixture 结果不计作 NPU 证据，实际 A5 结果待回传。
+验证入口改为单文件脚本 revision 5 的 `idle_chain_r0/r1/r2`：同 bucket live→idle→live，公开 writer、ratio-2 compressor、index-K/QLI/QSLI 与 attention 合成链在图内执行。测试采用当前 dummy EXTEND 的物理 bucket cu/KV 长度，logical seqused/sparse lengths 为 0；检查实际 cache/state 的字节级保护。使用私有合成缓存和 identity RoPE，不修改服务代码，不宣称多卡 DeepEP、真实 metadata hooks 或整模已经通过。命令与判读见[运行说明](../scripts/README.md)。
+
+[第五轮](a5-20261117-run5/findings.md)已回传：ratio 0/1 各 5 个 case exact；ratio 2 的 full live 与其后 idle exact，之后 live odd-prefix 的 compressed cache 有 17 字节差异。实际源码为 `24deba1e5f…`（clean），不能当作 `d3700bf0a9` 的整模验收。已保留原 FAIL 并归档证据，revision 6 仅补合法 pending-pair 预热、中间值和无 idle 对照，等待定向复验；没有据此修改服务回退策略。
 

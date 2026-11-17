@@ -2,11 +2,28 @@
 
 运行文件：[verify_dsv41_prefill_graph.py](verify_dsv41_prefill_graph.py)。只需复制这个 `.py`，不下载或加载模型权重。
 
-**当前 revision 5，预期主仓 `dsv41-a5-graph-gpt@d3700bf0a9`。** 新增三组 idle 本地链探针，尚未取得设备结果；不修改服务代码或决定 idle 回退策略。原 17 组保留：[第三轮](../validation/a5-20261117-run3/findings.md)取得新基元证据，[第四轮](../validation/a5-20261117-run4/findings.md)已确认 dtype 修复生效，writer 产出缓存后 MQSMLA 的 15 轮有效输出 graph/eager exact。独立 CPU FP32 reference 仍 FAIL，诊断与手工缓存一致；不把该结果改写为独立精度通过。
+**当前 revision 6，预期主仓 `dsv41-a5-graph-gpt@d3700bf0a9`。** [第五轮](../validation/a5-20261117-run5/findings.md)已取得 ratio 0/1 完整 idle 序列和 ratio 2 首轮 idle 的单卡正面证据；ratio 2 后续 live odd-prefix case 有 17 个 compressed cache 字节差异，仍保留 FAIL。revision 6 只增强合法 pending-pair 建立和差异定位，不修改服务代码或决定 idle 回退策略。原 17 组及第三/四轮独立 CPU FP32 reference FAIL 保留，不能改写为独立精度通过。
 
 首两轮 [run1](../validation/a5-20261116-run1/findings.md) / [run2](../validation/a5-20261116-run2/findings.md) 与 [randgun 合并记录](../analysis/randgun_merge_20261117.md)保留为对应旧环境/代码的历史快照。第三轮的硬件和 SDK 内容均有变化，即使包版本号相同也不自动等同。
 
-## 本轮先验证 idle 本地链
+## 当前只需 ratio-2 定向复验
+
+第五轮不必全量重跑。新脚本先用真实 compressor 的一个有效 token 建立 bank 2 的合法 prefix-1 pending pair，再执行同一组 live 输入的两种序列：插入 idle，以及不插入 idle。增加有效 compressor 原始/归一化输出、每个张量的比较结果与实际不一致坐标；比较失败会保留 FAIL 并继续收集后续 case，算子异常仍保留原失败阶段。
+
+```bash
+python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py" \
+  --sglang-root /mnt/share/y00627667/repos/sglang \
+  --device 0 --tokens 64 \
+  --probes environment,idle_chain_r2,active_chain_r2 \
+  --timeout 1200 \
+  --output-dir "./dsv41-idle-r2-r6-$(date +%Y%m%d-%H%M%S)"
+```
+
+`idle_state_checks` 单独记录每轮 idle 的 eager/replay 状态保护；`case_failures` 保存全部数值/字节差异。失败后不把 live 输出、cache 或 top-k 改成宽松阈值。主仓源码保持现状，脚本不应用服务侧修改。
+
+第五轮实际 checkout 为 `24deba1e5f…`（clean），与脚本的预期标签不同。新一轮仍记录实际 SHA；不要将 expected baseline 当作实际源码证明，也不要把单卡合成链结论记为自己分支的整模验收。回传新目录中的 `dsv41-prefill-evidence.tar.gz` 即可。
+
+## 第五轮 idle 本地链命令（历史复现）
 
 主仓保持已推送的 `d3700bf0a9`。只替换这一个验证脚本，不应用 idle veto / 整组 eager 草稿。无需加载权重或先重跑原 17 组：
 
@@ -43,7 +60,7 @@ python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计
 
 运行结束回传输出目录中的 `dsv41-prefill-evidence.tar.gz`，FAIL/BLOCKED 也保留。若真实服务额外加载注册模块，显式使用 `--import-module MODULE`，不猜测模块或切换代际接口。
 
-## 全量 20 组命令（复现或新环境使用）
+## 全量 21 组命令（复现或新环境使用）
 
 ```bash
 python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py" \
@@ -56,7 +73,7 @@ python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计
   --output-dir "./dsv41-prefill-full-$(date +%Y%m%d-%H%M%S)"
 ```
 
-不通过 torchrun，不需要 HCCL 初始化。全量是 20 组单卡 synthetic 探针，不是整模或多卡验收。默认每组最长 600 秒（可用 `--timeout` 调整）；各组独立子进程，失败、超时、崩溃均尽量保留 checkpoint 和已完成 case，并继续其他组。
+不通过 torchrun，不需要 HCCL 初始化。全量是 21 组单卡 synthetic 探针，不是整模或多卡验收。默认每组最长 600 秒（可用 `--timeout` 调整）；各组独立子进程，失败、超时、崩溃均尽量保留 checkpoint 和已完成 case，并继续其他组。
 
 ## 结果内容
 
@@ -79,6 +96,7 @@ python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计
 | attention_r0/r1/r2 | 手工合法缓存的 MQSMLA，多轮 graph/eager 及部分行/head 的 CPU FP32 reference |
 | writer_attention_r0/r1/r2 | 公开 writer 在 replay 前准备缓存，CPU 按 544/320B ABI 解码，captured MQSMLA 消费；writer 与 consumer 的 dtype view 共享存储 |
 | idle_chain_r0/r1/r2 | 同 bucket live→idle→live；公开 writer、c1 投影/c2 compressor、index-K/QLI/QSLI 与 attention 合成图内链，检查 idle 对真实 cache/state 的字节级保护；未验证多卡 |
+| active_chain_r2 | 与 `idle_chain_r2` 相同的合法 pending pair、输入和初始缓存，仅不插入 idle，辅助区分差异是否依赖 idle |
 | engram_break | 小型真实 hasher fallback、固定输出、共享 break、history 和 verify 延迟提交 |
 | mhc_premix | 指定 `cann_recipes_infer_cann920` 的公开 premix、previous-pre 折叠、triplet、同 X 改 previous-pre 的系数不变性 |
 

@@ -1,0 +1,37 @@
+[idle_chain_r2] start
+/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py:1326: UserWarning: Cannot create tensor with internal format while allow_internal_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:406.)
+  stage(buffers, "residual", buffers["kv_lengths"] % ratio)
+[idle_chain_r2] warmup
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:13: FutureWarning: triton.language.extra.cann.extension.atan2 is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.atan2 instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.atan2")
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:35: FutureWarning: triton.language.extra.cann.extension.isfinited is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.isfinited instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.isfinited")
+/usr/local/python3.12.15/lib/python3.12/site-packages/triton/language/extra/cann/extension/math_ops.py:49: FutureWarning: triton.language.extra.cann.extension.finitef is deprecated and will be removed in the next release; use triton.language.extra.cann.libdevice.finitef instead.
+  @_deprecated(replacement="triton.language.extra.cann.libdevice.finitef")
+[idle_chain_r2] capture_begin
+[idle_chain_r2] capture_end
+[idle_chain_r2] prepare:live_full
+[idle_chain_r2] eager:live_full
+[idle_chain_r2] replay:live_full
+[idle_chain_r2] passed:live_full
+[idle_chain_r2] prepare:idle_after_full
+[idle_chain_r2] eager:idle_after_full
+[idle_chain_r2] replay:idle_after_full
+[idle_chain_r2] passed:idle_after_full
+[idle_chain_r2] prepare:live_odd_prefix
+[idle_chain_r2] eager:live_odd_prefix
+[idle_chain_r2] replay:live_odd_prefix
+Traceback (most recent call last):
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1514, in worker
+    dispatch_probe(options.worker)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1494, in dispatch_probe
+    probe_idle_chain(int(name[-1]))
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1468, in probe_idle_chain
+    matrix(cases, prepare, reset, lambda: run_idle_chain(buffers, ratio, functions), observe)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 248, in matrix
+    metrics = compare(expected, actual, case["name"])
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 196, in compare
+    raise AssertionError(f"{label}/{name}: {count} integer/byte values differ")
+AssertionError: live_odd_prefix/compressed: 17 integer/byte values differ
+

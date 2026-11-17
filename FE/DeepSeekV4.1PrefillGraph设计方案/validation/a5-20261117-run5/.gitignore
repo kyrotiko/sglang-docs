@@ -1,0 +1,2 @@
+# Keep returned logs despite the repository-wide log ignore.
+!raw/*.log

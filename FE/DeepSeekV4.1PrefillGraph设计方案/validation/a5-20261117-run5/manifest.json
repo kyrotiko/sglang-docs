@@ -1,0 +1,81 @@
+{
+  "source_directory": "C:/Users/admin/Desktop/file5",
+  "source_sha": "24deba1e5f631ba0459dd23292881a3f9239bbbb",
+  "expected_source_baseline": "d3700bf0a9",
+  "source_status": "",
+  "script_revision": 5,
+  "returned_script_sha256": "2286d7c446da76f071f6dfe6bf62ea0ec3c3679cdacde5a5667c3eabda9d1328",
+  "reported_script_sha256": "2286d7c446da76f071f6dfe6bf62ea0ec3c3679cdacde5a5667c3eabda9d1328",
+  "script_matches_manifest": true,
+  "script_matches_local_at_intake_after_lf_normalization": true,
+  "runtime": {
+    "device": "Ascend950DT_9582",
+    "packages": {
+      "torch": "2.13.0+cpu",
+      "torch-npu": "2.13.0",
+      "sglang": "0.5.23.dev636+gd0a756543",
+      "sgl-kernel-npu": "2026.11.0.post4",
+      "triton": "3.6.0",
+      "numpy": "2.2.6"
+    }
+  },
+  "note": "Returned Python was hashed/read as data only. Raw JSON/log/Markdown are byte-for-byte; archived Python text comes from the matching trusted local source.",
+  "files": [
+    {
+      "file": "raw/environment.json",
+      "bytes": 33656,
+      "sha256": "a64a8115909b91a2fa41f822689be5ef74f623f57e471510b3e667901f5724d1"
+    },
+    {
+      "file": "raw/environment.log",
+      "bytes": 1108,
+      "sha256": "0670d5faa3510b8e76592ef252f4cc9e7f55d3cb418a7b57feacb994cb0b2472"
+    },
+    {
+      "file": "raw/idle_chain_r0.json",
+      "bytes": 9794,
+      "sha256": "9006cb7c50c58863741b2c2ee7d8e9117f534bb285f451e6e79797052bd6a07d"
+    },
+    {
+      "file": "raw/idle_chain_r0.log",
+      "bytes": 868,
+      "sha256": "ac713a3dd10ba76a6df3388c492d84adbc134d6397eef9e6c48b954843d87885"
+    },
+    {
+      "file": "raw/idle_chain_r1.json",
+      "bytes": 19026,
+      "sha256": "eb9df787fbb256d49a18f1f416c467bc945baaf703ff3403fc70a2d954d8c3dc"
+    },
+    {
+      "file": "raw/idle_chain_r1.log",
+      "bytes": 1263,
+      "sha256": "57ca3d461bc27bb3ff3ef9c0dc4f43379e57da13a87069987def404dbe034c5c"
+    },
+    {
+      "file": "raw/idle_chain_r2.json",
+      "bytes": 11999,
+      "sha256": "0298e8c6661b36b904fb7b3e46ed5dbd0526b2db605202edcfd0e899f45bb259"
+    },
+    {
+      "file": "raw/idle_chain_r2.log",
+      "bytes": 3188,
+      "sha256": "90b656e356e97921351bfff995d1b4fb658ae9869bf689523dd236aadb0d85cf"
+    },
+    {
+      "file": "raw/report.json",
+      "bytes": 82876,
+      "sha256": "b5a6c986ae4d52039d9f16648f34dd46a4857ea0bd1f58fdf86001c6763018f7"
+    },
+    {
+      "file": "raw/report.md",
+      "bytes": 1362,
+      "sha256": "5f64814c02777a5c88b14ec8dd1cfb7689d980803fc1e8f99fa508098c094890"
+    },
+    {
+      "file": "raw/script_revision5.py.txt",
+      "bytes": 92036,
+      "sha256": "2286d7c446da76f071f6dfe6bf62ea0ec3c3679cdacde5a5667c3eabda9d1328",
+      "origin": "Trusted local script, LF normalized; returned script was not executed or imported."
+    }
+  ]
+}
