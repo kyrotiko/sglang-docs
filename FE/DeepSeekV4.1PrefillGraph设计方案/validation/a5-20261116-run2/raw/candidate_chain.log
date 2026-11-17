@@ -1,0 +1,27 @@
+[candidate_chain] start
+/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py:791: UserWarning: Cannot create tensor with internal format while allow_internal_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:406.)
+  stage(buffers, "residual", buffers["kv_lengths"] % ratio)
+[candidate_chain] warmup
+[candidate_chain] capture_begin
+[candidate_chain] capture_end
+[candidate_chain] prepare:full_A
+[candidate_chain] eager:full_A
+[candidate_chain] replay:full_A
+[candidate_chain] passed:full_A
+[candidate_chain] prepare:short_B
+[candidate_chain] eager:short_B
+[candidate_chain] replay:short_B
+[candidate_chain] passed:short_B
+[candidate_chain] prepare:page_boundary_C
+[candidate_chain] eager:page_boundary_C
+[candidate_chain] replay:page_boundary_C
+[candidate_chain] passed:page_boundary_C
+[candidate_chain] prepare:different_prefix_D
+[candidate_chain] eager:different_prefix_D
+[candidate_chain] replay:different_prefix_D
+[candidate_chain] passed:different_prefix_D
+[candidate_chain] prepare:repeat_A
+[candidate_chain] eager:repeat_A
+[candidate_chain] replay:repeat_A
+[candidate_chain] passed:repeat_A
+[candidate_chain] complete

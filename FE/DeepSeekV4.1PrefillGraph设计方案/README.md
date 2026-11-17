@@ -5,11 +5,11 @@
 需求：在 Ascend NPU 上支持 DeepSeek V4.1 的 prefill 入图，复用执行计划，减少 prefill 的 CPU 算子下发开销，并保持 eager 路径的计算和缓存语义。
 
 - 主仓：`sglang`，开发分支 `dsv41-a5`。
-- **当前基线：`5633d68b04`**，已从待合并的入图分支迁入 11 个功能、修复和 MoE scope 重构提交。
+- **当前基线：`9898f7ce9a`**，已合入 `randgun/dsv41-a5@c790194814` 的 13 个新提交，保留先前迁入的 11 个入图提交。合并与复验调整见 [记录](analysis/randgun_merge_20261117.md)。
 - 迁移前版本：`3cc67a7544`；备份分支 `backup/dsv41-a5-before-prefill-graph-20261116`。
-- 来源：本地保存的 `prefill_graph_ascend_ops_on_main@15443a991f`；本轮 GitHub TLS/API 连接失败，尚未重新核对远端最新 HEAD。
+- 首批入图来源：`prefill_graph_ascend_ops_on_main@15443a991f`；最新功能基线另合入 `randgun/dsv41-a5@c790194814`，详见合并记录。
 - 已保留的上游重构：`43d0ecf9e1` 的 device-neutral graph backend bases。
-- 日期：2026-11-16。首轮 A5 单卡证据已回传：[结果判读与原始证据](validation/a5-20261116-run1/findings.md)。window/c1/c2 attention 的图回放对照通过，独立 CPU 参考仍有差异；compressor/epilog API 及修订后的 QLI/QSLI 待补验证。整模正确性与性能未验证。
+- 更新日期：2026-11-17。已有[首轮](validation/a5-20261116-run1/findings.md)与[第二轮](validation/a5-20261116-run2/findings.md)旧基线 A5 证据，QLI/QSLI/attention 的 graph/eager 对照通过，CPU 精度差异仍保留。新公开 writer/mHC 需要定向复验，旧 custom schema 缺失不再直接否定新入口。整模正确性与性能未验证。
 
 **后续基于迁入后的框架和 scope 重构实现 V4.1 增量。** NPU backend 解析、NPUGraph segment、capture/replay 生命周期、V4 固定 metadata 和 MoE prefill scope 已进入开发分支；不再作为待重写的基础设施。
 
@@ -17,12 +17,14 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [入图提交迁移与当前基线](analysis/prefill_graph_integration.md) | 11 个提交的来源映射、冲突处理、重构接口、已有能力、V4.1 剩余增量与测试记录；优先阅读 |
+| [合入 randgun 后的当前基线与复验](analysis/randgun_merge_20261117.md) | 13 个新提交、281 项 CPU 回归、旧事实适用性、revision 3 定向命令；优先阅读 |
+| [首批入图提交迁移记录](analysis/prefill_graph_integration.md) | 旧基线 5633d68b04 的 11 个入图提交来源、冲突处理及当时测试记录 |
 | [迁移前源码分析](analysis/current_branch_gap_analysis.md) | 固定在 `3cc67a7544` 的历史快照，保留模型状态和代码证据；框架/MoE 缺口已由迁移覆盖 |
 | [实现方案与阶段划分](design/implementation_plan.md) | 基于迁入代码扩展 V4.1 metadata、source/candidate、Engram 和输出契约 |
 | [验收与验证计划](validation/acceptance_plan.md) | CPU 契约测试、A5 单算子与整模验证、性能 A/B、必要环境记录 |
-| [单文件 A5 验证脚本与运行说明](scripts/README.md) | 无需模型权重，13 组独立探针；自动输出 JSON、日志和证据包 |
+| [单文件 A5 验证脚本与运行说明](scripts/README.md) | revision 3，共 17 组；新增公开 writer、mHC premix 和 writer→attention 验证 |
 | [首轮 A5 事实与下一轮动作](validation/a5-20261116-run1/findings.md) | 原始证据、逐项失败归因、图回放与 CPU 参考区分、修订脚本重跑范围 |
+| [第二轮 A5 事实与当前阻塞](validation/a5-20261116-run2/findings.md) | QLI/QSLI 图链 exact、BF16 诊断、部署 API inventory 和后续实现边界 |
 
 ## 目标行为
 

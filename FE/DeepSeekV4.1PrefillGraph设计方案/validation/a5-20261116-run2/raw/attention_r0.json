@@ -1,0 +1,1255 @@
+{
+  "probe": "attention_r0",
+  "status": "FAIL",
+  "phase": "passed:repeat_A",
+  "started": "2026-11-16T20:01:53+0000",
+  "script_revision": 2,
+  "rtol": 0.001,
+  "atol": 0.001,
+  "reference_rtol": 0.001,
+  "reference_atol": 0.001,
+  "registration_imports": [],
+  "device": "Ascend950PR_9589",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "apis": {
+    "mixed_quant_sparse_flash_mla_dsl": {
+      "signature": "(q, *, ori_kv=None, cmp_kv=None, ori_sparse_indices=None, cmp_sparse_indices=None, ori_block_table=None, cmp_block_table=None, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, ori_topk_length=None, cmp_topk_length=None, sinks=None, metadata=None, quant_mode, softmax_scale=None, layout_q='TND', layout_kv='PA_BBND', return_softmax_lse=False, out, lse, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_dsl.py"
+    },
+    "mixed_quant_sparse_flash_mla_metadata_dsl": {
+      "signature": "(ori_topk_length, cmp_topk_length, *, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, batch_size=None, max_seqlen_q=None, max_seqlen_ori_kv=None, max_seqlen_cmp_kv=None, num_heads_q, num_heads_kv, head_dim, quant_mode, layout_q='TND', layout_kv='PA_BBND', has_ori_kv=True, has_cmp_kv=True, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_metadata_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_metadata_dsl.py"
+    }
+  },
+  "capture_supported": true,
+  "checks": {
+    "capture": "PASS",
+    "eager_replay": "PASS",
+    "cpu_reference": "FAIL"
+  },
+  "cases": [
+    {
+      "name": "full_A",
+      "parameters": {
+        "name": "full_A",
+        "live": 64,
+        "prefix": 768,
+        "page_shift": 0,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            64,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "short_B",
+      "parameters": {
+        "name": "short_B",
+        "live": 31,
+        "prefix": 1,
+        "page_shift": 1,
+        "seed": 20261117
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            31,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "page_boundary_C",
+      "parameters": {
+        "name": "page_boundary_C",
+        "live": 16,
+        "prefix": 127,
+        "page_shift": 2,
+        "seed": 20261118
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            16,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "different_prefix_D",
+      "parameters": {
+        "name": "different_prefix_D",
+        "live": 61,
+        "prefix": 513,
+        "page_shift": 1,
+        "seed": 20261119
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            61,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "repeat_A",
+      "parameters": {
+        "name": "repeat_A",
+        "live": 64,
+        "prefix": 768,
+        "page_shift": 0,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_output": {
+          "shape": [
+            64,
+            64,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    }
+  ],
+  "cpu_reference": {
+    "full_A": {
+      "row0_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0002572089433670044,
+          "max_rel": 0.3356935407006891
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.5498121946918604e-05,
+          "normalized_l2": 0.0020685254046358885,
+          "fp32_to_bf16_rounding_max_abs": 0.0002310723066329956,
+          "actual_to_rounded_reference_max_abs": 0.00048828125,
+          "max_bf16_ulp_distance": 60,
+          "within_one_bf16_ulp": 464,
+          "elements": 512,
+          "largest_error": {
+            "index": 76,
+            "reference_fp32": 0.074475958943367,
+            "reference_bf16": 0.07470703125,
+            "actual": 0.07421875,
+            "abs_error": 0.0002572089433670044
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00019349902868270874,
+          "max_rel": 1.3539315135819034
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.6679431541095405e-05,
+          "normalized_l2": 0.002127435267410529,
+          "fp32_to_bf16_rounding_max_abs": 0.00019349902868270874,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 28496,
+          "within_one_bf16_ulp": 466,
+          "elements": 512,
+          "largest_error": {
+            "index": 268,
+            "reference_fp32": -0.06572446972131729,
+            "reference_bf16": -0.06591796875,
+            "actual": -0.06591796875,
+            "abs_error": 0.00019349902868270874
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00015246495604515076,
+          "max_rel": 0.387897582224512
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.670189221351969e-05,
+          "normalized_l2": 0.00212968656106241,
+          "fp32_to_bf16_rounding_max_abs": 0.0001442357897758484,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 95,
+          "within_one_bf16_ulp": 469,
+          "elements": 512,
+          "largest_error": {
+            "index": 210,
+            "reference_fp32": -0.04354870691895485,
+            "reference_bf16": -0.04345703125,
+            "actual": -0.043701171875,
+            "abs_error": 0.00015246495604515076
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row63_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00017695128917694092,
+          "max_rel": 2.6812779246173863
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.4404559599375915e-05,
+          "normalized_l2": 0.0020161258003333115,
+          "fp32_to_bf16_rounding_max_abs": 0.00012198463082313538,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 243,
+          "within_one_bf16_ulp": 463,
+          "elements": 512,
+          "largest_error": {
+            "index": 202,
+            "reference_fp32": 0.04547734558582306,
+            "reference_bf16": 0.04541015625,
+            "actual": 0.045654296875,
+            "abs_error": 0.00017695128917694092
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row63_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00015497207641601562,
+          "max_rel": 0.14019416081310193
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.6051149612214656e-05,
+          "normalized_l2": 0.002091183262485892,
+          "fp32_to_bf16_rounding_max_abs": 0.00011692941188812256,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 33,
+          "within_one_bf16_ulp": 467,
+          "elements": 512,
+          "largest_error": {
+            "index": 262,
+            "reference_fp32": -0.037264347076416016,
+            "reference_bf16": -0.037353515625,
+            "actual": -0.037109375,
+            "abs_error": 0.00015497207641601562
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row63_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00014755874872207642,
+          "max_rel": 0.4964900593223027
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.35583811680173e-05,
+          "normalized_l2": 0.001976640977359026,
+          "fp32_to_bf16_rounding_max_abs": 0.00012188032269477844,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 126,
+          "within_one_bf16_ulp": 464,
+          "elements": 512,
+          "largest_error": {
+            "index": 429,
+            "reference_fp32": -0.041163183748722076,
+            "reference_bf16": -0.041259765625,
+            "actual": -0.041015625,
+            "abs_error": 0.00014755874872207642
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      }
+    },
+    "short_B": {
+      "row0_head0": {
+        "status": "FAIL",
+        "error": "CPU attention reference/reference: Tensor-likes are not close!\n\nMismatched elements: 1 / 512 (0.2%)\nGreatest absolute difference: 0.0018430352210998535 at index (121,) (up to 0.001 allowed)\nGreatest relative difference: 0.0036441676784306765 at index (121,) (up to 0.001 allowed)",
+        "details": {
+          "label": "CPU attention reference",
+          "tensor": "reference",
+          "metrics": {
+            "shape": [
+              512
+            ],
+            "dtype": "torch.float32",
+            "exact": false,
+            "finite": true,
+            "max_abs": 0.0018430352210998535,
+            "max_rel": 0.07692122780694673
+          },
+          "expected_sample": [
+            0.03975987061858177,
+            -0.05026652663946152,
+            -0.10940820723772049,
+            0.004387769382447004,
+            -0.26494207978248596,
+            -0.039627041667699814,
+            -0.18756641447544098,
+            -0.07147479057312012,
+            -0.005028098355978727,
+            0.22579871118068695,
+            0.13329508900642395,
+            0.288697212934494
+          ],
+          "actual_sample": [
+            0.039794921875,
+            -0.05029296875,
+            -0.109375,
+            0.004364013671875,
+            -0.265625,
+            -0.03955078125,
+            -0.1875,
+            -0.0712890625,
+            -0.0050048828125,
+            0.2255859375,
+            0.1337890625,
+            0.2890625
+          ]
+        },
+        "rounded_softmax_hypothesis_max_abs": 0.00390625,
+        "hypothesis_note": "Diagnostic alternate arithmetic; not substituted for the FP32 oracle.",
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 0.0002836768921174651,
+          "normalized_l2": 0.0016352314892154073,
+          "fp32_to_bf16_rounding_max_abs": 0.0018430352210998535,
+          "actual_to_rounded_reference_max_abs": 0.001953125,
+          "max_bf16_ulp_distance": 19,
+          "within_one_bf16_ulp": 498,
+          "elements": 512,
+          "largest_error": {
+            "index": 121,
+            "reference_fp32": 0.5057492852210999,
+            "reference_bf16": 0.50390625,
+            "actual": 0.50390625,
+            "abs_error": 0.0018430352210998535
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.001090705394744873,
+          "max_rel": 0.2235402281419276
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 0.0002642102637932892,
+          "normalized_l2": 0.0015230875856050083,
+          "fp32_to_bf16_rounding_max_abs": 0.001090705394744873,
+          "actual_to_rounded_reference_max_abs": 0.0009765625,
+          "max_bf16_ulp_distance": 47,
+          "within_one_bf16_ulp": 492,
+          "elements": 512,
+          "largest_error": {
+            "index": 121,
+            "reference_fp32": 0.5049969553947449,
+            "reference_bf16": 0.50390625,
+            "actual": 0.50390625,
+            "abs_error": 0.001090705394744873
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head63": {
+        "status": "FAIL",
+        "error": "CPU attention reference/reference: Tensor-likes are not close!\n\nMismatched elements: 2 / 512 (0.4%)\nGreatest absolute difference: 0.0014763474464416504 at index (52,) (up to 0.001 allowed)\nGreatest relative difference: 0.004869040567427874 at index (52,) (up to 0.001 allowed)",
+        "details": {
+          "label": "CPU attention reference",
+          "tensor": "reference",
+          "metrics": {
+            "shape": [
+              512
+            ],
+            "dtype": "torch.float32",
+            "exact": false,
+            "finite": true,
+            "max_abs": 0.0014763474464416504,
+            "max_rel": 0.10225823084365762
+          },
+          "expected_sample": [
+            0.043126367032527924,
+            -0.04778172820806503,
+            -0.1095685213804245,
+            0.006712252274155617,
+            -0.27107393741607666,
+            -0.04235229641199112,
+            -0.187887042760849,
+            -0.07708561420440674,
+            -0.005729451775550842,
+            0.22211159765720367,
+            0.1309105008840561,
+            0.2869338095188141
+          ],
+          "actual_sample": [
+            0.04296875,
+            -0.0478515625,
+            -0.10986328125,
+            0.006622314453125,
+            -0.271484375,
+            -0.042236328125,
+            -0.1884765625,
+            -0.0771484375,
+            -0.005706787109375,
+            0.22265625,
+            0.130859375,
+            0.287109375
+          ]
+        },
+        "rounded_softmax_hypothesis_max_abs": 0.001953125,
+        "hypothesis_note": "Diagnostic alternate arithmetic; not substituted for the FP32 oracle.",
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 0.0003510043322171961,
+          "normalized_l2": 0.0020217749704819366,
+          "fp32_to_bf16_rounding_max_abs": 0.0009785294532775879,
+          "actual_to_rounded_reference_max_abs": 0.001953125,
+          "max_bf16_ulp_distance": 21,
+          "within_one_bf16_ulp": 484,
+          "elements": 512,
+          "largest_error": {
+            "index": 52,
+            "reference_fp32": 0.30321115255355835,
+            "reference_bf16": 0.302734375,
+            "actual": 0.3046875,
+            "abs_error": 0.0014763474464416504
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row30_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.000348508358001709,
+          "max_rel": 0.8334970036563736
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 8.626377816472267e-05,
+          "normalized_l2": 0.0018212182741030275,
+          "fp32_to_bf16_rounding_max_abs": 0.000348508358001709,
+          "actual_to_rounded_reference_max_abs": 0.00048828125,
+          "max_bf16_ulp_distance": 332,
+          "within_one_bf16_ulp": 471,
+          "elements": 512,
+          "largest_error": {
+            "index": 286,
+            "reference_fp32": -0.1605047583580017,
+            "reference_bf16": -0.16015625,
+            "actual": -0.16015625,
+            "abs_error": 0.000348508358001709
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row30_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00043636560440063477,
+          "max_rel": 0.2848281432570833
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 9.274777527395242e-05,
+          "normalized_l2": 0.0019624976476240626,
+          "fp32_to_bf16_rounding_max_abs": 0.00043636560440063477,
+          "actual_to_rounded_reference_max_abs": 0.00048828125,
+          "max_bf16_ulp_distance": 54,
+          "within_one_bf16_ulp": 468,
+          "elements": 512,
+          "largest_error": {
+            "index": 86,
+            "reference_fp32": -0.12836605310440063,
+            "reference_bf16": -0.1279296875,
+            "actual": -0.1279296875,
+            "abs_error": 0.00043636560440063477
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row30_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0003980100154876709,
+          "max_rel": 0.37953447397242884
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 9.117240883291757e-05,
+          "normalized_l2": 0.001925539233908031,
+          "fp32_to_bf16_rounding_max_abs": 0.0003980100154876709,
+          "actual_to_rounded_reference_max_abs": 0.00048828125,
+          "max_bf16_ulp_distance": 55,
+          "within_one_bf16_ulp": 482,
+          "elements": 512,
+          "largest_error": {
+            "index": 71,
+            "reference_fp32": -0.13028082251548767,
+            "reference_bf16": -0.1298828125,
+            "actual": -0.1298828125,
+            "abs_error": 0.0003980100154876709
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      }
+    },
+    "page_boundary_C": {
+      "row0_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00016124919056892395,
+          "max_rel": 0.4948443636488364
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.549609605740003e-05,
+          "normalized_l2": 0.002052655701702823,
+          "fp32_to_bf16_rounding_max_abs": 0.00015302002429962158,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 83,
+          "within_one_bf16_ulp": 464,
+          "elements": 512,
+          "largest_error": {
+            "index": 397,
+            "reference_fp32": 0.039877813309431076,
+            "reference_bf16": 0.039794921875,
+            "actual": 0.0400390625,
+            "abs_error": 0.00016124919056892395
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00018408149480819702,
+          "max_rel": 0.4133841829801905
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.463558109952701e-05,
+          "normalized_l2": 0.0020154972744545084,
+          "fp32_to_bf16_rounding_max_abs": 0.00018408149480819702,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 105,
+          "within_one_bf16_ulp": 467,
+          "elements": 512,
+          "largest_error": {
+            "index": 316,
+            "reference_fp32": 0.0836801752448082,
+            "reference_bf16": 0.08349609375,
+            "actual": 0.08349609375,
+            "abs_error": 0.00018408149480819702
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00019452720880508423,
+          "max_rel": 0.9770274090802029
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.58045285022033e-05,
+          "normalized_l2": 0.002068429948280996,
+          "fp32_to_bf16_rounding_max_abs": 0.00019452720880508423,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 126,
+          "within_one_bf16_ulp": 464,
+          "elements": 512,
+          "largest_error": {
+            "index": 240,
+            "reference_fp32": -0.06523516029119492,
+            "reference_bf16": -0.0654296875,
+            "actual": -0.0654296875,
+            "abs_error": 0.00019452720880508423
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row15_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001993626356124878,
+          "max_rel": 0.6991577582764247
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.420682206101851e-05,
+          "normalized_l2": 0.0019775430996674843,
+          "fp32_to_bf16_rounding_max_abs": 0.00013463199138641357,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 225,
+          "within_one_bf16_ulp": 469,
+          "elements": 512,
+          "largest_error": {
+            "index": 66,
+            "reference_fp32": 0.04911704361438751,
+            "reference_bf16": 0.049072265625,
+            "actual": 0.04931640625,
+            "abs_error": 0.0001993626356124878
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row15_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.000186234712600708,
+          "max_rel": 0.422534605311145
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.4946439025224486e-05,
+          "normalized_l2": 0.002014609231626886,
+          "fp32_to_bf16_rounding_max_abs": 0.000186234712600708,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 99,
+          "within_one_bf16_ulp": 463,
+          "elements": 512,
+          "largest_error": {
+            "index": 316,
+            "reference_fp32": 0.06659248471260071,
+            "reference_bf16": 0.06640625,
+            "actual": 0.06640625,
+            "abs_error": 0.000186234712600708
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row15_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0002254694700241089,
+          "max_rel": 0.22720611061777596
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.5500504050209315e-05,
+          "normalized_l2": 0.0020324047935360552,
+          "fp32_to_bf16_rounding_max_abs": 0.0002254694700241089,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 46,
+          "within_one_bf16_ulp": 473,
+          "elements": 512,
+          "largest_error": {
+            "index": 240,
+            "reference_fp32": -0.06471593677997589,
+            "reference_bf16": -0.06494140625,
+            "actual": -0.06494140625,
+            "abs_error": 0.0002254694700241089
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      }
+    },
+    "different_prefix_D": {
+      "row0_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001466795802116394,
+          "max_rel": 0.4384623853134782
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.382842706638305e-05,
+          "normalized_l2": 0.0019064340468700665,
+          "fp32_to_bf16_rounding_max_abs": 0.00012061744928359985,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 103,
+          "within_one_bf16_ulp": 468,
+          "elements": 512,
+          "largest_error": {
+            "index": 46,
+            "reference_fp32": 0.05459003895521164,
+            "reference_bf16": 0.0546875,
+            "actual": 0.054443359375,
+            "abs_error": 0.0001466795802116394
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00017036497592926025,
+          "max_rel": 0.16813149775738248
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.822487817213136e-05,
+          "normalized_l2": 0.0020996038921544235,
+          "fp32_to_bf16_rounding_max_abs": 0.00012009963393211365,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 24,
+          "within_one_bf16_ulp": 463,
+          "elements": 512,
+          "largest_error": {
+            "index": 371,
+            "reference_fp32": -0.03654731810092926,
+            "reference_bf16": -0.03662109375,
+            "actual": -0.036376953125,
+            "abs_error": 0.00017036497592926025
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001609399914741516,
+          "max_rel": 0.38636761080617593
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.4749506002344e-05,
+          "normalized_l2": 0.001946723067905149,
+          "fp32_to_bf16_rounding_max_abs": 0.00012179836630821228,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 74,
+          "within_one_bf16_ulp": 460,
+          "elements": 512,
+          "largest_error": {
+            "index": 42,
+            "reference_fp32": 0.04915546625852585,
+            "reference_bf16": 0.049072265625,
+            "actual": 0.04931640625,
+            "abs_error": 0.0001609399914741516
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row60_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00027020275592803955,
+          "max_rel": 0.3194680733261524
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.454387239134208e-05,
+          "normalized_l2": 0.0020312575681985735,
+          "fp32_to_bf16_rounding_max_abs": 0.00021807849407196045,
+          "actual_to_rounded_reference_max_abs": 0.00048828125,
+          "max_bf16_ulp_distance": 59,
+          "within_one_bf16_ulp": 461,
+          "elements": 512,
+          "largest_error": {
+            "index": 61,
+            "reference_fp32": 0.06423504650592804,
+            "reference_bf16": 0.064453125,
+            "actual": 0.06396484375,
+            "abs_error": 0.00027020275592803955
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row60_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0001597665250301361,
+          "max_rel": 0.16033583593103987
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.67222255784331e-05,
+          "normalized_l2": 0.0021289417109488728,
+          "fp32_to_bf16_rounding_max_abs": 0.0001221969723701477,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 39,
+          "within_one_bf16_ulp": 463,
+          "elements": 512,
+          "largest_error": {
+            "index": 316,
+            "reference_fp32": -0.038245704025030136,
+            "reference_bf16": -0.038330078125,
+            "actual": -0.0380859375,
+            "abs_error": 0.0001597665250301361
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row60_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00013359636068344116,
+          "max_rel": 0.11657180932620262
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.1720597018390136e-05,
+          "normalized_l2": 0.0019006465988581835,
+          "fp32_to_bf16_rounding_max_abs": 0.00012148916721343994,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 24,
+          "within_one_bf16_ulp": 470,
+          "elements": 512,
+          "largest_error": {
+            "index": 296,
+            "reference_fp32": -0.03648749738931656,
+            "reference_bf16": -0.036376953125,
+            "actual": -0.03662109375,
+            "abs_error": 0.00013359636068344116
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      }
+    },
+    "repeat_A": {
+      "row0_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.0002572089433670044,
+          "max_rel": 0.3356935407006891
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.5498121946918604e-05,
+          "normalized_l2": 0.0020685254046358885,
+          "fp32_to_bf16_rounding_max_abs": 0.0002310723066329956,
+          "actual_to_rounded_reference_max_abs": 0.00048828125,
+          "max_bf16_ulp_distance": 60,
+          "within_one_bf16_ulp": 464,
+          "elements": 512,
+          "largest_error": {
+            "index": 76,
+            "reference_fp32": 0.074475958943367,
+            "reference_bf16": 0.07470703125,
+            "actual": 0.07421875,
+            "abs_error": 0.0002572089433670044
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00019349902868270874,
+          "max_rel": 1.3539315135819034
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.6679431541095405e-05,
+          "normalized_l2": 0.002127435267410529,
+          "fp32_to_bf16_rounding_max_abs": 0.00019349902868270874,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 28496,
+          "within_one_bf16_ulp": 466,
+          "elements": 512,
+          "largest_error": {
+            "index": 268,
+            "reference_fp32": -0.06572446972131729,
+            "reference_bf16": -0.06591796875,
+            "actual": -0.06591796875,
+            "abs_error": 0.00019349902868270874
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row0_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00015246495604515076,
+          "max_rel": 0.387897582224512
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.670189221351969e-05,
+          "normalized_l2": 0.00212968656106241,
+          "fp32_to_bf16_rounding_max_abs": 0.0001442357897758484,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 95,
+          "within_one_bf16_ulp": 469,
+          "elements": 512,
+          "largest_error": {
+            "index": 210,
+            "reference_fp32": -0.04354870691895485,
+            "reference_bf16": -0.04345703125,
+            "actual": -0.043701171875,
+            "abs_error": 0.00015246495604515076
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row63_head0": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00017695128917694092,
+          "max_rel": 2.6812779246173863
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.4404559599375915e-05,
+          "normalized_l2": 0.0020161258003333115,
+          "fp32_to_bf16_rounding_max_abs": 0.00012198463082313538,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 243,
+          "within_one_bf16_ulp": 463,
+          "elements": 512,
+          "largest_error": {
+            "index": 202,
+            "reference_fp32": 0.04547734558582306,
+            "reference_bf16": 0.04541015625,
+            "actual": 0.045654296875,
+            "abs_error": 0.00017695128917694092
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row63_head31": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00015497207641601562,
+          "max_rel": 0.14019416081310193
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.6051149612214656e-05,
+          "normalized_l2": 0.002091183262485892,
+          "fp32_to_bf16_rounding_max_abs": 0.00011692941188812256,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 33,
+          "within_one_bf16_ulp": 467,
+          "elements": 512,
+          "largest_error": {
+            "index": 262,
+            "reference_fp32": -0.037264347076416016,
+            "reference_bf16": -0.037353515625,
+            "actual": -0.037109375,
+            "abs_error": 0.00015497207641601562
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      },
+      "row63_head63": {
+        "reference": {
+          "shape": [
+            512
+          ],
+          "dtype": "torch.float32",
+          "exact": false,
+          "finite": true,
+          "max_abs": 0.00014755874872207642,
+          "max_rel": 0.4964900593223027
+        },
+        "bf16_diagnostics": {
+          "finite": true,
+          "rmse": 4.35583811680173e-05,
+          "normalized_l2": 0.001976640977359026,
+          "fp32_to_bf16_rounding_max_abs": 0.00012188032269477844,
+          "actual_to_rounded_reference_max_abs": 0.000244140625,
+          "max_bf16_ulp_distance": 126,
+          "within_one_bf16_ulp": 464,
+          "elements": 512,
+          "largest_error": {
+            "index": 429,
+            "reference_fp32": -0.041163183748722076,
+            "reference_bf16": -0.041259765625,
+            "actual": -0.041015625,
+            "abs_error": 0.00014755874872207642
+          },
+          "interpretation": "Diagnostics only; neither ULP distance nor BF16 rounding changes the strict reference status."
+        }
+      }
+    }
+  },
+  "padding_observations": {
+    "full_A": {
+      "rows": 0,
+      "finite_values": 0,
+      "elements": 0,
+      "zero_values": 0,
+      "max_abs_finite": null,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    },
+    "short_B": {
+      "rows": 33,
+      "finite_values": 1081344,
+      "elements": 1081344,
+      "zero_values": 1081344,
+      "max_abs_finite": 0.0,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    },
+    "page_boundary_C": {
+      "rows": 48,
+      "finite_values": 1572864,
+      "elements": 1572864,
+      "zero_values": 1572864,
+      "max_abs_finite": 0.0,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    },
+    "different_prefix_D": {
+      "rows": 3,
+      "finite_values": 98304,
+      "elements": 98304,
+      "zero_values": 98304,
+      "max_abs_finite": 0.0,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    },
+    "repeat_A": {
+      "rows": 0,
+      "finite_values": 0,
+      "elements": 0,
+      "zero_values": 0,
+      "max_abs_finite": null,
+      "note": "Output seeded with NaN; inactive rows are observed, not required to be written by the kernel."
+    }
+  },
+  "comparison_failure": {
+    "label": "CPU attention reference",
+    "tensor": "reference",
+    "metrics": {
+      "shape": [
+        512
+      ],
+      "dtype": "torch.float32",
+      "exact": false,
+      "finite": true,
+      "max_abs": 0.0014763474464416504,
+      "max_rel": 0.10225823084365762
+    },
+    "expected_sample": [
+      0.043126367032527924,
+      -0.04778172820806503,
+      -0.1095685213804245,
+      0.006712252274155617,
+      -0.27107393741607666,
+      -0.04235229641199112,
+      -0.187887042760849,
+      -0.07708561420440674,
+      -0.005729451775550842,
+      0.22211159765720367,
+      0.1309105008840561,
+      0.2869338095188141
+    ],
+    "actual_sample": [
+      0.04296875,
+      -0.0478515625,
+      -0.10986328125,
+      0.006622314453125,
+      -0.271484375,
+      -0.042236328125,
+      -0.1884765625,
+      -0.0771484375,
+      -0.005706787109375,
+      0.22265625,
+      0.130859375,
+      0.287109375
+    ]
+  },
+  "cpu_reference_failures": {
+    "short_B": true
+  },
+  "bound_input_pointers": {
+    "positions": 19792490826240,
+    "cu": 19792490826752,
+    "kv_lengths": 19792490827264,
+    "window": 19792490827776,
+    "window_length": 19792490860544,
+    "cmp_length": 19792490861056,
+    "sparse": 19792490861568,
+    "block_table": 19792490660352,
+    "original": 19792491549696,
+    "q": 19792496951296,
+    "sinks": 19792490660864,
+    "metadata": 19792490665472
+  },
+  "replay_count": 5,
+  "observed_output_changed": true,
+  "scope": "Real MQSMLA eager/replay, varying lengths/page IDs/Q/KV, with CPU float32 reference on selected rows/heads.",
+  "packing": "CPU-built valid fp8+BF16-scale ori rows and fp4+BF16-scale cmp rows; independent of custom epilog registration.",
+  "cpu_reference_scope": "Six or fewer row/head samples per case, not all output elements; sinks fixed at -10000.",
+  "error": "AssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.",
+  "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1183, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1165, in dispatch_probe\n    probe_attention(int(name[-1]))\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1018, in probe_attention\n    raise AssertionError(\"Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.\")\nAssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.\n",
+  "elapsed_seconds": 88.781,
+  "returncode": 1,
+  "wall_seconds": 92.007
+}

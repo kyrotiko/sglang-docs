@@ -1,0 +1,96 @@
+{
+  "source_directory": "C:/Users/admin/Desktop/file2",
+  "source_sha": "5633d68b04ad1bdd4faecb1c8e370e5c5ea6403c",
+  "script_revision": 2,
+  "returned_script_sha256": "db94340824e68cacf4449241a83bbd481571d9ffc558a4fd35b0de063f682f7f",
+  "reported_script_sha256": "db94340824e68cacf4449241a83bbd481571d9ffc558a4fd35b0de063f682f7f",
+  "script_matches_manifest": true,
+  "script_matches_local_after_lf_normalization": true,
+  "kernel_api_sources_vs_run1": [
+    {
+      "name": "compressor_v2",
+      "unchanged": true
+    },
+    {
+      "name": "mixed_quant_sparse_flash_mla_dsl",
+      "unchanged": true
+    },
+    {
+      "name": "mixed_quant_sparse_flash_mla_metadata_dsl",
+      "unchanged": true
+    },
+    {
+      "name": "indexer_prologue_k_dsl",
+      "unchanged": true
+    },
+    {
+      "name": "quant_lightning_indexer_dsl",
+      "unchanged": true
+    },
+    {
+      "name": "quant_lightning_indexer_metadata_dsl",
+      "unchanged": true
+    },
+    {
+      "name": "quant_sparse_lightning_indexer_dsl",
+      "unchanged": true
+    },
+    {
+      "name": "quant_sparse_lightning_indexer_metadata_dsl",
+      "unchanged": true
+    }
+  ],
+  "note": "Returned Python was hashed only, never executed or imported. Raw files copied byte-for-byte.",
+  "files": [
+    {
+      "file": "raw/attention_r0.json",
+      "bytes": 43274,
+      "sha256": "685ad10c6f4abaa114b5ac892671884f8294c87a43fa3985af1f6a77498212a5"
+    },
+    {
+      "file": "raw/attention_r0.log",
+      "bytes": 1606,
+      "sha256": "f09929de9f6d31ab1f8d465b96113e6265822be33eed87a5e09146112a65356d"
+    },
+    {
+      "file": "raw/candidate_chain.json",
+      "bytes": 9565,
+      "sha256": "9daa2cde008b07ecd6d5630553f1f80895dcda48db67c7e102b71cd87a650840"
+    },
+    {
+      "file": "raw/candidate_chain.log",
+      "bytes": 1268,
+      "sha256": "efa749389afbe03bea8c2ef8ca424b8bb3cce34378e3010c6753887afb0e9d63"
+    },
+    {
+      "file": "raw/environment.json",
+      "bytes": 27461,
+      "sha256": "ff0d592e41fca25349dfbcf78e37f691fae40e59d51363a575a390b2a1a542cb"
+    },
+    {
+      "file": "raw/environment.log",
+      "bytes": 1108,
+      "sha256": "0670d5faa3510b8e76592ef252f4cc9e7f55d3cb418a7b57feacb994cb0b2472"
+    },
+    {
+      "file": "raw/qli_c2.json",
+      "bytes": 5256,
+      "sha256": "896b2623ff264c76b49398ad20ef8374dde2aeb09f870a1a5bb02773fd771d49"
+    },
+    {
+      "file": "raw/qli_c2.log",
+      "bytes": 1043,
+      "sha256": "41b4c2cb0ddf108170196e0c376ace744968c6fc015fd78dd5a5bdb3c276c577"
+    },
+    {
+      "file": "raw/report.json",
+      "bytes": 94883,
+      "sha256": "a15cf70138a34fa734fd46d22b0c62733cccafb1c52f1a731788ab35313f3039"
+    },
+    {
+      "file": "raw/report.md",
+      "bytes": 1360,
+      "sha256": "1395cdd9be8c78473ea969e931eddf0a308818bc4290616d162f991f82abf0bd"
+    }
+  ]
+}

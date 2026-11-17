@@ -27,12 +27,13 @@ import traceback
 from types import SimpleNamespace
 
 
-BASELINE = "5633d68b04"
-SCRIPT_REVISION = 2
+BASELINE = "9898f7ce9a"
+SCRIPT_REVISION = 3
 PROBES = (
     "environment", "geometry", "metadata", "compressor", "epilog_fp8",
     "epilog_fp4", "prologue", "qli_c2", "candidate_chain",
-    "attention_r0", "attention_r1", "attention_r2", "engram_break",
+    "attention_r0", "attention_r1", "attention_r2", "engram_break", "mhc_premix",
+    "writer_attention_r0", "writer_attention_r1", "writer_attention_r2",
 )
 API_NAMES = {
     "attention": (
@@ -45,6 +46,8 @@ API_NAMES = {
         "quant_sparse_lightning_indexer_dsl",
         "quant_sparse_lightning_indexer_metadata_dsl",
     ),
+    "mem_cache": ("kv_compress_epilog_v2",),
+    "hyper_conn": ("mhc_pre_dpskv4",),
 }
 T = None
 N = None
@@ -291,7 +294,7 @@ def compression_count(prefix, length, ratio=2):
 
 def operator_inventory():
     inventory = {}
-    for group in ("attention", "mem_cache"):
+    for group in ("attention", "mem_cache", "hyper_conn"):
         key = "sgl_kernel_npu.operators." + group
         try:
             module = importlib.import_module(key)
@@ -315,19 +318,23 @@ def operator_inventory():
     for schema in T._C._jit_get_all_schemas():
         text = str(schema)
         name = text.split("(", 1)[0]
-        if name.startswith(("npu::", "custom::", "sgl_kernel_npu::")) and any(part in name.lower() for part in ("compress", "epilog", "mhc", "hc_pre")):
+        if name.startswith(("npu::", "custom::", "sgl_kernel_npu::", "cann_ops_transformer::")) and any(part in name.lower() for part in ("compress", "epilog", "mhc", "hc_pre")):
             schemas.append(text)
     inventory["registered_schemas"] = sorted(schemas)
     try:
         registry = importlib.import_module("sgl_kernel_npu.operators.utils.registry")
         resolved = {}
-        for name in ("attention.compressor", "attention.compressor_v2", "mem_cache.kv_compress_epilog"):
+        selections = (("attention.compressor", "auto"), ("attention.compressor_v2", "auto"),
+                      ("mem_cache.kv_compress_epilog", "auto"),
+                      ("mem_cache.kv_compress_epilog_v2", "auto"),
+                      ("hyper_conn.mhc_pre_dpskv4", "cann_recipes_infer_cann920"))
+        for name, implementation in selections:
             try:
-                function = registry.get_impl_by_name(name, "auto")
-                resolved[name] = {"module": function.__module__, "name": function.__name__,
+                function = registry.get_impl_by_name(name, implementation)
+                resolved[name] = {"requested_impl": implementation, "module": function.__module__, "name": function.__name__,
                                   "signature": str(inspect.signature(function))}
             except Exception as exc:
-                resolved[name] = {"error": f"{type(exc).__name__}: {exc}"}
+                resolved[name] = {"requested_impl": implementation, "error": f"{type(exc).__name__}: {exc}"}
         inventory["auto_resolution_without_execution"] = resolved
     except Exception as exc:
         inventory["registry_inspection_error"] = f"{type(exc).__name__}: {exc}"
@@ -371,6 +378,7 @@ def probe_environment():
         packet = getattr(getattr(T.ops, namespace), name, None)
         overload = getattr(packet, "default", None) if packet is not None else None
         R["custom_op_schemas"][namespace + "." + name] = str(getattr(overload, "_schema", "not registered"))
+    R["legacy_custom_schema_note"] = "Historical diagnostics only; merged writer and mHC pre use public wrappers. Missing legacy schemas do not block the new probes."
     R["operator_inventory"] = operator_inventory()
     R["probe_index_page_size"] = O.index_page_size
     try:
@@ -378,6 +386,18 @@ def probe_environment():
         R["sglang_index_page_size"] = int(pool_module.DSV41_INDEX_PAGE_SIZE)
     except Exception as exc:
         R["index_page_inspection_error"] = f"{type(exc).__name__}: {exc}"
+    try:
+        layouts = importlib.import_module("sglang.srt.hardware_backend.npu.dsv4.dsv4_kv_layout").NPUDSV4KVLayout
+        R["kv_layout_contracts"] = {}
+        for name in ("V4_BF16", "V4_FP8", "V41_SWA_FP8", "V41_CMP_FP4"):
+            layout = layouts[name]
+            width, dtype = layout.kv_info(448, 64)
+            R["kv_layout_contracts"][name] = {"width": width, "dtype": str(dtype),
+                                                "quant_mode": layout.quant_mode,
+                                                "quant_group": layout.quant_group}
+        R["kv_layout_contract_note"] = "Allocation metadata only; not evidence that writer or draft attention executed."
+    except Exception as exc:
+        R["kv_layout_inspection_error"] = f"{type(exc).__name__}: {exc}"
     R["device_capabilities"] = str(T.npu.get_device_properties(O.device))
     R["runtime_environment"] = {
         name: os.environ.get(name) for name in (
@@ -546,11 +566,9 @@ def probe_compressor():
 
 
 def epilog():
-    importlib.import_module("sgl_kernel_npu.operators.mem_cache")
-    packet = getattr(T.ops.custom, "kv_compress_epilog_v2", None)
-    if packet is None:
-        raise Blocked("custom.kv_compress_epilog_v2 is not registered in this serving environment")
-    return packet
+    R["writer_entrypoint"] = "sgl_kernel_npu.operators.mem_cache.kv_compress_epilog_v2"
+    R["writer_profile"] = "public wrapper used by merged SGLang; no custom namespace fallback"
+    return api("mem_cache", "kv_compress_epilog_v2")
 
 
 def probe_epilog(kind):
@@ -614,6 +632,43 @@ def packed_cache(kind, rows, seed):
     data = codes[:, 0::2] | (codes[:, 1::2] << 4)
     scale = T.full((rows, 32), 0.125, dtype=T.bfloat16)
     return T.cat((data, scale.view(T.uint8)), dim=-1), fp4_values()[codes.long()] * 0.125
+
+
+def unpack_cache(kind, packed):
+    packed = packed.detach().cpu().contiguous().view(T.uint8)
+    if kind == "fp8":
+        data = packed[:, :512].contiguous().view(T.float8_e4m3fn).float()
+        scale = packed[:, 512:].contiguous().view(T.bfloat16).float()
+        return data * scale.repeat_interleave(32, dim=-1)
+    data = packed[:, :256]
+    codes = T.stack((data & 15, data >> 4), dim=-1).reshape(-1, 512)
+    scale = packed[:, 256:].contiguous().view(T.bfloat16).float()
+    return fp4_values()[codes.long()] * scale.repeat_interleave(16, dim=-1)
+
+
+def prepare_writer_cache(buffers, cpu, writer, case_name):
+    for name, kind, mode, group in (
+        ("original", "fp8", "mxfp8_bf16", 32),
+        ("compressed", "fp4", "mxfp4_bf16", 16),
+    ):
+        if name not in buffers:
+            continue
+        cache = buffers[name]
+        rows, width = cache.numel() // cache.shape[-1], cache.shape[-1]
+        latent = cpu[name].to(device=cache.device, dtype=T.bfloat16).contiguous()
+        locations = T.arange(rows, dtype=T.int64, device=cache.device)
+        writer(cache.view(rows, width), latent, locations,
+               quant_group_size=group, quant_mode=mode, round_scale=True, x_scale=1.0)
+        T.npu.synchronize()
+        decoded = unpack_cache(kind, cache.view(rows, width))
+        if not bool(T.isfinite(decoded).all()):
+            raise AssertionError(f"Public writer produced non-finite {name} data under the advertised KV ABI")
+        R.setdefault("writer_quantization_diagnostics", {}).setdefault(case_name, {})[name] = {
+            "row_bytes": width, "quant_group": group,
+            "max_abs_input_to_decoded": float((decoded - latent.cpu().float()).abs().max()),
+            "note": "Recorded error, not a quantization-accuracy acceptance threshold.",
+        }
+        cpu[name] = decoded
 
 
 def index_fixture(rows, seed):
@@ -949,14 +1004,19 @@ def bf16_diagnostics(reference, actual):
     }
 
 
-def probe_attention(ratio):
+def probe_attention(ratio, *, use_writer=False):
     load_device()
+    writer = epilog() if use_writer else None
     function = api("attention", "mixed_quant_sparse_flash_mla_dsl")
     metadata_fn = api("attention", "mixed_quant_sparse_flash_mla_metadata_dsl")
     buffers, cpu = {}, {}
 
     def prepare(case):
-        return prepare_attention(buffers, cpu, case, ratio, metadata_fn)
+        pointers = prepare_attention(buffers, cpu, case, ratio, metadata_fn)
+        if writer is not None:
+            checkpoint("public_writer_prepare:" + case["name"])
+            prepare_writer_cache(buffers, cpu, writer, case["name"])
+        return pointers
 
     def body():
         q = buffers["q"]
@@ -1011,7 +1071,11 @@ def probe_attention(ratio):
 
     matrix(case_layouts(), prepare, lambda case: None, body, observe)
     R["scope"] = "Real MQSMLA eager/replay, varying lengths/page IDs/Q/KV, with CPU float32 reference on selected rows/heads."
-    R["packing"] = "CPU-built valid fp8+BF16-scale ori rows and fp4+BF16-scale cmp rows; independent of custom epilog registration."
+    R["packing"] = (
+        "Public V4.1 writer produced the cache before replay; CPU oracle decodes its 544/320B bytes. Writer executes outside this consumer graph."
+        if use_writer else
+        "CPU-built valid fp8+BF16-scale ori rows and fp4+BF16-scale cmp rows; independent of epilog registration."
+    )
     R["cpu_reference_scope"] = "Six or fewer row/head samples per case, not all output elements; sinks fixed at -10000."
     R.setdefault("checks", {})["cpu_reference"] = "FAIL" if R.get("cpu_reference_failures") else "PASS"
     if R.get("cpu_reference_failures"):
@@ -1144,6 +1208,62 @@ def check_engram_verify(hasher, reference):
     R["verify_commit"] = compare({"history": reference.history}, {"history": hasher.history.cpu()}, "accepted verify commit")
 
 
+def probe_mhc_premix():
+    load_device()
+    function = api("hyper_conn", "mhc_pre_dpskv4")
+    rows, mult, hidden = O.tokens, 4, O.hidden_size
+    x = random_tensor((rows, mult, hidden), O.seed)
+    fn = random_tensor((24, mult * hidden), O.seed + 1, scale=0.005, dtype=T.float32)
+    scale = device_tensor([0.1, 0.1, 0.1], T.float32)
+    base = T.zeros(24, dtype=T.float32, device=x.device)
+    previous_pre = T.zeros((rows, mult), dtype=T.float32, device=x.device)
+    cases = [
+        {"name": "identity_A", "weights": [1.0, 0.0, 0.0, 0.0], "seed": O.seed},
+        {"name": "uniform_same_x", "weights": [0.25] * 4, "seed": O.seed},
+        {"name": "nonuniform_same_x", "weights": [0.1, 0.2, 0.3, 0.4], "seed": O.seed},
+        {"name": "different_x", "weights": [0.25] * 4, "seed": O.seed + 2},
+        {"name": "repeat_A", "weights": [1.0, 0.0, 0.0, 0.0], "seed": O.seed},
+    ]
+    R["entrypoint"] = "hyper_conn.mhc_pre_dpskv4"
+    R["implementation"] = "cann_recipes_infer_cann920"
+    R["parameter_shapes"] = {"x": list(x.shape), "fn": list(fn.shape),
+                             "scale": list(scale.shape), "base": list(base.shape)}
+
+    def prepare(case):
+        x.copy_(random_tensor(x.shape, case["seed"]))
+        previous_pre.copy_(device_tensor(case["weights"], T.float32).expand(rows, mult))
+        return addresses({"x": x, "fn": fn, "scale": scale, "base": base, "previous_pre": previous_pre})
+
+    def body():
+        y, post_mix, comb, pre = function(
+            x, fn, scale, base, mult, 20, 1e-6, 1e-6,
+            pre_mix=previous_pre, return_pre=True,
+            impl="cann_recipes_infer_cann920",
+        )
+        return {"mixed": y, "pre": pre, "post": post_mix, "comb": comb}
+
+    def observe(out, case):
+        expected_shapes = {"mixed": (rows, hidden), "pre": (rows, mult),
+                           "post": (rows, mult), "comb": (rows, mult, mult)}
+        for name, shape in expected_shapes.items():
+            if tuple(out[name].shape) != shape:
+                raise AssertionError(f"mHC {name} shape: {tuple(out[name].shape)} != {shape}")
+        reference = (x.cpu().float() * previous_pre.cpu().unsqueeze(-1)).sum(1)
+        R.setdefault("fold_reference", {})[case["name"]] = compare(
+            {"mixed": reference.to(out["mixed"].dtype)}, {"mixed": out["mixed"].cpu()},
+            "previous-sublayer pre-mix fold", rtol=O.reference_rtol, atol=O.reference_atol)
+        return out
+
+    observations = matrix(cases, prepare, lambda case: None, body, observe)
+    reference = {name: observations[0][name] for name in ("pre", "post", "comb")}
+    R["same_x_triplet_invariance"] = [
+        compare(reference, {name: observations[i][name] for name in reference}, "own triplet does not depend on previous pre")
+        for i in (1, 2)
+    ]
+    R.setdefault("checks", {})["premix_fold"] = "PASS"
+    R["scope"] = "Merged mHC public premix call, fixed-shape eager/replay and previous-pre folding. No external RMSNorm, post kernel, full HcState chain or multi-stream test."
+
+
 def dispatch_probe(name):
     if name == "environment":
         probe_environment()
@@ -1163,8 +1283,12 @@ def dispatch_probe(name):
         probe_index(True)
     elif name.startswith("attention_r"):
         probe_attention(int(name[-1]))
+    elif name.startswith("writer_attention_r"):
+        probe_attention(int(name[-1]), use_writer=True)
     elif name == "engram_break":
         probe_engram()
+    elif name == "mhc_premix":
+        probe_mhc_premix()
     else:
         raise ValueError(name)
 
@@ -1219,8 +1343,8 @@ def run_child(name, options):
             "--seed", str(options.seed), "--rtol", str(options.rtol), "--atol", str(options.atol)]
     if options.sglang_root:
         argv += ["--sglang-root", options.sglang_root]
-    for name in options.import_module:
-        argv += ["--import-module", name]
+    for registration_module in options.import_module:
+        argv += ["--import-module", registration_module]
     started = time.monotonic()
     timeout = False
     with (output / (name + ".log")).open("w", encoding="utf-8") as log:
@@ -1264,7 +1388,7 @@ def finish_report(options, results, interrupted=False):
         "interrupted": interrupted, "results": results,
         "not_covered": [
             "Full model, real checkpoint/tokenizer/Engram lookup tables",
-            "mHC operator and multi-stream joins",
+            "Full mHC state/post/external norm chain and multi-stream joins",
             "Real serving allocator/source-group lifetime and cache sharing",
             "Complete compressor/RoPE/cache/indexer/attention integration",
             "DSpark packed aux hidden and draft KV injection",
@@ -1335,6 +1459,7 @@ def self_test(options):
             scale = packed[:, 256:].contiguous().view(T.bfloat16).float()
         decoded *= scale.repeat_interleave(group, dim=-1)
         T.testing.assert_close(decoded, reference, rtol=0, atol=0)
+        T.testing.assert_close(unpack_cache(kind, packed), reference, rtol=0, atol=0)
     for case in case_layouts():
         reference = geometry_reference(case, options.tokens, min(options.tokens, options.tokens // 2 + 1))
         if not bool((reference["c1_slots"][case["live"]:] == -1).all()):

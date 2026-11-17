@@ -1,0 +1,305 @@
+{
+  "probe": "candidate_chain",
+  "status": "PASS",
+  "phase": "complete",
+  "started": "2026-11-16T20:00:53+0000",
+  "script_revision": 2,
+  "rtol": 0.001,
+  "atol": 0.001,
+  "reference_rtol": 0.001,
+  "reference_atol": 0.001,
+  "registration_imports": [],
+  "device": "Ascend950PR_9589",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "apis": {
+    "quant_lightning_indexer_dsl": {
+      "signature": "(q: 'torch.Tensor', k: 'torch.Tensor', w: 'torch.Tensor', descale_q: 'torch.Tensor', descale_k: 'torch.Tensor', cu_seqlens_q: 'Optional[torch.Tensor]' = None, cu_seqlens_k: 'Optional[torch.Tensor]' = None, seqused_q: 'Optional[torch.Tensor]' = None, seqused_k: 'Optional[torch.Tensor]' = None, cmp_residual_k: 'Optional[torch.Tensor]' = None, block_table: 'Optional[torch.Tensor]' = None, output_idx_offset: 'Optional[torch.Tensor]' = None, metadata: 'Optional[torch.Tensor]' = None, *, topk: 'int', quant_mode: 'int', max_seqlen_q: 'int' = -1, mask_mode: 'int' = 0, cmp_ratio: 'int' = 1, layout_q: 'str' = 'TND', layout_k: 'str' = 'TND', return_value: 'bool' = False, candidate_topk_blocks: 'int' = -1, candidate_block_size: 'int' = -1, impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_dsl.py"
+    },
+    "quant_lightning_indexer_metadata_dsl": {
+      "signature": "(cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', candidate_topk_blocks=-1, candidate_block_size=-1, impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.quant_lightning_indexer_metadata_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_lightning_indexer_metadata_dsl.py"
+    },
+    "quant_sparse_lightning_indexer_dsl": {
+      "signature": "(q: 'torch.Tensor', k: 'torch.Tensor', w: 'torch.Tensor', descale_q: 'torch.Tensor', candidate_block_indices: 'torch.Tensor', candidate_block_length: 'torch.Tensor', cu_seqlens_q: 'Optional[torch.Tensor]' = None, cu_seqlens_k: 'Optional[torch.Tensor]' = None, seqused_q: 'Optional[torch.Tensor]' = None, seqused_k: 'Optional[torch.Tensor]' = None, cmp_residual_k: 'Optional[torch.Tensor]' = None, block_table: 'Optional[torch.Tensor]' = None, output_idx_offset: 'Optional[torch.Tensor]' = None, metadata: 'Optional[torch.Tensor]' = None, *, descale_k: 'Optional[torch.Tensor]' = None, topk: 'int', candidate_block_size: 'int', quant_mode: 'int', max_seqlen_q: 'int' = -1, mask_mode: 'int' = 0, cmp_ratio: 'int' = 1, layout_q: 'str' = 'TND', layout_k: 'str' = 'TND', return_value: 'bool' = False, impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.quant_sparse_lightning_indexer_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_sparse_lightning_indexer_dsl.py"
+    },
+    "quant_sparse_lightning_indexer_metadata_dsl": {
+      "signature": "(candidate_block_length, cu_seqlens_q=None, cu_seqlens_k=None, seqused_q=None, seqused_k=None, cmp_residual_k=None, *, batch_size=None, max_seqlen_q=-1, max_seqlen_k=-1, num_heads_q, num_heads_k, head_dim, topk, quant_mode, candidate_block_size, mask_mode=0, cmp_ratio=1, layout_q='TND', layout_k='TND', impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.quant_sparse_lightning_indexer_metadata_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/quant_sparse_lightning_indexer_metadata_dsl.py"
+    }
+  },
+  "capture_supported": true,
+  "checks": {
+    "capture": "PASS",
+    "eager_replay": "PASS"
+  },
+  "cases": [
+    {
+      "name": "full_A",
+      "parameters": {
+        "name": "full_A",
+        "live": 64,
+        "prefix": 768,
+        "page_shift": 0,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "qli_ordered": {
+          "shape": [
+            64,
+            512
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "qsli_ordered": {
+          "shape": [
+            64,
+            512
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "candidate_indices": {
+          "shape": [
+            64,
+            2048
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "candidate_lengths": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "short_B",
+      "parameters": {
+        "name": "short_B",
+        "live": 31,
+        "prefix": 1,
+        "page_shift": 1,
+        "seed": 20261117
+      },
+      "status": "PASS",
+      "comparisons": {
+        "qli_ordered": {
+          "shape": [
+            31,
+            512
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "qsli_ordered": {
+          "shape": [
+            31,
+            512
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "candidate_indices": {
+          "shape": [
+            31,
+            2048
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "candidate_lengths": {
+          "shape": [
+            31,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "page_boundary_C",
+      "parameters": {
+        "name": "page_boundary_C",
+        "live": 16,
+        "prefix": 127,
+        "page_shift": 2,
+        "seed": 20261118
+      },
+      "status": "PASS",
+      "comparisons": {
+        "qli_ordered": {
+          "shape": [
+            16,
+            512
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "qsli_ordered": {
+          "shape": [
+            16,
+            512
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "candidate_indices": {
+          "shape": [
+            16,
+            2048
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "candidate_lengths": {
+          "shape": [
+            16,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "different_prefix_D",
+      "parameters": {
+        "name": "different_prefix_D",
+        "live": 61,
+        "prefix": 513,
+        "page_shift": 1,
+        "seed": 20261119
+      },
+      "status": "PASS",
+      "comparisons": {
+        "qli_ordered": {
+          "shape": [
+            61,
+            512
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "qsli_ordered": {
+          "shape": [
+            61,
+            512
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "candidate_indices": {
+          "shape": [
+            61,
+            2048
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "candidate_lengths": {
+          "shape": [
+            61,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "repeat_A",
+      "parameters": {
+        "name": "repeat_A",
+        "live": 64,
+        "prefix": 768,
+        "page_shift": 0,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "qli_ordered": {
+          "shape": [
+            64,
+            512
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "qsli_ordered": {
+          "shape": [
+            64,
+            512
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "candidate_indices": {
+          "shape": [
+            64,
+            2048
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "candidate_lengths": {
+          "shape": [
+            64,
+            1
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        }
+      }
+    }
+  ],
+  "bound_input_pointers": {
+    "positions": 19792490826240,
+    "cu": 19792490826752,
+    "kv_lengths": 19792490827264,
+    "window": 19792490827776,
+    "window_length": 19792490860544,
+    "cmp_length": 19792490861056,
+    "sparse": 19792490861568,
+    "block_table": 19792490660352,
+    "index_kv_lengths": 19792490660864,
+    "residual": 19792490661376,
+    "key": 19792490727424,
+    "key_scale": 19792490797056,
+    "combined_key": 19792491062272,
+    "q": 19792491262976,
+    "qscale": 19792490809344,
+    "weights": 19792490817536,
+    "qli_metadata": 19792490661888,
+    "candidate_bound": 19792490825728,
+    "qsli_metadata": 19792490684416
+  },
+  "replay_count": 5,
+  "observed_output_changed": true,
+  "scope": "Real QLI -> QSLI graph dataflow",
+  "comparison_note": "Ordered indices are checked exactly; a failure with equal selected sets may be a tie and needs inspection. No independent score oracle is claimed.",
+  "layout": {
+    "query_heads": 32,
+    "logical_head_dim": 128,
+    "index_page_size": 64,
+    "candidate_block_size": 8,
+    "topk": 512,
+    "candidate_blocks": 2048
+  },
+  "elapsed_seconds": 57.635,
+  "returncode": 0,
+  "wall_seconds": 60.974
+}

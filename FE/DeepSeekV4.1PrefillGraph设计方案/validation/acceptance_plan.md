@@ -1,6 +1,6 @@
 # DeepSeek V4.1 Prefill Graph 验收计划
 
-开发基线：`sglang@5633d68b04`；2026-11-16。11 个入图提交已迁入，迁移相关 CPU 测试 49 项通过；扩展回归及迁移前对照见 [集成记录](../analysis/prefill_graph_integration.md)。首轮 A5 单卡结果已回传，见 [事实、失败归因及下一轮命令](a5-20261116-run1/findings.md)；下列矩阵中仅该记录明确覆盖的项已有设备证据，完整模型和性能仍待验收。
+开发基线：`sglang@9898f7ce9a`；2026-11-17。[合入 randgun 后](../analysis/randgun_merge_20261117.md)的 12 文件 CPU 回归共 281 项全部通过。已有[首轮](a5-20261116-run1/findings.md)与[第二轮](a5-20261116-run2/findings.md) A5 证据固定在 `5633d68b04` 与旧 SDK；保留其历史结论，不能推广为新 writer/mHC 已通过。revision 3 应定向复验公开 writer、mHC premix、writer→attention 及 compressor，完整模型和性能仍待验收。
 
 ## 1. 实验环境记录
 
@@ -113,6 +113,6 @@ context 验收记录页表容量来源和有效 `prefill.max_seq_len`。当超�
 python verify_dsv41_prefill_graph.py --output-dir ./dsv41-prefill-evidence
 ```
 
-如需指定 checkout，增加 `--sglang-root /path/to/sglang`。脚本自动运行 13 组独立探针，记录版本、算子签名、case、误差、状态及失败阶段；每组独立子进程并设超时，最终回传 `dsv41-prefill-evidence/dsv41-prefill-evidence.tar.gz` 即可。失败或 BLOCKED 也是事实，保留完整包。
+如需指定 checkout，增加 `--sglang-root /path/to/sglang`。revision 3 默认共 17 组，推荐按[合并后定向命令](../analysis/randgun_merge_20261117.md)先检查环境，再跑直接受影响组和 writer 消费链；每组独立进程并设超时，最终回传各输出目录中的 `dsv41-prefill-evidence.tar.gz`。失败或 BLOCKED 也是事实，保留完整包。
 
-本地已通过 Python 编译、CPU 数学/打包自检，以及无 NPU 报告、归档、目录防覆盖、子进程超时和崩溃处理检查。首版已在 A5 执行并归档；revision 2 修正 index PA page、补充 SDK inventory 和 BF16 诊断，尚待设备重跑，建议先按 [四组最小重跑命令](a5-20261116-run1/findings.md)执行。该脚本不替代真实整模、mHC 多流、完整 source 生命周期、DSpark KV 注入或多卡 collective 验收。
+本地已通过 Python 编译、CPU 自检和探针记录/归档回归。首版与 revision 2 的 A5 结果已归档，revision 3 只在本地 CPU 验证了代码和协议，尚未取得新基线 A5 结果。旧 QLI/QSLI/attention 事实保留；新公开 writer/mHC、writer 产出缓存的消费和新 SDK 兼容性需要定向复验。该脚本不替代真实整模、完整 source/多流状态、DSpark KV 注入或多卡 collective 验收。
