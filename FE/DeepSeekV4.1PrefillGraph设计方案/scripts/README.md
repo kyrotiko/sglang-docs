@@ -1,50 +1,28 @@
 # V4.1 A5 Prefill Graph 单文件验证
 
-运行文件：[verify_dsv41_prefill_graph.py](verify_dsv41_prefill_graph.py)。只需复制这一个 `.py`，无需本目录其他脚本、模型下载或权重加载。
+运行文件：[verify_dsv41_prefill_graph.py](verify_dsv41_prefill_graph.py)。只需复制这个 `.py`，不下载或加载模型权重。
 
-**当前脚本 revision 3，预期主仓 `dsv41-a5@9898f7ce9a`。** 已对齐合入 randgun 后的公开 writer/mHC 入口；完整变更和复验矩阵见 [合并后验证调整](../analysis/randgun_merge_20261117.md)。原始两轮证据保留在 [run1](../validation/a5-20261116-run1/findings.md) / [run2](../validation/a5-20261116-run2/findings.md)，没有改写历史结果。
+**当前 revision 4，预期主仓 `dsv41-a5@9898f7ce9a`。** [第三轮事实](../validation/a5-20261117-run3/findings.md)已确认 compressor、公开 writer、mHC premix 和其他已捕获探针的对照 exact。writer→attention 三项在 capture 前暴露了脚本 dtype 视图问题，revision 4 已修复：FP8 writer 取 float8 view，attention 保留 uint8 view，二者共享同一存储，不做数值转换。
 
-## 合并后的推荐执行顺序
+首两轮 [run1](../validation/a5-20261116-run1/findings.md) / [run2](../validation/a5-20261116-run2/findings.md) 与 [randgun 合并记录](../analysis/randgun_merge_20261117.md)保留为对应旧环境/代码的历史快照。第三轮的硬件和 SDK 内容均有变化，即使包版本号相同也不自动等同。
 
-在实际 A5 serving 环境中运行，使用同一套 torch_npu、sgl-kernel-npu 和 SGLang。`--output-dir` 必须是新目录，不使用 torchrun，不需要 HCCL 初始化。
+## 当前只需重跑三组
 
-先检查新依赖是否齐全：
-
-```bash
-python verify_dsv41_prefill_graph.py \
-  --sglang-root /mnt/share/y00627667/repos/sglang \
-  --device 0 --probes environment \
-  --output-dir ./dsv41-after-merge-env
-```
-
-重点看 `missing_apis` 和实现解析：新基线需要 `mem_cache.kv_compress_epilog_v2`、`hyper_conn.mhc_pre_dpskv4` 及其 `cann_recipes_infer_cann920` 实现。旧 `2026.11.0.post4` 的回传 exports 没有公开 writer，不能假定拉取 SGLang 已满足依赖；精确 SDK 版本需按实际构建确认。environment 的 PASS 表示 inspection 完成，不表示所有算子可执行。
-
-依赖可用后，优先跑五组直接相关项：
+在第三轮相同的 A5 serving 环境替换脚本后运行：
 
 ```bash
-python verify_dsv41_prefill_graph.py \
+python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py" \
   --sglang-root /mnt/share/y00627667/repos/sglang \
   --device 0 \
-  --probes environment,compressor,epilog_fp8,epilog_fp4,mhc_premix \
-  --output-dir ./dsv41-after-merge-ops
-```
-
-writer 两组通过后，检查真实写入缓存能否被 attention 消费：
-
-```bash
-python verify_dsv41_prefill_graph.py \
-  --sglang-root /mnt/share/y00627667/repos/sglang \
   --probes writer_attention_r0,writer_attention_r1,writer_attention_r2 \
-  --output-dir ./dsv41-after-merge-writer-read
+  --output-dir ./dsv41-writer-read-r4
 ```
 
-本组 writer 在 replay 前 eager 准备缓存，attention 在图内执行；writer 自身 capture 由 epilog 两组验证。它不是完整 source/attention 同段捕获。
+使用新目录。无需重复其余 14 组；原来的 CPU attention 参考失败继续保留，writer dtype 修复不代表独立精度问题已解决。若再次换机器或 SDK，先跑 `--probes environment` 记录实际版本、source hash、公开 API 与实现解析。
 
-若 SDK/CANN/torch_npu 已升级，再追加 `--probes qli_c2,candidate_chain` 的轻量回归。`--list` 和 `--help` 不导入 torch。
+运行结束回传输出目录中的 `dsv41-prefill-evidence.tar.gz`，FAIL/BLOCKED 也保留。若真实服务额外加载注册模块，显式使用 `--import-module MODULE`，不猜测模块或切换代际接口。
 
-## 全量 17 组探针命令
-
-在实际 A5 serving 环境中更新两个仓后执行：
+## 全量 17 组命令（复现或新环境使用）
 
 ```bash
 python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py" \
@@ -57,67 +35,55 @@ python "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计
   --output-dir "./dsv41-prefill-full-$(date +%Y%m%d-%H%M%S)"
 ```
 
-全量指本文件的 17 组单卡 synthetic 探针，不是整模/多卡验收。默认浮点阈值保持不变；独立精度失败和 SDK 缺口继续如实记录，各组独立运行。运行结束按终端打印的 `Send back:` 路径回传完整证据包。
+不通过 torchrun，不需要 HCCL 初始化。全量是 17 组单卡 synthetic 探针，不是整模或多卡验收。默认每组最长 600 秒（可用 `--timeout` 调整）；各组独立子进程，失败、超时、崩溃均尽量保留 checkpoint 和已完成 case，并继续其他组。
 
-## 结果回传
+## 结果内容
 
-每组独立子进程，默认最长 600 秒（含首次 JIT）；需要时指定 `--timeout 1200`。失败、超时或崩溃会保留最后 checkpoint 和已完成 case，继续其他组。
+每个输出目录包含 `report.json`、`report.md`、各 probe 的 JSON/log、脚本快照与 hash，以及 `dsv41-prefill-evidence.tar.gz`。终端的 `Send back:` 给出回传包路径。
 
-每个输出目录内都会尽量生成：
+报告记录实际 source SHA/dirty 状态、包版本/API 签名与源码 hash、硬件信息、参数、误差和失败阶段。environment PASS 表示 inspection 完成，不表示所有公开函数已能执行；需同时看 `missing_apis` 和 implementation 解析。
 
-```text
-report.json
-report.md
-<probe>.json / <probe>.log
-verify_dsv41_prefill_graph.py
-dsv41-prefill-evidence.tar.gz
-```
-
-把各目录的 `dsv41-prefill-evidence.tar.gz` 发回来即可，FAIL/BLOCKED 也保留。包内有运行脚本快照与 hash、实际 source SHA、包版本和完整日志。
-
-## 实际覆盖范围
+## 探针范围
 
 | 探针 | 内容 |
 | --- | --- |
-| environment | 包版本/NPU/CANN/source SHA、公开 API 签名/hash、auto/指定实现解析、npu/custom/cann_ops_transformer schema、主仓索引页和 runtime V4/V4.1 行宽 |
-| geometry | 实际 SGLang c1 行序、c2 compact、显式 live mask、window/cmp lengths、固定 buffer 和请求槽 0；CPU 数学对照及图回放 |
-| metadata | 真实 window/c1/c2/QLI/candidate/QSLI metadata 的 shape、地址和内容变化；planning 在图外 |
-| compressor | 当前仍是 `compressor_v2`；有效压缩行、完整 private state、bank 切换、无新 pair、split/concat 和 ring wrap |
-| epilog_fp8 / epilog_fp4 | **公开 `sgl_kernel_npu.operators.mem_cache.kv_compress_epilog_v2`**；544B/group32、320B/group16、`-1`、NaN skip、guard 和字节级 eager/replay |
-| prologue | storage mode 0/1、图内 NZ 转换、skip/guard、分离 K/scale 与 combined record 一致 |
-| qli_c2 | ratio-2 QLI，多输入和动态 metadata、因果范围与有序 top-k 对照 |
-| candidate_chain | ratio-1 QLI→QSLI 同图数据流，candidate 内容/长度和有序 top-k；index cache 为预置合成值 |
-| attention_r0/r1/r2 | 手工有效缓存，MQSMLA window/c1/c2，多轮图回放和部分行/head 的独立 CPU FP32 oracle |
-| writer_attention_r0/r1/r2 | 公开 writer 生成缓存，按 544/320B ABI 解包作为 CPU reference，captured MQSMLA 读取；记录量化误差但不虚构量化精度阈值 |
-| engram_break | 小型真实 EngramHasher fallback、共享 break、history/固定 hash/图内 consumer，verify 延迟提交 |
-| mhc_premix | 按主仓签名调用 `hyper_conn.mhc_pre_dpskv4`，固定指定 implementation；previous-pre 折叠、返回 triplet、同 X 改 previous-pre 的系数不变性、多轮 eager/replay |
+| environment | 包/NPU/CANN/source SHA、公开 API 与实现、npu/custom/cann_ops_transformer schema、索引页及 V4/V4.1 行宽 |
+| geometry | SGLang c1 行序、c2 compact、显式 live mask、window/cmp lengths、固定 buffer 和请求槽 0；CPU 几何及图对照 |
+| metadata | window/c1/c2/QLI/candidate/QSLI metadata 的 shape、固定地址及内容变化；planning 在图外 |
+| compressor | `compressor_v2`、有效输出、完整 private state、bank 切换、pending pair、split/concat 和 ring wrap |
+| epilog_fp8 / epilog_fp4 | 公开 `mem_cache.kv_compress_epilog_v2`、544B/group32 与 320B/group16、skip/NaN/guard 和字节级对照 |
+| prologue | storage mode 0/1、NZ 转换、skip/guard、K/scale 与 combined records |
+| qli_c2 | ratio-2 QLI，动态输入/metadata、因果边界、有序 top-k |
+| candidate_chain | ratio-1 QLI→QSLI 图内数据流，candidate 内容/长度及 top-k |
+| attention_r0/r1/r2 | 手工合法缓存的 MQSMLA，多轮 graph/eager 及部分行/head 的 CPU FP32 reference |
+| writer_attention_r0/r1/r2 | 公开 writer 在 replay 前准备缓存，CPU 按 544/320B ABI 解码，captured MQSMLA 消费；writer 与 consumer 的 dtype view 共享存储 |
+| engram_break | 小型真实 hasher fallback、固定输出、共享 break、history 和 verify 延迟提交 |
+| mhc_premix | 指定 `cann_recipes_infer_cann920` 的公开 premix、previous-pre 折叠、triplet、同 X 改 previous-pre 的系数不变性 |
 
-图探针按相同输入和相同初始状态先 eager、再 replay。包含 A→B→C→D→A；压缩输出只比较有效行，state/cache 比较完整存储。padding attention 输出预填 NaN，记录是否被写入、零值数和最大绝对值，不假定任意算子必须写零。
+writer→attention 中 writer 在图外准备缓存；writer 自身 capture 由 epilog 两组验证。不宣称整个 source 链已同段入图，也不将 cache 解码误差当作独立量化精度验收。
 
-默认均为合成尺寸：T=64、主 heads=64、head_dim=512、indexer heads=32、index_dim=128、topk=512、full page=128、index PA page=64、candidate block=8、candidate capacity=2048、hidden=4096、ratio-2 ring=2。index PA page 与 candidate block 是不同维度；`--index-page-size` 必须整除 `--page-size/2`。测试 index page=128 时用 `--page-size 256`。
+## 几何、数值和状态判读
 
-## 判读规则
+默认 T=64，主 heads=64，head_dim=512，indexer heads=32，index_dim=128，topk=512，full page=128，index PA page=64，candidate block=8，candidate capacity=2048，hidden=4096，ratio-2 ring=2。
 
-- PASS 只对该 probe 的已记录范围成立；接口存在、auto 可解析不等于实际执行通过。
-- BLOCKED 是缺依赖/NPU/公开 API。若新 writer 被 BLOCKED，检查新公开入口，旧 custom namespace 是否存在不再是阻塞标准。
-- FAIL 结合最后 phase、`capture_supported` 和 traceback 判断；warmup/eager 失败不能证明 graph 不支持。
-- TIMEOUT/CRASH 保留最后 checkpoint 和返回码；默认不重置设备或更改 SDK。
-- 返回值 0=选中组全部通过，1=失败/超时/崩溃，2=仅依赖阻塞，130=用户中断。
+index PA page 与 candidate block 不同；`--index-page-size` 必须整除 `--page-size/2`。测试 index page=128 时用 `--page-size 256`。测试更宽 private ring 可指定 `--state-ring-size 8`，但不等于验证了 DSpark。
 
-`checks.capture`、`checks.eager_replay` 和 `checks.cpu_reference` 分开记录。浮点 parity 默认 `rtol=1e-3, atol=1e-3`，CPU oracle 的 reference 阈值也独立保持 `1e-3/1e-3`；整数、hash、top-k 和 cache bytes 精确比较。BF16 ULP/L2/softmax 假设均为诊断，不替换 oracle，也不为了变绿自动放宽阈值。
+每轮用相同输入和初始状态做 eager，再 replay。压缩只比有效行，state/cache 比完整存储。padding attention 预填 NaN并记录写入/零值情况，不假定所有算子必须写零。
 
-若真实服务有额外注册模块，用 `--import-module MODULE` 显式加入并记录；不猜测模块，不默认切换代际接口或 `torch_native`。revision 3 修复了该参数覆盖 probe 名的记录问题；前两轮该列表为空，历史证据不受影响。
+- PASS 仅适用于记录的 probe、shape 和 case。
+- BLOCKED 表示缺依赖/NPU/API；在当前已验证环境，旧 custom schema 缺失不影响新的公开 wrapper。
+- FAIL 结合最后 phase 和 checks 判断；capture 前失败不能证明 graph 不支持。
+- TIMEOUT/CRASH 保留最后 checkpoint/返回码，不自动重置设备或更改 SDK。
+- 返回值：0=全通过，1=失败/超时/崩溃，2=仅阻塞，130=用户中断。
 
-## 仍未覆盖
+`checks.capture`、`checks.eager_replay`、`checks.cpu_reference` 分列。parity 和 reference 默认均为 `rtol=1e-3, atol=1e-3`，没有放宽；整数、hash、top-k 和 cache bytes 精确比较。BF16 ULP/L2/softmax 假设仅作诊断，不代替 FP32 oracle。
 
-不加载真实 checkpoint/tokenizer/lookup 表，不能替代整模、真实 allocator/source-group 生存期、compressor→RoPE→cache→index→attention 全链、mHC 外部 RMSNorm/post/完整状态和多流、DSpark packed aux hidden/draft KV、多卡 collective/admission，以及准确率/性能验收。
+## 覆盖边界和本地检查
 
-当前 mHC premix 的独立折叠参考只验证上一子层 pre 到输入的关系，不是完整 triplet 数学 oracle。writer→attention 检查消费格式，但没有独立量化精度阈值。脚本不修改主仓代码或启动模型服务。
-
-## 本地无 NPU 的检查
+仍未验证真实 checkpoint/lookup 表、服务 allocator/source-group 生存期、完整 compressor→RoPE→cache→index→attention、mHC 外部 norm/post/多流、DSpark aux hidden/draft KV、多卡通信/admission，以及模型准确率和性能。
 
 ```bash
 python verify_dsv41_prefill_graph.py --self-test
 ```
 
-需要 CPU torch，仅验证计数边界、KV 打包/解包、页表与 record 分离、padding、BF16 诊断；不产生 NPU 已通过结论。
+需要 CPU torch，覆盖计数边界、KV pack/unpack、页表与 record、padding、BF16 诊断及 writer/consumer 视图 alias；不输出 NPU 已通过结论。dtype 回归已在本地验证 revision 3 失败、revision 4 通过，但实际 writer→attention 仍需上述三组设备重跑。

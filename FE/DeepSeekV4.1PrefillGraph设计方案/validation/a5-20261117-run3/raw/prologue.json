@@ -1,0 +1,210 @@
+{
+  "probe": "prologue",
+  "status": "PASS",
+  "phase": "complete",
+  "started": "2026-11-17T03:27:43+0000",
+  "script_revision": 3,
+  "rtol": 0.001,
+  "atol": 0.001,
+  "reference_rtol": 0.001,
+  "reference_atol": 0.001,
+  "registration_imports": [],
+  "device": "Ascend950DT_9582",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "apis": {
+    "indexer_prologue_k_dsl": {
+      "signature": "(latent: 'torch.Tensor', wk: 'torch.Tensor', norm_weight: 'torch.Tensor', rope_sin: 'torch.Tensor', rope_cos: 'torch.Tensor', k_cache: 'torch.Tensor', k_scale_cache: 'torch.Tensor | None' = None, *, cache_index: 'torch.Tensor', storage_mode: 'int', norm_eps: 'float', combined_block_size: 'int' = -1, impl='auto')",
+      "module": "sgl_kernel_npu.operators.indexer.indexer_prologue_k_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/indexer/indexer_prologue_k_dsl.py"
+    }
+  },
+  "capture_supported": true,
+  "checks": {
+    "capture": "PASS",
+    "eager_replay": "PASS"
+  },
+  "cases": [
+    {
+      "name": "full_A",
+      "parameters": {
+        "name": "full_A",
+        "live": 64,
+        "offset": 128,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "key": {
+          "shape": [
+            4,
+            64,
+            1,
+            64
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "scales": {
+          "shape": [
+            4,
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "combined": {
+          "shape": [
+            4,
+            8,
+            1,
+            544
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "short_B",
+      "parameters": {
+        "name": "short_B",
+        "live": 31,
+        "offset": 192,
+        "seed": 20261118
+      },
+      "status": "PASS",
+      "comparisons": {
+        "key": {
+          "shape": [
+            4,
+            64,
+            1,
+            64
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "scales": {
+          "shape": [
+            4,
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "combined": {
+          "shape": [
+            4,
+            8,
+            1,
+            544
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "all_skip",
+      "parameters": {
+        "name": "all_skip",
+        "live": 0,
+        "offset": 128,
+        "seed": 20261119
+      },
+      "status": "PASS",
+      "comparisons": {
+        "key": {
+          "shape": [
+            4,
+            64,
+            1,
+            64
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "scales": {
+          "shape": [
+            4,
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "combined": {
+          "shape": [
+            4,
+            8,
+            1,
+            544
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        }
+      }
+    },
+    {
+      "name": "repeat_A",
+      "parameters": {
+        "name": "repeat_A",
+        "live": 64,
+        "offset": 128,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "key": {
+          "shape": [
+            4,
+            64,
+            1,
+            64
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "scales": {
+          "shape": [
+            4,
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        },
+        "combined": {
+          "shape": [
+            4,
+            8,
+            1,
+            544
+          ],
+          "dtype": "torch.uint8",
+          "exact": true
+        }
+      }
+    }
+  ],
+  "bound_input_pointers": {
+    "latent": 19792490659840,
+    "loc": 19792490889728,
+    "key": 19792490890240,
+    "scales": 19792490906624,
+    "combined": 19792490907648
+  },
+  "replay_count": 4,
+  "observed_output_changed": true,
+  "scope": "Actual K prologue modes 0/1, fixed caches, -1 skip and packed-record equivalence; identity RoPE, synthetic BF16 weights.",
+  "elapsed_seconds": 19.208,
+  "returncode": 0,
+  "wall_seconds": 22.507
+}

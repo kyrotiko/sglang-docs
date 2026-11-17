@@ -1,0 +1,508 @@
+{
+  "probe": "mhc_premix",
+  "status": "PASS",
+  "phase": "complete",
+  "started": "2026-11-17T03:35:45+0000",
+  "script_revision": 3,
+  "rtol": 0.001,
+  "atol": 0.001,
+  "reference_rtol": 0.001,
+  "reference_atol": 0.001,
+  "registration_imports": [],
+  "device": "Ascend950DT_9582",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "apis": {
+    "mhc_pre_dpskv4": {
+      "signature": "(x, fn, scale, base, hc_mult, sinkhorn_iters, hc_eps, rms_norm_eps, *, pre_mix=None, return_pre=False, impl='auto')",
+      "module": "sgl_kernel_npu.operators.hyper_conn.mhc_pre_dpskv4",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/hyper_conn/mhc_pre_dpskv4.py"
+    }
+  },
+  "entrypoint": "hyper_conn.mhc_pre_dpskv4",
+  "implementation": "cann_recipes_infer_cann920",
+  "parameter_shapes": {
+    "x": [
+      64,
+      4,
+      4096
+    ],
+    "fn": [
+      24,
+      16384
+    ],
+    "scale": [
+      3
+    ],
+    "base": [
+      24
+    ]
+  },
+  "capture_supported": true,
+  "checks": {
+    "capture": "PASS",
+    "eager_replay": "PASS",
+    "premix_fold": "PASS"
+  },
+  "cases": [
+    {
+      "name": "identity_A",
+      "parameters": {
+        "name": "identity_A",
+        "weights": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "mixed": {
+          "shape": [
+            64,
+            4096
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "pre": {
+          "shape": [
+            64,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "post": {
+          "shape": [
+            64,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "comb": {
+          "shape": [
+            64,
+            4,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "uniform_same_x",
+      "parameters": {
+        "name": "uniform_same_x",
+        "weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ],
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "mixed": {
+          "shape": [
+            64,
+            4096
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "pre": {
+          "shape": [
+            64,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "post": {
+          "shape": [
+            64,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "comb": {
+          "shape": [
+            64,
+            4,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "nonuniform_same_x",
+      "parameters": {
+        "name": "nonuniform_same_x",
+        "weights": [
+          0.1,
+          0.2,
+          0.3,
+          0.4
+        ],
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "mixed": {
+          "shape": [
+            64,
+            4096
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "pre": {
+          "shape": [
+            64,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "post": {
+          "shape": [
+            64,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "comb": {
+          "shape": [
+            64,
+            4,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "different_x",
+      "parameters": {
+        "name": "different_x",
+        "weights": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ],
+        "seed": 20261118
+      },
+      "status": "PASS",
+      "comparisons": {
+        "mixed": {
+          "shape": [
+            64,
+            4096
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "pre": {
+          "shape": [
+            64,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "post": {
+          "shape": [
+            64,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "comb": {
+          "shape": [
+            64,
+            4,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "repeat_A",
+      "parameters": {
+        "name": "repeat_A",
+        "weights": [
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "mixed": {
+          "shape": [
+            64,
+            4096
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "pre": {
+          "shape": [
+            64,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "post": {
+          "shape": [
+            64,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "comb": {
+          "shape": [
+            64,
+            4,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    }
+  ],
+  "fold_reference": {
+    "identity_A": {
+      "mixed": {
+        "shape": [
+          64,
+          4096
+        ],
+        "dtype": "torch.bfloat16",
+        "exact": true,
+        "finite": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      }
+    },
+    "uniform_same_x": {
+      "mixed": {
+        "shape": [
+          64,
+          4096
+        ],
+        "dtype": "torch.bfloat16",
+        "exact": true,
+        "finite": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      }
+    },
+    "nonuniform_same_x": {
+      "mixed": {
+        "shape": [
+          64,
+          4096
+        ],
+        "dtype": "torch.bfloat16",
+        "exact": true,
+        "finite": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      }
+    },
+    "different_x": {
+      "mixed": {
+        "shape": [
+          64,
+          4096
+        ],
+        "dtype": "torch.bfloat16",
+        "exact": true,
+        "finite": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      }
+    },
+    "repeat_A": {
+      "mixed": {
+        "shape": [
+          64,
+          4096
+        ],
+        "dtype": "torch.bfloat16",
+        "exact": true,
+        "finite": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      }
+    }
+  },
+  "bound_input_pointers": {
+    "x": 19792490659840,
+    "fn": 19792492756992,
+    "scale": 19792511631360,
+    "base": 19792511631872,
+    "previous_pre": 19792511632384
+  },
+  "replay_count": 5,
+  "observed_output_changed": true,
+  "same_x_triplet_invariance": [
+    {
+      "pre": {
+        "shape": [
+          64,
+          4
+        ],
+        "dtype": "torch.float32",
+        "exact": true,
+        "finite": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      },
+      "post": {
+        "shape": [
+          64,
+          4
+        ],
+        "dtype": "torch.float32",
+        "exact": true,
+        "finite": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      },
+      "comb": {
+        "shape": [
+          64,
+          4,
+          4
+        ],
+        "dtype": "torch.float32",
+        "exact": true,
+        "finite": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      }
+    },
+    {
+      "pre": {
+        "shape": [
+          64,
+          4
+        ],
+        "dtype": "torch.float32",
+        "exact": true,
+        "finite": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      },
+      "post": {
+        "shape": [
+          64,
+          4
+        ],
+        "dtype": "torch.float32",
+        "exact": true,
+        "finite": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      },
+      "comb": {
+        "shape": [
+          64,
+          4,
+          4
+        ],
+        "dtype": "torch.float32",
+        "exact": true,
+        "finite": true,
+        "max_abs": 0.0,
+        "max_rel": 0.0
+      }
+    }
+  ],
+  "scope": "Merged mHC public premix call, fixed-shape eager/replay and previous-pre folding. No external RMSNorm, post kernel, full HcState chain or multi-stream test.",
+  "elapsed_seconds": 10.759,
+  "returncode": 0,
+  "wall_seconds": 14.107
+}

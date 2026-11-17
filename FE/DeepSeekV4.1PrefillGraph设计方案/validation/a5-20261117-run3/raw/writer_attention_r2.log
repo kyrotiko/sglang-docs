@@ -1,0 +1,21 @@
+[writer_attention_r2] start
+[writer_attention_r2] public_writer_prepare:full_A
+Traceback (most recent call last):
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1307, in worker
+    dispatch_probe(options.worker)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1287, in dispatch_probe
+    probe_attention(int(name[-1]), use_writer=True)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1072, in probe_attention
+    matrix(case_layouts(), prepare, lambda case: None, body, observe)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 222, in matrix
+    prepare(cases[0])
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1018, in prepare
+    prepare_writer_cache(buffers, cpu, writer, case["name"])
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 660, in prepare_writer_cache
+    writer(cache.view(rows, width), latent, locations,
+  File "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/mem_cache/kv_compress_epilog_v2.py", line 174, in kv_compress_epilog_v2
+    _validate(cache, x, slot_mapping, mode, quant_group_size, round_scale, x_scale)
+  File "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/mem_cache/kv_compress_epilog_v2.py", line 72, in _validate
+    raise ValueError(
+ValueError: cache dtype does not match quant_mode: mxfp8_bf16 requires float8_e4m3fn/float8_e5m2 and mxfp4_bf16 requires uint8
+

@@ -1,0 +1,39 @@
+{
+  "probe": "writer_attention_r2",
+  "status": "FAIL",
+  "phase": "public_writer_prepare:full_A",
+  "started": "2026-11-17T03:36:28+0000",
+  "script_revision": 3,
+  "rtol": 0.001,
+  "atol": 0.001,
+  "reference_rtol": 0.001,
+  "reference_atol": 0.001,
+  "registration_imports": [],
+  "device": "Ascend950DT_9582",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "writer_entrypoint": "sgl_kernel_npu.operators.mem_cache.kv_compress_epilog_v2",
+  "writer_profile": "public wrapper used by merged SGLang; no custom namespace fallback",
+  "apis": {
+    "kv_compress_epilog_v2": {
+      "signature": "(cache, x, slot_mapping, quant_group_size=32, quant_mode='mxfp8_bf16', round_scale=True, x_scale=1.0, *, impl='auto')",
+      "module": "sgl_kernel_npu.operators.mem_cache.kv_compress_epilog_v2",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/mem_cache/kv_compress_epilog_v2.py"
+    },
+    "mixed_quant_sparse_flash_mla_dsl": {
+      "signature": "(q, *, ori_kv=None, cmp_kv=None, ori_sparse_indices=None, cmp_sparse_indices=None, ori_block_table=None, cmp_block_table=None, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, ori_topk_length=None, cmp_topk_length=None, sinks=None, metadata=None, quant_mode, softmax_scale=None, layout_q='TND', layout_kv='PA_BBND', return_softmax_lse=False, out, lse, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_dsl.py"
+    },
+    "mixed_quant_sparse_flash_mla_metadata_dsl": {
+      "signature": "(ori_topk_length, cmp_topk_length, *, cu_seqlens_q=None, seqused_q=None, seqused_ori_kv=None, seqused_cmp_kv=None, batch_size=None, max_seqlen_q=None, max_seqlen_ori_kv=None, max_seqlen_cmp_kv=None, num_heads_q, num_heads_kv, head_dim, quant_mode, layout_q='TND', layout_kv='PA_BBND', has_ori_kv=True, has_cmp_kv=True, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.mixed_quant_sparse_flash_mla_metadata_dsl",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/mixed_quant_sparse_flash_mla_metadata_dsl.py"
+    }
+  },
+  "error": "ValueError: cache dtype does not match quant_mode: mxfp8_bf16 requires float8_e4m3fn/float8_e5m2 and mxfp4_bf16 requires uint8",
+  "traceback": "Traceback (most recent call last):\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1307, in worker\n    dispatch_probe(options.worker)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1287, in dispatch_probe\n    probe_attention(int(name[-1]), use_writer=True)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1072, in probe_attention\n    matrix(case_layouts(), prepare, lambda case: None, body, observe)\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 222, in matrix\n    prepare(cases[0])\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 1018, in prepare\n    prepare_writer_cache(buffers, cpu, writer, case[\"name\"])\n  File \"/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py\", line 660, in prepare_writer_cache\n    writer(cache.view(rows, width), latent, locations,\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/mem_cache/kv_compress_epilog_v2.py\", line 174, in kv_compress_epilog_v2\n    _validate(cache, x, slot_mapping, mode, quant_group_size, round_scale, x_scale)\n  File \"/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/mem_cache/kv_compress_epilog_v2.py\", line 72, in _validate\n    raise ValueError(\nValueError: cache dtype does not match quant_mode: mxfp8_bf16 requires float8_e4m3fn/float8_e5m2 and mxfp4_bf16 requires uint8\n",
+  "elapsed_seconds": 11.513,
+  "returncode": 1,
+  "wall_seconds": 15.08
+}

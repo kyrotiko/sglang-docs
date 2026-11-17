@@ -1,0 +1,24 @@
+[metadata] start
+[metadata] metadata:full_A
+[metadata] metadata_passed:full_A
+/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py:764: UserWarning: Cannot create tensor with internal format while allow_internal_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:406.)
+  stage(buffers, "residual", buffers["kv_lengths"] % ratio)
+[metadata] metadata_passed:full_A
+[metadata] metadata_passed:full_A
+[metadata] metadata:short_B
+[metadata] metadata_passed:short_B
+[metadata] metadata_passed:short_B
+[metadata] metadata_passed:short_B
+[metadata] metadata:page_boundary_C
+[metadata] metadata_passed:page_boundary_C
+[metadata] metadata_passed:page_boundary_C
+[metadata] metadata_passed:page_boundary_C
+[metadata] metadata:different_prefix_D
+[metadata] metadata_passed:different_prefix_D
+[metadata] metadata_passed:different_prefix_D
+[metadata] metadata_passed:different_prefix_D
+[metadata] metadata:repeat_A
+[metadata] metadata_passed:repeat_A
+[metadata] metadata_passed:repeat_A
+[metadata] metadata_passed:repeat_A
+[metadata] complete

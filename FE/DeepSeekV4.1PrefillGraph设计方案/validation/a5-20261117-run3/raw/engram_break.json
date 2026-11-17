@@ -1,0 +1,214 @@
+{
+  "probe": "engram_break",
+  "status": "PASS",
+  "phase": "complete",
+  "started": "2026-11-17T03:35:26+0000",
+  "script_revision": 3,
+  "rtol": 0.001,
+  "atol": 0.001,
+  "reference_rtol": 0.001,
+  "reference_atol": 0.001,
+  "registration_imports": [],
+  "device": "Ascend950DT_9582",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "capture_supported": true,
+  "checks": {
+    "capture": "PASS",
+    "eager_replay": "PASS",
+    "cpu_reference": "PASS",
+    "verify_commit": "PASS"
+  },
+  "cases": [
+    {
+      "name": "full_A",
+      "status": "PASS",
+      "comparisons": {
+        "hash": {
+          "shape": [
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "history": {
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "consumer": {
+          "shape": [
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "short_B",
+      "status": "PASS",
+      "comparisons": {
+        "hash": {
+          "shape": [
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "history": {
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "consumer": {
+          "shape": [
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "page_boundary_C",
+      "status": "PASS",
+      "comparisons": {
+        "hash": {
+          "shape": [
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "history": {
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "consumer": {
+          "shape": [
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "different_prefix_D",
+      "status": "PASS",
+      "comparisons": {
+        "hash": {
+          "shape": [
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "history": {
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "consumer": {
+          "shape": [
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "repeat_A",
+      "status": "PASS",
+      "comparisons": {
+        "hash": {
+          "shape": [
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.int64",
+          "exact": true
+        },
+        "history": {
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "torch.int32",
+          "exact": true
+        },
+        "consumer": {
+          "shape": [
+            64,
+            1,
+            4
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    }
+  ],
+  "break_calls": 5,
+  "verify_commit": {
+    "history": {
+      "shape": [
+        4,
+        2
+      ],
+      "dtype": "torch.int32",
+      "exact": true
+    }
+  },
+  "scope": "Actual EngramHasher fallback and shared breakable graph, synthetic identity tokenizer and tiny hash parameters. No lookup tables, lookup communication, or model weights.",
+  "elapsed_seconds": 15.011,
+  "returncode": 0,
+  "wall_seconds": 19.199
+}

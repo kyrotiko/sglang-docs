@@ -1,6 +1,6 @@
 # DeepSeek V4.1 Prefill Graph 验收计划
 
-开发基线：`sglang@9898f7ce9a`；2026-11-17。[合入 randgun 后](../analysis/randgun_merge_20261117.md)的 12 文件 CPU 回归共 281 项全部通过。已有[首轮](a5-20261116-run1/findings.md)与[第二轮](a5-20261116-run2/findings.md) A5 证据固定在 `5633d68b04` 与旧 SDK；保留其历史结论，不能推广为新 writer/mHC 已通过。revision 3 应定向复验公开 writer、mHC premix、writer→attention 及 compressor，完整模型和性能仍待验收。
+开发基线：`sglang@9898f7ce9a`；2026-11-17。[合入 randgun 后](../analysis/randgun_merge_20261117.md)的 CPU 回归 281 项通过。旧基线设备证据见 [run1](a5-20261116-run1/findings.md) / [run2](a5-20261116-run2/findings.md)；[run3](a5-20261117-run3/findings.md)在 950DT 和实际内容已变化的 SDK 中验证了 compressor、公开 writer 和 mHC premix。revision 4 只修正 writer→attention 的脚本 dtype 视图，待三组重跑；独立精度和整模/多卡仍待验收。
 
 ## 1. 实验环境记录
 
@@ -113,6 +113,6 @@ context 验收记录页表容量来源和有效 `prefill.max_seq_len`。当超�
 python verify_dsv41_prefill_graph.py --output-dir ./dsv41-prefill-evidence
 ```
 
-如需指定 checkout，增加 `--sglang-root /path/to/sglang`。revision 3 默认共 17 组，推荐按[合并后定向命令](../analysis/randgun_merge_20261117.md)先检查环境，再跑直接受影响组和 writer 消费链；每组独立进程并设超时，最终回传各输出目录中的 `dsv41-prefill-evidence.tar.gz`。失败或 BLOCKED 也是事实，保留完整包。
+如需指定 checkout，增加 `--sglang-root /path/to/sglang`。revision 4 仍为 17 组；第三轮已完成全量，当前按[三组最小重跑命令](a5-20261117-run3/findings.md)补 writer 消费链即可。每组独立进程并设超时，回传输出目录中的 `dsv41-prefill-evidence.tar.gz`，失败或 BLOCKED 也保留。
 
-本地已通过 Python 编译、CPU 自检和探针记录/归档回归。首版与 revision 2 的 A5 结果已归档，revision 3 只在本地 CPU 验证了代码和协议，尚未取得新基线 A5 结果。旧 QLI/QSLI/attention 事实保留；新公开 writer/mHC、writer 产出缓存的消费和新 SDK 兼容性需要定向复验。该脚本不替代真实整模、完整 source/多流状态、DSpark KV 注入或多卡 collective 验收。
+Python 编译、CPU 自检和记录/归档回归已通过；revision 3 的第三轮全量 A5 结果已归档，新增 compressor/writer/mHC 图对照 exact。revision 4 的 dtype 视图回归已在本地验证修复前失败、修复后通过，实际 writer 消费链待三组设备复跑。独立 CPU reference、整模、真实 source/多流状态、DSpark KV 注入和多卡 collective 仍按各自范围验收。

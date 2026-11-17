@@ -1,0 +1,33 @@
+[attention_r0] start
+[attention_r0] warmup
+[attention_r0] capture_begin
+[attention_r0] capture_end
+[attention_r0] prepare:full_A
+[attention_r0] eager:full_A
+[attention_r0] replay:full_A
+[attention_r0] passed:full_A
+[attention_r0] prepare:short_B
+[attention_r0] eager:short_B
+[attention_r0] replay:short_B
+[attention_r0] passed:short_B
+[attention_r0] prepare:page_boundary_C
+[attention_r0] eager:page_boundary_C
+[attention_r0] replay:page_boundary_C
+[attention_r0] passed:page_boundary_C
+[attention_r0] prepare:different_prefix_D
+[attention_r0] eager:different_prefix_D
+[attention_r0] replay:different_prefix_D
+[attention_r0] passed:different_prefix_D
+[attention_r0] prepare:repeat_A
+[attention_r0] eager:repeat_A
+[attention_r0] replay:repeat_A
+[attention_r0] passed:repeat_A
+Traceback (most recent call last):
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1307, in worker
+    dispatch_probe(options.worker)
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1285, in dispatch_probe
+    probe_attention(int(name[-1]))
+  File "/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py", line 1082, in probe_attention
+    raise AssertionError("Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.")
+AssertionError: Graph parity completed, but the sampled CPU attention reference mismatched; inspect cpu_reference separately.
+

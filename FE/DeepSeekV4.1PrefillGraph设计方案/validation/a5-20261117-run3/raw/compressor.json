@@ -1,0 +1,336 @@
+{
+  "probe": "compressor",
+  "status": "PASS",
+  "phase": "complete",
+  "started": "2026-11-17T03:27:06+0000",
+  "script_revision": 3,
+  "rtol": 0.001,
+  "atol": 0.001,
+  "reference_rtol": 0.001,
+  "reference_atol": 0.001,
+  "registration_imports": [],
+  "device": "Ascend950DT_9582",
+  "torch": "2.13.0+cpu",
+  "torch_npu": "2.13.0",
+  "apis": {
+    "compressor_v2": {
+      "signature": "(x, wkv, wgate, state_cache, cmp_ratio=4, *, state_block_table=None, cu_seqlens=None, seqused=None, start_pos=None, impl='auto')",
+      "module": "sgl_kernel_npu.operators.attention.compressor_v2",
+      "file": "/usr/local/python3.12.15/lib/python3.12/site-packages/sgl_kernel_npu/operators/attention/compressor_v2.py"
+    }
+  },
+  "capture_supported": true,
+  "checks": {
+    "capture": "PASS",
+    "eager_replay": "PASS"
+  },
+  "cases": [
+    {
+      "name": "capture_bank_zero",
+      "parameters": {
+        "name": "capture_bank_zero",
+        "live": 64,
+        "prefix": 0,
+        "bank": 0,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_value": {
+          "shape": [
+            32,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "state": {
+          "shape": [
+            3,
+            2,
+            1024
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "bank_one_short",
+      "parameters": {
+        "name": "bank_one_short",
+        "live": 32,
+        "prefix": 0,
+        "bank": 1,
+        "seed": 20261119
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_value": {
+          "shape": [
+            16,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "state": {
+          "shape": [
+            3,
+            2,
+            1024
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "pair_chunk_first",
+      "parameters": {
+        "name": "pair_chunk_first",
+        "live": 1,
+        "prefix": 0,
+        "bank": 1,
+        "seed": 20261120
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_value": {
+          "shape": [
+            0,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true
+        },
+        "state": {
+          "shape": [
+            3,
+            2,
+            1024
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "pair_chunk_second",
+      "parameters": {
+        "name": "pair_chunk_second",
+        "live": 1,
+        "prefix": 1,
+        "bank": 1,
+        "seed": 20261121,
+        "carry": true
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_value": {
+          "shape": [
+            1,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "state": {
+          "shape": [
+            3,
+            2,
+            1024
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "ring_wrap",
+      "parameters": {
+        "name": "ring_wrap",
+        "live": 7,
+        "prefix": 2,
+        "bank": 2,
+        "seed": 20261122
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_value": {
+          "shape": [
+            3,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "state": {
+          "shape": [
+            3,
+            2,
+            1024
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "bank_reuse",
+      "parameters": {
+        "name": "bank_reuse",
+        "live": 32,
+        "prefix": 0,
+        "bank": 1,
+        "seed": 20261123
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_value": {
+          "shape": [
+            16,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "state": {
+          "shape": [
+            3,
+            2,
+            1024
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    },
+    {
+      "name": "repeat_capture_bank_zero",
+      "parameters": {
+        "name": "repeat_capture_bank_zero",
+        "live": 64,
+        "prefix": 0,
+        "bank": 0,
+        "seed": 20261116
+      },
+      "status": "PASS",
+      "comparisons": {
+        "valid_value": {
+          "shape": [
+            32,
+            512
+          ],
+          "dtype": "torch.bfloat16",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        },
+        "state": {
+          "shape": [
+            3,
+            2,
+            1024
+          ],
+          "dtype": "torch.float32",
+          "exact": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "max_rel": 0.0
+        }
+      }
+    }
+  ],
+  "output_capacities": {
+    "capture_bank_zero": [
+      33,
+      512
+    ],
+    "bank_one_short": [
+      33,
+      512
+    ],
+    "pair_chunk_first": [
+      33,
+      512
+    ],
+    "pair_chunk_second": [
+      33,
+      512
+    ],
+    "ring_wrap": [
+      33,
+      512
+    ],
+    "bank_reuse": [
+      33,
+      512
+    ],
+    "repeat_capture_bank_zero": [
+      33,
+      512
+    ]
+  },
+  "bound_input_pointers": {
+    "x": 19792490659840,
+    "cu": 19792491208704,
+    "used": 19792491209216,
+    "start": 19792491209728,
+    "bank": 19792491210240,
+    "state": 19792491184128
+  },
+  "replay_count": 7,
+  "observed_output_changed": true,
+  "split_pair_reference": {
+    "pair": {
+      "shape": [
+        1,
+        512
+      ],
+      "dtype": "torch.bfloat16",
+      "exact": true,
+      "finite": true,
+      "max_abs": 0.0,
+      "max_rel": 0.0
+    }
+  },
+  "scope": "Actual compressor_v2; private banks only. Ratio 1 uses projection, not this fused compressor. Ring-wrap parity is not an independent compressor math oracle.",
+  "elapsed_seconds": 9.479,
+  "returncode": 0,
+  "wall_seconds": 12.478
+}

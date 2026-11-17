@@ -28,7 +28,7 @@ from types import SimpleNamespace
 
 
 BASELINE = "9898f7ce9a"
-SCRIPT_REVISION = 3
+SCRIPT_REVISION = 4
 PROBES = (
     "environment", "geometry", "metadata", "compressor", "epilog_fp8",
     "epilog_fp4", "prologue", "qli_c2", "candidate_chain",
@@ -646,6 +646,11 @@ def unpack_cache(kind, packed):
     return fp4_values()[codes.long()] * scale.repeat_interleave(16, dim=-1)
 
 
+def writer_cache_view(cache, kind):
+    # Writer dtype and attention's byte view must alias the same storage.
+    return cache.view(T.float8_e4m3fn) if kind == "fp8" else cache
+
+
 def prepare_writer_cache(buffers, cpu, writer, case_name):
     for name, kind, mode, group in (
         ("original", "fp8", "mxfp8_bf16", 32),
@@ -657,7 +662,8 @@ def prepare_writer_cache(buffers, cpu, writer, case_name):
         rows, width = cache.numel() // cache.shape[-1], cache.shape[-1]
         latent = cpu[name].to(device=cache.device, dtype=T.bfloat16).contiguous()
         locations = T.arange(rows, dtype=T.int64, device=cache.device)
-        writer(cache.view(rows, width), latent, locations,
+        typed_cache = writer_cache_view(cache, kind)
+        writer(typed_cache.view(rows, width), latent, locations,
                quant_group_size=group, quant_mode=mode, round_scale=True, x_scale=1.0)
         T.npu.synchronize()
         decoded = unpack_cache(kind, cache.view(rows, width))
@@ -665,6 +671,8 @@ def prepare_writer_cache(buffers, cpu, writer, case_name):
             raise AssertionError(f"Public writer produced non-finite {name} data under the advertised KV ABI")
         R.setdefault("writer_quantization_diagnostics", {}).setdefault(case_name, {})[name] = {
             "row_bytes": width, "quant_group": group,
+            "writer_dtype": str(typed_cache.dtype), "attention_view_dtype": str(cache.dtype),
+            "same_storage": typed_cache.data_ptr() == cache.data_ptr(),
             "max_abs_input_to_decoded": float((decoded - latent.cpu().float()).abs().max()),
             "note": "Recorded error, not a quantization-accuracy acceptance threshold.",
         }
@@ -1480,7 +1488,16 @@ def self_test(options):
     assert diagnostics["max_bf16_ulp_distance"] == 0
     diagnostics = bf16_diagnostics(T.tensor([1.0]), T.tensor([1.0 + 1.0 / 128]))
     assert diagnostics["max_bf16_ulp_distance"] == 1
-    print("CPU self-test passed: count boundaries, KV packing, geometry tails, index PA/record separation, BF16 diagnostics.")
+    raw = (T.arange(4 * 544) % 256).to(T.uint8).reshape(4, 544)
+    typed = writer_cache_view(raw, "fp8")
+    assert typed.dtype == T.float8_e4m3fn and typed.data_ptr() == raw.data_ptr()
+    assert T.equal(typed.view(T.uint8), raw)
+    typed.view(T.uint8)[0, 0] = 17
+    assert raw[0, 0].item() == 17
+    fp4 = T.zeros((4, 320), dtype=T.uint8)
+    assert writer_cache_view(fp4, "fp4").dtype == T.uint8
+    assert writer_cache_view(fp4, "fp4").data_ptr() == fp4.data_ptr()
+    print("CPU self-test passed: count boundaries, KV packing, index PA/record separation, BF16 diagnostics and writer/consumer dtype aliasing.")
     print("This is a script/oracle check, not NPU graph evidence.")
     return 0
 

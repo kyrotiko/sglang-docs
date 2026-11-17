@@ -1,0 +1,27 @@
+[qli_c2] start
+/mnt/share/y00627667/repos/sglang-docs/FE/DeepSeekV4.1PrefillGraph设计方案/scripts/verify_dsv41_prefill_graph.py:846: UserWarning: Cannot create tensor with internal format while allow_internal_format=False, tensor will be created with base format. (Triggered internally at ../torch_npu/csrc/aten/common/TensorFactories.cpp:406.)
+  stage(buffers, "residual", buffers["kv_lengths"] % ratio)
+[qli_c2] warmup
+[qli_c2] capture_begin
+[qli_c2] capture_end
+[qli_c2] prepare:full_A
+[qli_c2] eager:full_A
+[qli_c2] replay:full_A
+[qli_c2] passed:full_A
+[qli_c2] prepare:short_B
+[qli_c2] eager:short_B
+[qli_c2] replay:short_B
+[qli_c2] passed:short_B
+[qli_c2] prepare:page_boundary_C
+[qli_c2] eager:page_boundary_C
+[qli_c2] replay:page_boundary_C
+[qli_c2] passed:page_boundary_C
+[qli_c2] prepare:different_prefix_D
+[qli_c2] eager:different_prefix_D
+[qli_c2] replay:different_prefix_D
+[qli_c2] passed:different_prefix_D
+[qli_c2] prepare:repeat_A
+[qli_c2] eager:repeat_A
+[qli_c2] replay:repeat_A
+[qli_c2] passed:repeat_A
+[qli_c2] complete

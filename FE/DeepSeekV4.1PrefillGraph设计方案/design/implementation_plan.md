@@ -2,7 +2,7 @@
 
 开发基线：`sglang/dsv41-a5@9898f7ce9a`；2026-11-17。已保留先前 11 个入图提交并合入 randgun 的 13 个新提交，281 项 CPU 回归全部通过；本次变化和定向设备复验见 [合并记录](../analysis/randgun_merge_20261117.md)。writer/mHC 已迁到公开 SDK wrapper，但 V4.1 prefill 固定状态和下面的使能闸门仍未实现，新主仓尚未做 A5 整模验证。
 
-首轮 A5 [事实记录](../validation/a5-20261116-run1/findings.md)已确认几何、metadata planning、K prologue、Engram break 及 MQSMLA 的多轮 graph/eager 对照可行。[第二轮](../validation/a5-20261116-run2/findings.md)进一步确认 index PA page=64 时 ratio-2 QLI 和 QLI→QSLI candidate 图链 5 轮输出全部 exact；这些路径可继续采用固定地址和原地刷新。Attention 的独立 FP32 精度仍未通过，compressor/epilog 的 V4.1 接口尚未对齐，阶段 B 仍为部分完成。主仓 actual index page=64/128，无需为首轮夹具 page8 的错误修改布局。
+前两轮 A5 [run1](../validation/a5-20261116-run1/findings.md) / [run2](../validation/a5-20261116-run2/findings.md)已验证几何、metadata、prologue、Engram 和 QLI/QSLI/MQSMLA 对照。[第三轮](../validation/a5-20261117-run3/findings.md)在新 950DT/SDK 环境进一步实际验证 compressor、公开 544/320B writer、mHC premix 的多轮图回放 exact；旧接口阻塞不再适用于该环境。writer→attention 探针的 dtype 视图已修复待重跑，独立 FP32 精度仍保留失败。可以继续固定 metadata/模型数据流接入，但这些单卡证据不等于整模图实现或完整状态验收。
 
 ## 1. 复用边界与首版范围
 
