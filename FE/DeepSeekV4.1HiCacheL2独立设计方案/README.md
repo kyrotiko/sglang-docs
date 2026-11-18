@@ -18,7 +18,13 @@
 | 文档仓 | `sglang-docs`，`main` 分支 |
 | 分析日期 | 2026-11-18 |
 
-本文档只做**独立代码分析**：结论全部来自上述基线的代码、提交历史和 `sgl-kernel-npu` 参考仓文档，不引用其他分析文档的结论。**本次没有 A5 实机运行**，所有涉及设备行为的判断都标记为待验证，并给出验证方法。
+本文档只做**独立代码分析**：结论全部来自上述基线的代码、提交历史和 `sgl-kernel-npu` 参考仓文档，不引用其他分析文档的结论。**设计分析阶段没有 A5 实机运行**，所有涉及设备行为的判断都标记为待验证，并给出验证方法；后续 A5 算子探测结果见下节。
+
+## 实现状态（2026-11-18）
+
+- 代码分支：`dsv41-a5-hicache-l2`，commit `b376ac9e25`（低压缩比页几何/预留/断言）与 `4ddf6b5246`（V4 paged pools auto-size）。
+- CPU：`test_dsv4_hicache_l2.py`、`test_dsv4_compressed_pools.py`、`test_hicache_auto_size.py` 共 48 passed。
+- A5：`a5_kv_exchange_probe.py` 的 `page_size=128`、`layers=2` AIV D2H/H2D 已通过；sglang 侧 HiCache E2E 仍待跑。
 
 ## 结论摘要
 
@@ -29,22 +35,22 @@
    - A5 的 AIV 分片 KV 传输算子声明支持 arch22（A3）与 arch35（A5）：`sgl-kernel-npu/docs/api/en/operators/mem_cache/kv_transfer.md`。
 
 2. **但不能直接宣告 DSV4.1 L2 可用。** 代码级有多处未闭环（详见 [缺口分析](analysis/gap_analysis.md)）：
-   - **G1（高优先级，NPU 4-D 路径）**：低压缩比 host 池的页几何未闭环。NPU 4-D KV 的 `item_bytes` 按 `shape[1] * element_size` 计算，得到槽数 `S` 而不是 `S*dim*itemsize`；indexer K/scale 被整理成 2-D `[full_pages, bytes]` 行，而 Ascend 传输路径按 4-D PA_ND 推导 `native_page_size`，ratio-1 的 full page 还需要把 `I=2` 个 native index page 合成 `S=128` 槽。GPU 的 2-D 页行是正确的，现有 CPU 测试也锁定了该契约，修复不能把 GPU 路径一起改成 4-D。修复方向是 NPU indexer 规范化为 full-page 4-D 视图、`item_bytes` 取 full-page 字节、传输 `page_size=S`。
+   - **G1（高优先级，NPU 4-D 路径）**：低压缩比 host 池的页几何未闭环。NPU 4-D KV 的 `item_bytes` 按 `shape[1] * element_size` 计算，得到槽数 `S` 而不是 `S*dim*itemsize`；indexer K/scale 被整理成 2-D `[full_pages, bytes]` 行，而 Ascend 传输路径按 4-D PA_ND 推导 `page_slots`，ratio-1 的 full page 还需要把 `I=2` 个 native index page 合成 `S=128` 槽。GPU 的 2-D 页行是正确的，现有 CPU 测试也锁定了该契约，修复不能把 GPU 路径一起改成 4-D。修复方向是 NPU indexer 规范化为 full-page 4-D 视图、`item_bytes` 取 full-page 字节、传输 `page_size=S`。
    - **G2**：`reserve_dsv4_paged_host_memory` 没有把 C1/C2 KV 与 indexer 的 host 块计入预留；ACL 后端下 `ensure_capacity` 是空操作所以默认不触发，但 memfabric 后端会漏预留。
    - **G3**：DSV4 明确不支持 `--hicache-size`（`hybrid_pool_assembler.py:551-555`），只能按 ratio 定容。
-   - **G10**：只写 `--enable-hierarchical-cache`、不写 `--hicache-ratio` 时，默认的 `hicache_host_memory_fraction=0.8` 仍会触发 auto-size，而 V4.1 pool 不在 auto-size 支持范围内，启动失败。首批必须显式给 ratio。
+   - **G10（已修复，待 A5 验证）**：`_estimate_hicache_bytes` 现在支持 V4.1 的 paged pools，只写 `--enable-hierarchical-cache` 时会走 auto-size；带 C4 持久状态或 V4 draft 的模型仍要求显式 `--hicache-ratio`。首批仍建议显式写 ratio，便于容量可预测。
    - 已有 `test_dsv4_compressed_pools.py:553-606` 覆盖 CPU/2-D 低压缩比装配；缺 NPU 4-D 单测、indexer 传输调用测试和 A5 端到端用例。
 
 3. **首批推荐配置（L2-only）**：
 
    ```bash
    --enable-hierarchical-cache
-   --hicache-ratio 2.0          # 首批必须显式给，见 G10
+   --hicache-ratio 2.0          # 首批建议显式给；不写时走 auto-size（G10 已修）
    --hicache-write-policy write_through
    # 其余由 NPU 侧自动解析：page_first / kernel_ascend / acl host 内存后端
    ```
 
-   不要同时给 `--hicache-storage-backend`、`--hicache-size`、`--hicache-host-memory-mode buffer_only` 或 `--disable-radix-cache`；也不要只开 `--enable-hierarchical-cache` 而不给 ratio（G10）。
+   不要同时给 `--hicache-storage-backend`、`--hicache-size`、`--hicache-host-memory-mode buffer_only` 或 `--disable-radix-cache`。
 
 4. **首批交付边界**：A5 单机、聚合推理、page_size 128、C1/C2 低压缩比模型、无 L3、DCP=1、暂不含投机解码（DSpark 单列验证）、PP=1；TP / DP attention 逐项验证。完整矩阵见 [设计](design/l2_host_offload.md#兼容性矩阵) 与 [验收](validation/acceptance_plan.md)。
 

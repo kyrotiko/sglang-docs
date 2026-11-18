@@ -10,7 +10,7 @@
 | 2 | `dsv41 hicache: cover low-ratio pools in host memory reservation` | 补齐 C1/C2 + indexer 的预留 | 1 |
 | 3 | `dsv41 hicache: add low-ratio host pool and transfer unit tests` | CPU 契约测试 | 1, 2 |
 | 4 | `dsv41 hicache: guard draft SWA row width in packed host pools` | DSpark 行宽断言 | 1 |
-| 5 | `dsv41 hicache: extend auto-size estimate to V4 sidecars`（可选） | G4/G10；首批用显式 ratio 规避 | 2 |
+| 5 | `dsv41 hicache: size V4 paged pools in auto-size` | G4/G10；覆盖 C1/C2/indexer；C4 state/draft 显式拒绝 | 2 |
 | 6 | `npu tests: add DSV4.1 HiCache L2 end-to-end` | 注册 NPU CI | 1–3 |
 
 ## 1. 提交 1：低压缩比 host 页几何
@@ -25,59 +25,40 @@
 
 ### 1.1 `python/sglang/srt/mem_cache/hybrid_cache/hybrid_pool_assembler.py`
 
-`_dsv4_low_ratio_regions`（`600-657`）改为按维度分派，并返回每个 region 的 `item_bytes`：
+`_dsv4_low_ratio_regions`（`600-657`）改为按维度分派；KV buffer 原样保留，indexer buffer 通过 `_dsv4_full_page_index_row` 归一化为 full-page 行：
 
 ```python
-# KV: NPU 4-D PA_ND / GPU 2-D page row，均保持原样。
-item_bytes = kv.buffer_info.page_bytes
-regions.append(
-    (names[0], kvcache.kv_pools[ratio], list(kv.buffer_info.buffers),
-     layer_mapping, item_bytes)
-)
-
-for name in names[1:]:
-    index = infos.get(name)
-    if index is None:
-        continue
-    rows = []
-    for buffer in index.buffer_info.buffers:
-        full_pages = buffer.shape[0] // index_pages_per_full_page
-        page = buffer[: full_pages * index_pages_per_full_page]
-        if page.ndim == 4:
-            # NPU PA_ND: [full_pages*I, K, 1, dim] -> [full_pages, S, 1, dim]
-            page = page.reshape(
-                full_pages, slots_per_page, *page.shape[2:]
-            )
-        else:
-            # GPU 2-D: [full_pages*I, native_page_bytes] -> [full_pages, full_page_bytes]
-            page = page.view(torch.uint8).reshape(full_pages, -1)
-        rows.append(page)
-    item_bytes = index_pages_per_full_page * index.buffer_info.page_bytes
-    regions.append((name, kvcache.index_pools[ratio], rows, layer_mapping, item_bytes))
+def _dsv4_full_page_index_row(buffer, *, full_pages, index_pages_per_full_page,
+                              slots_per_full_page):
+    page = buffer[: full_pages * index_pages_per_full_page]
+    if page.ndim == 4:
+        # NPU PA_ND: [full_pages*I, K, 1, dim] -> [full_pages, S, 1, dim]
+        return page.reshape(full_pages, slots_per_full_page, *page.shape[2:])
+    # GPU 2-D: [full_pages*I, native_page_bytes] -> [full_pages, full_page_bytes]
+    return page.view(torch.uint8).reshape(full_pages, -1)
 ```
 
 要点：
 
 - `full_pages = buffer.shape[0] // I`，丢弃尾部 padding；`I = slots_per_page // key.page_slots`，已有断言 `slots_per_page % key.page_slots == 0`。
 - `page.ndim == 4` 只会在 NPU PA_ND 出现；GPU 2-D 行继续走原来的 `view(uint8).reshape(full_pages, -1)`，不要无条件改成 4-D。
-- 每个 region 用自己的 `buffer_info.page_bytes` 计算 `item_bytes`；indexer K 与 scale 的行宽不同，不能复用一个 `index_item_bytes`。
+- region 仍返回 4 元组，不携带 `item_bytes`，避免改 `linker_pool_assembler` 的解包；host 页字节由 entries 从 buffer 本身计算。
 
 `_dsv4_low_ratio_entries`（`660-690`）不再用 `shape[1] * element_size`：
 
 ```python
-for name, device_pool, buffers, layer_mapping, item_bytes in \
+def _dsv4_full_page_bytes(buffers):
+    return buffers[0][0].numel() * buffers[0].element_size()
+
+for name, device_pool, buffers, layer_mapping in \
         _dsv4_low_ratio_regions(kvcache, infos, page_size):
-    assert item_bytes == buffers[0][0].numel() * buffers[0].element_size(), (
-        f"{name}: full-page item_bytes mismatch: {item_bytes} vs "
-        f"{buffers[0][0].numel() * buffers[0].element_size()}"
-    )
     entries.append(
         build_pool_entry(
             name=name,
             host_pool=DeepSeekV4PagedHostPool(
                 pool_name=str(name),
                 device_buffers=buffers,
-                item_bytes=item_bytes,
+                item_bytes=_dsv4_full_page_bytes(buffers),
                 num_host_pages=num_host_pages,
                 slot_page_size=page_size,
                 layout=get_memory().hicache_mem_layout,
@@ -91,16 +72,18 @@ for name, device_pool, buffers, layer_mapping, item_bytes in \
     )
 ```
 
+`_dsv4_full_page_bytes` 对 2-D `[pages, page_bytes]` 和 4-D `[pages, slots, 1, dim]` 都返回 full-page 字节；indexer K/scale 各自从自己的 buffer 计算，不共用 `index_item_bytes`。
+
 ### 1.2 `memory_pool_host.py`：不改 API
 
 `DeepSeekV4PagedHostPool` 的现有逻辑在规范化后即可工作：
 
 - `_host_page_view` 用 `device_buffer.shape[1]` 作为每页槽数；KV 的 `shape[1]=S`，NPU indexer 规范化后也是 `S`。
-- `_to_native_page_indices` 用同一个 `shape[1]` 展开；一个 full page 展开 `S` 个槽。
+- `_to_page_slots` 用同一个 `shape[1]` 展开；一个 full page 展开 `S` 个槽。
 - `kernel_ascend` 的 `page_size` 自动变成 `S`；C1 indexer `S=128`，C2 indexer `S=64`，KV 同样是 `S`。
 - host 视图：`page_first` 为 `[pages, 1, S, 1, dim]`（页间 gap 合法），`layer_first` 为 `[1, pages, S, 1, dim]`。
 
-不需要新增构造参数，也不需要在 `_host_page_view` 里做 `num_host_pages*I` 的扁平化。顺手把 `kernel_ascend` 分支里的局部变量 `native_page_size` 改名为 `page_slots`（值仍是 `shape[1]`），避免在 full-page 传输语义下继续使用“native page”这个名字；`_to_native_page_indices` 同步改名为 `_to_page_slots`。这是纯命名清理，不改行为。
+不需要新增构造参数，也不需要在 `_host_page_view` 里做 `num_host_pages*I` 的扁平化。`kernel_ascend` 分支里的局部变量已从 `native_page_size` 改名为 `page_slots`，`_to_native_page_indices` 已改名为 `_to_page_slots`；这是纯命名清理，不改行为。
 
 ### 1.3 测试
 
@@ -112,7 +95,7 @@ for name, device_pool, buffers, layer_mapping, item_bytes in \
    - `_dsv4_low_ratio_regions` 返回的 device buffer 是 `[full_pages, S, 1, dim]`；
    - `item_bytes == I * key.page_bytes`（scale 用自己的 `page_bytes`）；
    - `_host_page_view` 形状为 `[pages, 1, S, 1, dim]`（`page_first`）；
-   - `_to_native_page_indices` 返回 `S` 个槽。
+   - `_to_page_slots` 返回 `S` 个槽。
 4. **传输调用**：mock `transfer_kv_all_layer_kv_split(_lf_pf)` 与 `transfer_kv_per_layer_kv_split(_pf_lf)`，断言 `page_size == S`，`device_k.shape == (1, full_pages, S, 1, dim)`，索引覆盖 `S` 个连续槽。
 5. 覆盖 ratio 1 与 ratio 2（C1 indexer `I=2, S=128`；C2 indexer `I=1, S=64`）。
 
@@ -172,14 +155,15 @@ for buffer in draft_swa.buffer_info.buffers:
 
 只在启用投机时触发；首批即使不启用，也应加上显式拒绝，避免静默错读。
 
-## 5. 提交 5（可选）：自动定容 / 默认 ratio
+## 5. 提交 5：自动定容支持 V4 paged pools
 
-G10 的规避方案是首批**必须显式给 `--hicache-ratio`**；只开 `--enable-hierarchical-cache` 当前会在 auto-size 阶段失败。若要把默认路径做成可用，二选一：
+`hicache_auto_size._estimate_hicache_bytes` 增加 V4 分支：
 
-- 扩展 `_estimate_hicache_bytes`，支持 `DeepSeekV4TokenToKVPool` 及其 C1/C2/indexer 侧池（与 G4 一起做）。
-- 在 `handle_hicache_ratio_default` 填入默认 ratio 的同时把 `hicache_host_memory_fraction` 置空；需要评估对其他模型的默认行为影响。
+- `_dsv4_pool_bytes` 遍历 `get_device_pool_infos()`，统计 SWA、C1/C2 KV、indexer K/scale 的 `page_bytes * pages`。
+- `DSV4CheckpointBufferInfo`（C4 持久状态）和 V4 draft 池显式拒绝 auto-size，要求用户给 `--hicache-ratio`；首批不做这两类组合。
+- CPU 用例：`test_hicache_auto_size.py::test_dsv4_paged_pools_are_sized_for_auto`。
 
-在这两项完成前，提交 5 可以不做；验收命令必须显式写 ratio。
+首批仍建议显式写 ratio 以固定容量；auto-size 是默认启用路径的兜底。
 
 ## 6. 提交 6：A5 端到端用例
 
@@ -193,7 +177,7 @@ G10 的规避方案是首批**必须显式给 `--hicache-ratio`**；只开 `--en
 4. 不同前缀不误命中；
 5. greedy 输出与关闭 HiCache 的基线逐 token 一致；
 6. 启动日志中的 host 池 GB 与容量公式一致；每个池打印 `item_bytes`、页数、`backup/load` 字节数；
-7. 只给 `--enable-hierarchical-cache` 不给 ratio 时，得到明确错误或按 G10 修复成功启动。
+7. 只给 `--enable-hierarchical-cache` 不给 ratio 时，auto-size 能选出一个可用 ratio；显式 ratio 路径作为对照。
 
 详细步骤与通过标准见 [验收计划](../validation/acceptance_plan.md)。
 

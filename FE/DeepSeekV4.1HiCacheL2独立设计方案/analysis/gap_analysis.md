@@ -49,7 +49,7 @@ NPU 低压缩比 KV buffer 是 4-D PA_ND `[pages, S, 1, dim]`，`shape[1]` 是�
 
    对 2-D `[full_pages, bytes]` 会得到 `(bytes, 1, bytes)` 的 page 形状，`.view(...)` 的元素数不匹配。
 
-4. `kernel_ascend` 分支用 `native_page_size = int(device_buffers[0].shape[1])`（`memory_pool_host.py:590, 697`）并把一个逻辑页展开成 `native_page_size` 个槽（`_to_native_page_indices`，`memory_pool_host.py:430-436`）。对 2-D 行，`shape[1]` 是“整页字节数”，不是槽数。
+4. `kernel_ascend` 分支用 `page_slots = int(device_buffers[0].shape[1])`（`memory_pool_host.py:590, 697`）并把一个逻辑页展开成 `page_slots` 个槽（`_to_page_slots`，`memory_pool_host.py:430-436`）。对 2-D 行，`shape[1]` 是“整页字节数”，不是槽数。
 
 5. 2-D 页行本身对 GPU 是正确表示；不能把 GPU 路径也改成 4-D。修复必须按 buffer 维度分派：NPU 4-D 保留 PA_ND，GPU 2-D 保持现状。
 
@@ -83,7 +83,7 @@ NPU 低压缩比 KV buffer 是 4-D PA_ND `[pages, S, 1, dim]`，`shape[1]` 是�
 2. CPU 单测（NPU 4-D indexer）：构造 `[npu_pages, K, 1, dim]` fake indexer buffer，走 `_dsv4_low_ratio_regions` + `DeepSeekV4PagedHostPool`，断言：
    - 规范化后 device buffer 是 `[full_pages, S, 1, dim]`；
    - `_host_page_view` 形状 `[pages, 1, S, 1, dim]`（`page_first`）；
-   - `_to_native_page_indices` 返回 `S` 个槽；
+   - `_to_page_slots` 返回 `S` 个槽；
    - 传输算子收到 `page_size=S`。
 3. 回归：现有 GPU 2-D 测试保持通过，断言 2-D 页行与 `item_bytes` 不变。
 4. A5 冒烟：启动 V4.1 + HiCache，打印每个 PoolEntry 的 `item_bytes`、`device_buffers[0].shape`、`_host_page_view` 形状；执行一次含前缀命中的请求，检查是否报错、输出是否与无 HiCache 一致。
@@ -94,7 +94,7 @@ NPU 低压缩比 KV buffer 是 4-D PA_ND `[pages, S, 1, dim]`，`shape[1]` 是�
 
 - **KV（G1a）**：`item_bytes = buffers[0][0].numel() * buffers[0].element_size()`（对 4-D 和 2-D 都正确），不再用 `shape[1] * element_size`。
 - **indexer（G1b/G1c）**：NPU 4-D buffer 规范化为 `[full_pages, S, 1, dim]`；GPU 2-D 行保持不变。host 行仍按 full page 分配，`page_size=S`，索引展开 `S` 个槽。
-- 这样 `_host_page_view` / `_to_native_page_indices` / `kernel_ascend` 的现有逻辑都能工作，不需要 `native_page_size` / `native_pages_per_full_page` 参数，也不会触碰 `page_first` 的跨页 stride。
+- 这样 `_host_page_view` / `_to_page_slots` / `kernel_ascend` 的现有逻辑都能工作，不需要 `native_page_size` / `native_pages_per_full_page` 参数，也不会触碰 `page_first` 的跨页 stride。
 
 ## G2（中）host 内存预留没有覆盖 C1/C2
 
@@ -127,17 +127,17 @@ if get_memory().hicache_size > 0:
 
 首批接受“按 ratio 定容”。如果产品要求按 GB 配置，需要实现各池（FULL/SWA/C1/C2/indexer）的字节预算拆分，属于独立需求。
 
-## G4（低）自动定容不覆盖侧池
+## G4（已修复，待 A5 验证）自动定容不覆盖侧池
 
-`hicache_auto_size._estimate_hicache_bytes` 只统计 `_SIZEABLE_POOLS` 或 layer-router 子池的设备字节（`hicache_auto_size.py:36-99`），不统计 C1/C2/indexer 侧池。
+`hicache_auto_size._estimate_hicache_bytes` 原先只统计 `_SIZEABLE_POOLS` 或 layer-router 子池的设备字节，不统计 C1/C2/indexer 侧池。
 
-`handle_hicache_ratio_default` 默认把 ratio 置为 2.0（`hicache_hook.py:123-129`），但不会同时关闭默认的 `--hicache-host-memory-fraction=0.8`（`fields/memory.py:119-122`）。因此只要用户不显式写 ratio，auto-size 仍会运行；V4.1 的 `DeepSeekV4TokenToKVPool` 不在 `_SIZEABLE_POOLS` 且没有 `layer_router`，会在 `_estimate_hicache_bytes` 处失败（见 G10）。所以在 G4 修复前，首批必须显式写 `--hicache-ratio`，不能依赖自动定容。
+已增加 `_dsv4_pool_bytes`：遍历 `DeepSeekV4TokenToKVPool.get_device_pool_infos()`，按每个 `DSV4PagedBufferInfo` 的 `page_bytes * buffer.shape[0]` 统计 SWA、C1/C2 KV 和 indexer K/scale。C4 持久状态（`DSV4CheckpointBufferInfo`）和 V4 draft 仍显式要求用户给 `--hicache-ratio`。CPU 用例：`test_hicache_auto_size.py::test_dsv4_paged_pools_are_sized_for_auto`。
 
 ## G5（中）测试覆盖缺口
 
-- 已有 `test_dsv4_compressed_pools.py:553-606` 的 CPU/2-D 低压缩比装配测试，覆盖 `item_bytes` 与 2-D full-page 行；它不覆盖 NPU 4-D。
-- 无 NPU 低压缩比 host 池单元测试（G1 的直接原因）。
-- 无 A5 上 DSV4.1 HiCache 的端到端用例；现有 NPU HiCache E2E 是 Qwen3 / DeepSeek-R1（`test/registered/npu/basic_function/HiCache/`）。
+- 已有 `test_dsv4_compressed_pools.py:553-606` 的 CPU/2-D 低压缩比装配测试，覆盖 `item_bytes` 与 2-D full-page 行。
+- 已增加 NPU 4-D fake buffer 测试：`test_dsv4_hicache_l2.py::test_npu_pa_nd_rows_use_full_page_bytes`，覆盖 KV/indexer/scale 的 full-page 字节与 4-D 规范化。
+- 仍无 A5 上 DSV4.1 HiCache 的端到端用例；现有 NPU HiCache E2E 是 Qwen3 / DeepSeek-R1（`test/registered/npu/basic_function/HiCache/`）。
 - 无“强制 L2 命中”的验证：普通重复请求可能命中 L1，不能证明 host 路径。
 
 对策见 [验收计划](../validation/acceptance_plan.md)：必须构造 device 淘汰后再命中的场景，并用 `sglang:prefill_effective_tokens_total{mode="host_hit"}` 证明 L2 命中。
@@ -146,10 +146,10 @@ if get_memory().hicache_size > 0:
 
 - DSpark/MTP 的 draft SWA 层会被追加到 target 的 SWA host 池（`hybrid_pool_assembler.py:811-838`），共享 `item_bytes`。
 - V4.1 target 的 SWA 行是 `V41_SWA_FP8`（544 B/token，`dsv4_kv_layout.py:69-97`）；draft 被 pin 到 V4 行格式（提交 `3cc67a7544`）。
-- SWA 装配路径**没有逐层检查** draft 与 target 的 `page_bytes`；只有 `_extra_host_region_entries` 对 extra region 做了检查（`hybrid_pool_assembler.py:725-729`）。若行宽不同，`_host_page_view` 会按 target 宽度解释 draft buffer。
-- `_dsv4_region_page_aligned_only` 和 layer mapping 也无法发现字节宽度不一致。
+- SWA 装配路径原先**没有逐层检查** draft 与 target 的 `page_bytes`；只有 `_extra_host_region_entries` 对 extra region 做了检查（`hybrid_pool_assembler.py:725-729`）。若行宽不同，`_host_page_view` 会按 target 宽度解释 draft buffer。
+- 已增加 `_check_dsv4_draft_swa_row_bytes`：用 `buffer[0].numel() * element_size()`（full-page bytes）比较 target 的 `page_bytes`，4-D PA_ND 上不会把槽数 `S` 与 `S*544` 误比。
 
-首批把投机解码排除在验收外；若后续开启 DSpark + HiCache，必须先加行宽断言并做 A/B 精度验证。断言必须用 `buffer[0].numel() * element_size()`（full-page bytes），不能再用 `buffer.shape[1] * element_size()`，否则 4-D PA_ND 上会把槽数 `S` 与 `S*544` 比较，必然误报。
+首批仍把投机解码排除在验收外；后续开启 DSpark + HiCache 时还需做 A/B 精度验证。
 
 ## G7（中）并行/部署组合未定义
 
@@ -174,37 +174,36 @@ HiCache 的既有约束（`hicache_hook.py:134-172`、`kv_cache_hook.py:640-675`
 ## G9（低）容量与可观测
 
 - 容量公式与节点级预算未文档化（见 [设计](../design/l2_host_offload.md#容量与定容)）。多 TP/DP rank 共享一台机器时，host 池总量是各 rank 之和，需要按 cgroup/物理内存做上限。
-- `--hicache-host-memory-fraction` 的默认 0.8 与 ratio 默认值的关系容易误用；V4.1 首批必须显式写 `--hicache-ratio`（G10）。
+- `--hicache-host-memory-fraction` 的默认 0.8 与 ratio 默认值的关系容易误用；auto-size 已支持 V4.1 paged pools，但首批仍建议显式写 `--hicache-ratio` 以固定容量。
 - 现有 `sglang:hicache_host_used_tokens` 只统计锚点池（`scheduler_components/metrics_reporter.py:1220-1221`），不统计 C1/C2/indexer 字节。首批必须补每池的 `item_bytes`、页数、backup/load 次数与字节数，否则无法定位 G1/G2。
 
-## G10（中）只开 `--enable-hierarchical-cache` 的默认启用路径会失败
+## G10（已修复，待 A5 验证）只开 `--enable-hierarchical-cache` 的默认启用路径
 
-### 证据
+### 原问题
 
 - `hicache_host_memory_fraction` 默认 `0.8`（`fields/memory.py:119-122`）。
 - `handle_hicache_ratio_default` 用 `resolving_view(server_args)` 读取 `hicache_ratio`；当用户没有显式设置时，它在函数末尾才 `declare_resolution(..., hicache_ratio=2.0)`（`hicache_hook.py:123-131`）。同一次读取里 `cfg.hicache_ratio` 仍是 `None`，所以第 128 行的 `if cfg.hicache_ratio is not None or cfg.hicache_size > 0` 不会把 fraction 置空。
-- `auto_size_hicache` 看到 fraction 非空就会运行（`hicache_auto_size.py:110-112`），而 `_estimate_hicache_bytes` 对 `DeepSeekV4TokenToKVPool` 不支持（`hicache_auto_size.py:82-99`；V4 pool 不在 `_SIZEABLE_POOLS`，也没有 `layer_router`），启动失败。
+- `auto_size_hicache` 看到 fraction 非空就会运行（`hicache_auto_size.py:110-112`），而 `_estimate_hicache_bytes` 原先对 `DeepSeekV4TokenToKVPool` 不支持（V4 pool 不在 `_SIZEABLE_POOLS`，也没有 `layer_router`），启动失败。
 
-### 影响
+### 已实现修复
 
-- 只给 `--enable-hierarchical-cache`、不写 `--hicache-ratio` 的启动会失败，错误信息来自 auto-size，而不是明确的“V4 必须显式给 ratio”。
-- 显式给 `--hicache-ratio` 的路径不受影响；验收命令已经显式给了 ratio。
+- `_estimate_hicache_bytes` 增加 V4 分支，调用 `_dsv4_pool_bytes` 统计 SWA、C1/C2 KV、indexer K/scale 的设备字节。
+- 带 C4 持久状态（`DSV4CheckpointBufferInfo`）或 V4 draft 的模型仍抛明确错误，要求显式 `--hicache-ratio`。
+- 单测：`test_hicache_auto_size.py::test_dsv4_paged_pools_are_sized_for_auto`。
 
-### 修复/规避
+### 待验证
 
-- **首批规避**：文档和启动检查要求显式 `--hicache-ratio`，并在 G4/G10 修复前不支持自动定容。
-- **修复方向（可选）**：`handle_hicache_ratio_default` 在填入默认 ratio 的同时把 `hicache_host_memory_fraction` 置空（需要评估对其他模型的影响）；或扩展 `_estimate_hicache_bytes` 支持 V4 及其侧池（与 G4 一起做）。
-- 单测：只给 `--enable-hierarchical-cache` 时应得到明确的“set --hicache-ratio”错误，或按修复方向成功启动；不能抛 auto-size 的 AttributeError。
+- A5 上只给 `--enable-hierarchical-cache` 启动，确认 auto-size 选出的 ratio、host 池总量和 v4.1 侧池一致；显式 ratio 的路径仍是首批推荐配置。
 
 ## 优先级汇总
 
 | ID | 优先级 | 内容 | 阻断首批？ |
 | --- | --- | --- | --- |
-| G1 | 高 | NPU 4-D 低压缩比 host 池几何：KV `item_bytes` + indexer full-page 视图 | 是 |
-| G2 | 中 | host 内存预留漏 C1/C2（memfabric） | 否（ACL 默认可用） |
-| G5 | 中 | 无 NPU 低压缩比 host 池单测、无 A5 E2E | 是（验收必需） |
+| G1 | 高 | NPU 4-D 低压缩比 host 池几何：KV `item_bytes` + indexer full-page 视图 | 代码已修，待 A5 |
+| G2 | 中 | host 内存预留漏 C1/C2（memfabric） | 代码已补，待 memfabric 验证 |
+| G5 | 中 | 已有 NPU 4-D 单测；仍缺 A5 E2E | 是（验收必需） |
 | G8 | 中 | 压缩状态页边界重建正确性 | 是（正确性验收） |
-| G10 | 中 | 只开 HiCache 不开 ratio 的默认路径失败 | 否（显式 ratio 可绕过） |
+| G10 | 中 | 只开 HiCache 不开 ratio 的默认路径失败 | 代码已修，待 A5 |
 | G6 | 中 | DSpark draft 行宽 | 否（首批排除投机） |
 | G7 | 中 | 并行组合矩阵 | 否（限定首批组合） |
 | G3 | 低 | `--hicache-size` 不支持 | 否（用 ratio） |

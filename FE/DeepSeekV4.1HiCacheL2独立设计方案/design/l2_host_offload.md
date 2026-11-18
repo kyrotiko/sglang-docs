@@ -41,7 +41,7 @@
 | --- | --- | --- |
 | `enable_hierarchical_cache` | 显式开关，默认关 | `fields/memory.py:100-103` |
 | `hicache_host_memory_mode` | 固定 `cache`；`buffer_only` 需要 L3，首批拒绝 | `hicache_hook.py:340-389` |
-| `hicache_ratio` | **首批必须显式设置**。未设置时 hook 会声明 2.0，但不会关闭默认的 `hicache_host_memory_fraction=0.8`，V4.1 会在 auto-size 阶段失败（G10）；显式值优先 | `hicache_hook.py:105-131`；`fields/memory.py:119-122` |
+| `hicache_ratio` | 未设置时 hook 声明 2.0，再由 auto-size 按 host 预算收缩；V4.1 paged pools 已支持（G10）。首批仍建议显式写 ratio，便于容量可预测 | `hicache_hook.py:105-131`；`fields/memory.py:119-122` |
 | `hicache_size` | 首批不支持，启动期报错 | `hybrid_pool_assembler.py:551-555` |
 | `hicache_write_policy` | 默认 `write_through`；首批只开放 `write_through` / `write_back` 二选一验证 | `fields/memory.py:123-129` |
 | `hicache_io_backend` | NPU 上强制 `kernel_ascend` | `npu/utils.py:191-195` |
@@ -51,7 +51,7 @@
 ### 2.3 明确拒绝的组合
 
 - `--hicache-storage-backend`：首批 L2-only 不配。
-- 只写 `--enable-hierarchical-cache`、不写 `--hicache-ratio`：当前会在 auto-size 阶段失败（G10）；首批必须显式给 ratio。
+- 只写 `--enable-hierarchical-cache`、不写 `--hicache-ratio`：V4.1 paged pools 已支持 auto-size（G10 已修）；带 C4 持久状态或 V4 draft 时仍要求显式 ratio。
 - `--hicache-size > 0`：DSV4 不支持。
 - `--hicache-host-memory-mode buffer_only`：需要 L3。
 - `--disable-radix-cache`：互斥。
@@ -111,7 +111,7 @@ HybridCacheController
 设计要点：
 
 1. **host 行仍是一个 full page**：`item_bytes = S * row_bytes = I * native_page_bytes`；不把 `I` 个 native page 当成 host 页。
-2. **NPU indexer 在装配时规范化**：`full_pages = npu_pages // I`，`buffer[: full_pages*I].reshape(full_pages, S, *trailing)`；丢掉尾部 padding。这样 `device_buffers[0].shape[1]` 就是 `S`，`_host_page_view` / `_to_native_page_indices` / `kernel_ascend` 都不需要新参数。
+2. **NPU indexer 在装配时规范化**：`full_pages = npu_pages // I`，`buffer[: full_pages*I].reshape(full_pages, S, *trailing)`；丢掉尾部 padding。这样 `device_buffers[0].shape[1]` 就是 `S`，`_host_page_view` / `_to_page_slots` / `kernel_ascend` 都不需要新参数。
 3. **GPU 2-D 保持不变**：GPU 的 indexer 行本来就是 `[full_pages, page_bytes*I]`，直接保持 2-D；不能为了 NPU 把 GPU 也改成 4-D。
 4. **传输以 full page 为单位**：`page_size=S`，`device_indices = p*S + arange(S)`，host 同理。C1 indexer 一次传 128 槽（两个 native page 的连续内容），C2 一次传 64 槽。
 5. **不要扁平化 `page_first` host 行**：`self.kv_buffer[:, l, :]` 的页间 stride 是 `layers * item_bytes`，`num_host_pages*I` 个 native page 不连续；host 视图只能是 `[host_pages, 1, S, 1, dim]`，页间 gap 由算子允许。
@@ -152,9 +152,9 @@ H ≈ ratio * Σ(device KV bytes of all mirrored pools)
 
 ### 4.3 定容建议
 
-- 首批只支持 `--hicache-ratio`，且必须显式写出；ratio 2.0 表示每个镜像池的 host 页数是 device 页数的 2 倍。
+- 首批只支持 `--hicache-ratio`；ratio 2.0 表示每个镜像池的 host 页数是 device 页数的 2 倍。未显式写 ratio 时 auto-size 已覆盖 V4.1 paged pools（G4/G10），但首批仍建议写死 ratio。
 - 多 TP/DP rank 同机部署时，host 总量是各 rank 之和；需要按 cgroup/物理内存设置上限并人工核算。
-- `--hicache-host-memory-fraction` 不覆盖 C1/C2（G4），且未显式给 ratio 时默认路径会进入 auto-size 并失败（G10）；首批不要依赖自动定容。
+- `--hicache-host-memory-fraction` 已覆盖 C1/C2/indexer（G4）；带 C4 持久状态或 V4 draft 时 auto-size 会拒绝，需要显式 ratio。
 
 ## 5. 数据面设计
 

@@ -60,11 +60,13 @@ python a5_hicache_e2e_probe.py \
 - `sglang:hicache_host_used_tokens` 的变化；
 - 如果 candidate 在第一次 D2H/H2D 就崩溃，会保存 candidate 日志末尾和 traceback。
 
-当前代码的预期结果（这是我们要确认的）：
+在**未应用设计改动**的基线 `dsv41-a5` 上，预期结果（用来复现问题）：
 
 - `geometry_checks` 里 `deepseek_v4_c1` / `deepseek_v4_c2` 的 `item_bytes` **不匹配**（实际是 `128/64`，期望 `128*320 / 64*320`）→ 复现 G1a；
 - 第一次 A 请求可能直接报 view/shape 错误 → 复现 G1b（NPU indexer 2-D vs 5-D）；
 - 如果 candidate 没崩但 `host_hit_delta == 0`，说明 L2 路径没有真正命中，也要返回报告。
+
+在**应用本设计的 commit 1–5** 后，`geometry_checks` 应全部 `ok`，第一次 A 请求应成功；若仍失败，报告里的 candidate log tail 就是定位依据。
 
 ## 3. 默认 ratio 的启动路径（G10，约 1–2 分钟）
 
@@ -76,7 +78,13 @@ python a5_hicache_e2e_probe.py \
   --g10
 ```
 
-这会额外启动一个只带 `--enable-hierarchical-cache`、不带 `--hicache-ratio` 的 server。当前代码预期启动失败，日志里应出现 auto-size 相关错误（V4 pool 不在 `_SIZEABLE_POOLS` / 没有 `layer_router`）。如果它能正常启动，说明 G10 已被其他改动修复，也请返回日志。
+这会额外启动一个只带 `--enable-hierarchical-cache`、不带 `--hicache-ratio` 的 server：
+
+- 在基线 `dsv41-a5` 上，预期启动失败，日志里出现 auto-size 相关错误（V4 pool 不在 `_SIZEABLE_POOLS` / 没有 `layer_router`）；
+- 应用提交 5 后，预期能正常启动，并打印 auto-size 选出的 ratio；
+- 带 C4 持久状态或 V4 draft 的模型仍应得到明确的“set --hicache-ratio”错误。
+
+不管哪种结果，请返回 `probe_out/g10` 的日志。
 
 ## 4. 返回什么
 

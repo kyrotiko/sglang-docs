@@ -46,17 +46,20 @@ python -m sglang.launch_server \
 
 | 用例 | 断言 | 对应缺口 |
 | --- | --- | --- |
-| `test_low_ratio_regions_build_host_pools` | C1/C2 KV 与 4 个 indexer K/scale host 池（共 6 个）均被装配；无 C128；`item_bytes` 等于 full page 字节（`S*row_bytes`） | G1/G5 |
-| `test_low_ratio_indexer_page_geometry` | NPU 4-D device 规范化为 `[full_pages, S, 1, dim]`；`_host_page_view` 形状 `[pages, 1, S, 1, dim]`；`_to_native_page_indices` 返回 `S = P//ratio` 个槽 | G1 |
-| `test_low_ratio_indexer_kernel_ascend_call` | mock 传输算子，`page_size=S`，索引覆盖 `S` 连续槽，`device_k.shape == (1, full_pages, S, 1, dim)` | G1 |
-| `test_low_ratio_regions_reserved` | `reserve_dsv4_paged_host_memory` 的预留字节包含 C1/C2 与 indexer 的 `I` 倍页数 | G2 |
-| `test_kv_pool_geometry_unchanged` | GPU 2-D 页行与 `item_bytes` 与修改前完全一致（回归） | G1 |
+| `test_npu_pa_nd_rows_use_full_page_bytes` | C1/C2 KV 与 indexer K/scale 的 `item_bytes` 等于 full page 字节；NPU indexer 规范化为 `[full_pages, S, 1, dim]` | G1/G5 |
+| `test_dsv4_compressed_pools.py::test_ced_host_uses_captured_owner_pages_and_full_page_units` | GPU 2-D 页行与 `item_bytes` 与修改前完全一致（回归） | G1 |
+| `test_low_ratio_pools_reserve_indexer_native_pages` | `reserve_dsv4_paged_host_memory` 的预留字节包含 C1/C2 与 indexer 的 `I` 倍页数 | G2 |
+| `test_draft_swa_row_bytes_must_match_target` | draft SWA 行宽与 target 不一致时启动期报错 | G6 |
+| `test_dsv4_paged_pools_are_sized_for_auto` | auto-size 统计 SWA/C1/C2/indexer 的设备字节 | G4/G10 |
 
 运行：
 
 ```bash
 cd D:/workspace/SGLang/sglang-dsv41-a5-hicache-l2
-python -m pytest test/registered/unit/mem_cache/test_dsv4_hicache_l2.py -q
+python -m pytest \
+  test/registered/unit/mem_cache/test_dsv4_hicache_l2.py \
+  test/registered/unit/mem_cache/test_dsv4_compressed_pools.py \
+  test/registered/unit/mem_cache/test_hicache_auto_size.py -q
 ```
 
 ## 2. P1：A5 功能用例

@@ -90,7 +90,7 @@ V4.1 与 V4 的关键差异：`compress_ratios` 为 1/2（低压缩比），没�
 - `backup_from_device_all_layer`：整页 D2H；`kernel_ascend` 分支见 `585-623`。
 - `load_to_device_per_layer`：逐层 H2D；`kernel_ascend` 分支见 `695-732`。
 - `_host_page_view`：为 Ascend split 算子构造 5-D 视图，`page_shape = (device_buffer.shape[1], 1, device_buffer.shape[-1])`（`402-418`）。`page_first` 下 `self.kv_buffer[:, l, :]` 的页间 stride 是 `layers * item_bytes`，因此不能把多个 host 页扁平化成一个连续的 native-page 维。
-- `_to_native_page_indices`：把一个逻辑页展开为 `native_page_size` 个 native 槽（`430-436`）；NPU 低压缩比 indexer 必须先把 4-D buffer 规范化为 full-page `[full_pages, S, 1, dim]`，否则这里会按 `K` 而不是 `S` 展开。
+- `_to_page_slots`：把一个逻辑页展开为 `page_slots` 个槽（`430-436`）；NPU 低压缩比 indexer 必须先把 4-D buffer 规范化为 full-page `[full_pages, S, 1, dim]`，否则这里会按 `K` 而不是 `S` 展开。
 
 ### 5.2 控制器与传输
 
