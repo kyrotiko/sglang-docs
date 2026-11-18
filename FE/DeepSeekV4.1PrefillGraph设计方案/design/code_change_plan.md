@@ -1,6 +1,6 @@
 # V4.1 Prefill Graph 本轮代码改动清单
 
-基线：`sglang/dsv41-a5@9898f7ce9a`；2026-11-17。实现分支：`dsv41-a5-graph-gpt`，实现提交：`d3700bf0a9edad40dc30b3cc4e6ea9f810822f34`；独立 worktree：`D:/workspace/SGLang/sglang-dsv41-a5-graph-gpt`。本方案对应的代码已落地并通过 287 项 CPU 回归，尚未做本版 A5 整模验收。本文只跟踪该分支，源码链接指向该独立 worktree。[实现与 CPU 回归记录](../validation/gpt-implementation-20261117.md)。
+基线：`sglang/dsv41-a5@9898f7ce9a`；更新日期 2026-11-18。实现分支：`dsv41-a5-graph-gpt`，当前实现提交：`182ba91e091da65f70ab64e71b04f6d3084011c1`（首版 `d3700bf0a9`）；独立 worktree：`D:/workspace/SGLang/sglang-dsv41-a5-graph-gpt`。idle metadata 接入已通过 289 项 CPU 回归，尚未做本提交的 A5 多 rank 整模验收。源码链接只指向自己的 worktree；见[idle 接入与运行记录](../validation/gpt-idle-metadata-20261118.md)及[首版记录](../validation/gpt-implementation-20261117.md)。
 
 本轮目标：让 V4.1 target 普通 EXTEND 的 source、indexer 和 attention 读取按 token bucket 固定的存储，并在 replay 前原地刷新本次请求的长度、位置、页表和 request-bank。复用已迁入的 breakable NPU graph，不重做 runner/backend，也不把“metadata 已分配”当成完整实现。
 
@@ -103,6 +103,17 @@ ratio-2 compressor 会读写 pending-pair state，warmup/capture 因此会改变
 因此本轮先保持 `base_attn_backend.py` 和 `prefill_cuda_graph_runner.py` 不变。整模接入时检查非零 request bank 在 capture 前后不变、跨 bucket capture 不受旧 dummy state 影响，以及实际 replay 切换 bank 后的结果/缓存正确性。只有出现可复现的 warmup 间状态依赖，且 bucket 入口初始化不足以解决时，才考虑增加 prefill 专用 reset hook。
 
 届时 runner 通过已有 `post_warmup_hook` 在图外调度，并与 Mamba cleanup 组合。现有 BCG 继续屏蔽通用 `on_after_cuda_graph_warmup()`：CUDA DSV4 的该 hook 可能把 metadata 恢复成 decode 留下的旧对象，不能为 NPU 清理需求直接取消屏蔽。任何 reset 都不得在正常 replay 时清理真实请求的 pending-pair state。
+
+### 2.4 已验证 dummy idle 协议的主仓接入（2026-11-18）
+
+第五/六轮已经验证物理 bucket dummy query、零有效行的本地链和状态保护。现在把这份协议接入自己的代码分支；第七轮的 odd-prefix compressor 数值问题另行保留，不新增整组 eager、ring 扩容或阈值变更。
+
+- 针对框架已经物化为 B=1 EXTEND、`global_num_token_non_padded_cpu=0` 的 idle rank，直接刷新 captured owner，不再调用 live eager metadata builder；该 builder 的真实请求/长度假设不适用于空 rank。
+- 固定 GPU/CPU cu 为 `[0,T_cap]`，query/KV 占位长度为 `T_cap`；`seqused/start_pos/live_mask/cycle-bank/SWA loc` 全 0；c1/c2 positions 为 0、loc 为 `-1`，full/SWA 页表归保留 page 0。index 页表复用现有 expansion，保留 page 0 对应的 index subpage offsets，不能一律清零。
+- window/cmp 有效长度为 0，window indices 按已测 ABI 保留第一个 0、其余 `-1`。重建 kernel metadata 后再保证该 index 约定，避免 helper 覆盖成全 `-1`。
+- QLI/QSLI 的 prefill KV length 从 captured owner 的固定 `actual_seq_lengths_kv` 读取，使 planner 与图内 compute 读取相同本轮长度；decode/verify 沿原协议。
+- 不修改 live/static ForwardBatch 的真实 token 计数，不清真实 request state，不重绑 top-k/candidate 图输出，不新增公共 runner/base hook。未物化为固定 bucket 的 native idle 继续沿现有 runner 准入规则。
+- 先用回归复现原 `idle rows or token capacity overflow`，再验证 live→idle→live 地址、尾部、index offsets、真实 bank 和零长度输入下跳过 eager builder。CPU 通过后提交自己分支做实际 DP/DeepEP 整模验证，不能预先宣称多 rank 已通过。
 
 ## 3. 测试落点与可阻止的回归
 

@@ -79,5 +79,5 @@ Python 编译、Ruff format、修改文件的基础 lint 和 `git diff --check` 
 
 [第六轮](a5-20261117-run6/findings.md)用合法 pending pair 比较有无 idle，两组均在 live odd-prefix 失败，差异已出现在 compressor 原始输出；两轮 idle 状态保护均通过。硬件变为 950PR、driver 25.1.rc3，实际主仓仍是 `24deba1e5f…`。
 
-[第七轮](a5-20261117-run7/findings.md)进一步隔离 compressor：相同 GPU 输入/state 下，odd-prefix 长 extend 的 eager 重复已在有效 row 0 不一致，其他有效行和最终 state exact；同步未消除合成链差异。已整理[算子方复现材料](../analysis/compressor_odd_prefix_reproducer.md)，等待匹配部署 ABI/构建的确认或修复，不继续原样重复 probe。主源码分支仍保持 `d3700bf0a9`，没有提交 idle veto 或未经设备验证的服务修复。
+[第七轮](a5-20261117-run7/findings.md)进一步隔离 compressor：相同 GPU 输入/state 下，odd-prefix 长 extend 的 eager 重复已在有效 row 0 不一致，其他有效行和最终 state exact；同步未消除合成链差异。已整理[算子方复现材料](../analysis/compressor_odd_prefix_reproducer.md)，等待匹配部署 ABI/构建的确认或修复，不继续原样重复 probe。该采集阶段主源码分支保持 `d3700bf0a9`，没有提交 idle veto。2026-11-18 已按单卡设备确认的 dummy 协议完成 [idle metadata 主仓接入](gpt-idle-metadata-20261118.md)，提交 `182ba91e09`，289 项 CPU 回归通过；该新提交的 A5 多 rank 整模验证待执行。
 

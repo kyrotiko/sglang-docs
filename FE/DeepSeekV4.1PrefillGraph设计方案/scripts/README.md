@@ -6,6 +6,8 @@
 
 首两轮 [run1](../validation/a5-20261116-run1/findings.md) / [run2](../validation/a5-20261116-run2/findings.md) 与 [randgun 合并记录](../analysis/randgun_merge_20261117.md)保留为对应旧环境/代码的历史快照。第三轮的硬件和 SDK 内容均有变化，即使包版本号相同也不自动等同。
 
+主仓 idle metadata 已在自己的 `dsv41-a5-graph-gpt@182ba91e09` 接入，289 项 CPU 回归通过；下一步是该提交的真实 DP 整模验证，见[接入与运行记录](../validation/gpt-idle-metadata-20261118.md)。单算子脚本仍保留 revision 7，不需要因此重新跑同类探针。
+
 ## 当前结论：独立 compressor 的 eager 重复也失败
 
 [第七轮](../validation/a5-20261117-run7/findings.md)已完成。相同 GPU x/state、同 stream 且显式同步，奇数 prefix 的长 extend 在 eager 重复中已发生有效 row 0 差异；偶数 prefix 长 extend 和奇数 prefix 单 token 对照通过。合成链 replay 前加同步仍失败。这里的 eager 调用发生在同进程 capture 之后，尚未排除 capture 初始化或全局 workspace 的影响。
