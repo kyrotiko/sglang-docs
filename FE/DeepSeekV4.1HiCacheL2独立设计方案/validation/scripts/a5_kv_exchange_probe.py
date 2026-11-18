@@ -180,19 +180,24 @@ def run_case(*, impl: str, pages: int, page_size: int, native_page_size: int,
     # H2D: load from the already-registered host buffer.  Do not pass a fresh
     # permuted copy here: AIV resolves host addresses from the registration
     # table, so every host operand must be the registered tensor itself.
+    # The public API is per-layer; loop over layers and pass one-layer views,
+    # matching memory_pool_host.py: load_to_device_per_layer().
     device_out = torch.zeros_like(device_view)
-    load(
-        device_indices,
-        host_indices,
-        device_out,
-        host,
-        empty_device,
-        empty_host,
-        page_size=page_size,
-        device_layer_id=0,
-        host_layer_id=0,
-        impl=impl,
-    )
+    for layer in range(layers):
+        device_layer = device_out[layer : layer + 1]
+        host_layer = host[:, layer : layer + 1]
+        load(
+            device_indices,
+            host_indices,
+            device_layer,
+            host_layer,
+            empty_device,
+            empty_host,
+            page_size=page_size,
+            device_layer_id=0,
+            host_layer_id=0,
+            impl=impl,
+        )
     torch.npu.synchronize()
     h2d_ok = torch.equal(device_out.cpu(), device_view.cpu())
     result["h2d_ok"] = h2d_ok
@@ -211,7 +216,8 @@ def main() -> int:
                         help="V4.1 DSV41_INDEX_PAGE_SIZE on A5")
     parser.add_argument("--page-sizes", type=int, nargs="+", default=[64, 128],
                         help="64 is the control; 128 is the full-page design")
-    parser.add_argument("--layers", type=int, default=1)
+    parser.add_argument("--layers", type=int, default=2,
+                        help="2 exercises the page_first layer stride between pages")
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
 

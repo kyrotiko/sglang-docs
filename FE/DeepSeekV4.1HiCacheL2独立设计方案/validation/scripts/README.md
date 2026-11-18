@@ -23,6 +23,8 @@ python a5_kv_exchange_probe.py --impl torch_native --out probe_out/op_ref
 python a5_kv_exchange_probe.py --impl ascendc_aiv --out probe_out/op_aiv
 ```
 
+默认 `--layers 2`，这样 host 的相邻页之间会隔着另一个 layer，正好覆盖 `page_first` 的真实 stride；`--layers 1` 会退化成连续布局，不能证明页间 gap 合法。
+
 期望：两个 `page_size`（64 和 128）的 `d2h_ok`、`h2d_ok` 都为 `True`。
 
 如果 `ascendc_aiv` 的 128 失败而 64 通过，说明我们设计的 full-page 传输不能直接用，需要改为在 host 侧保留 native page 行；请把 `probe_out/op_aiv/*.json` 返回。
