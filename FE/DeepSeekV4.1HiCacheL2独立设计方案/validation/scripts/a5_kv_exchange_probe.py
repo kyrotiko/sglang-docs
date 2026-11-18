@@ -150,10 +150,13 @@ def run_case(*, impl: str, pages: int, page_size: int, native_page_size: int,
         native_page_size=native_page_size,
         dim=dim,
     )
-    device_indices = torch.arange(
+    # Both index tensors must live on the same NPU as device_k; host_k stays
+    # on CPU.  This is an operator contract, not a host-buffer placement.
+    indices = torch.arange(
         pages * page_size, dtype=torch.int64, device=device.device
     )
-    host_indices = torch.arange(pages * page_size, dtype=torch.int64)
+    device_indices = indices
+    host_indices = indices.clone()
     empty_device = torch.empty(0, dtype=torch.uint8, device=device.device)
     empty_host = torch.empty(0, dtype=torch.uint8)
 
