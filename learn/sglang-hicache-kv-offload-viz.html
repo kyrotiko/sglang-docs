@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SGLang KV 卸载（HiCache L2）与 DeepSeek-V4.1 实现 · 可视化教学</title>
+<style>
+:root[data-theme="dark"]{
+  --bg:#060a13; --bg2:#0b1220; --panel:#0f1a2e; --panel2:#13223b;
+  --text:#e8eefb; --muted:#8ea3c2; --line:rgba(148,163,184,.18);
+  --cyan:#22d3ee; --violet:#a78bfa; --amber:#fbbf24; --green:#34d399; --pink:#f472b6; --red:#f87171;
+  --code:#0a1322; --shadow:0 24px 70px rgba(0,0,0,.5);
+  --hero-glow:radial-gradient(circle at 70% 20%,rgba(34,211,238,.18),transparent 45%),radial-gradient(circle at 20% 80%,rgba(167,139,250,.16),transparent 40%);
+}
+:root[data-theme="light"]{
+  --bg:#f6f8fc; --bg2:#eef2f9; --panel:#ffffff; --panel2:#f1f5fb;
+  --text:#16233a; --muted:#5b6b85; --line:rgba(15,23,42,.12);
+  --cyan:#0891b2; --violet:#7c3aed; --amber:#b45309; --green:#047857; --pink:#be185d; --red:#dc2626;
+  --code:#f4f7fb; --shadow:0 18px 50px rgba(15,23,42,.12);
+  --hero-glow:radial-gradient(circle at 70% 20%,rgba(8,145,178,.12),transparent 45%),radial-gradient(circle at 20% 80%,rgba(124,58,237,.1),transparent 40%);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--bg);color:var(--text);line-height:1.65;
+  font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  overflow-x:hidden;
+}
+::selection{background:color-mix(in srgb,var(--cyan) 35%,transparent)}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,.mono{font-family:"JetBrains Mono",Consolas,"Cascadia Code",monospace}
+.wrap{max-width:1180px;margin:0 auto;padding:0 26px}
+
+/* ---------- top bar ---------- */
+#progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:100;
+  background:linear-gradient(90deg,var(--cyan),var(--violet));box-shadow:0 0 12px var(--cyan)}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:90;backdrop-filter:blur(14px);
+  background:color-mix(in srgb,var(--bg) 78%,transparent);border-bottom:1px solid var(--line)}
+.topbar .inner{max-width:1180px;margin:0 auto;padding:10px 26px;display:flex;align-items:center;gap:20px}
+.brand{font-weight:700;letter-spacing:.3px;font-size:14px;color:var(--text);white-space:nowrap}
+.brand b{color:var(--cyan)}
+.topnav{display:flex;gap:4px;overflow-x:auto;flex:1;scrollbar-width:none}
+.topnav a{color:var(--muted);font-size:13px;padding:5px 9px;border-radius:999px;white-space:nowrap}
+.topnav a:hover{background:var(--panel2);color:var(--text);text-decoration:none}
+.theme-btn{border:1px solid var(--line);background:var(--panel);color:var(--text);
+  width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:15px}
+.theme-btn:hover{border-color:var(--cyan)}
+
+/* ---------- hero ---------- */
+.hero{min-height:88vh;display:flex;align-items:center;padding:120px 0 70px;
+  background:var(--hero-glow);position:relative;overflow:hidden}
+.hero .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center}
+.kicker{display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:2px;
+  text-transform:uppercase;color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 40%,transparent);
+  padding:5px 12px;border-radius:999px;background:color-mix(in srgb,var(--cyan) 8%,transparent)}
+.hero h1{font-size:clamp(30px,4.1vw,54px);line-height:1.12;margin:20px 0 18px;letter-spacing:-1px}
+.hero h1 .grad{background:linear-gradient(100deg,var(--cyan),var(--violet) 55%,var(--pink));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.lead{font-size:17px;color:var(--muted);max-width:560px;margin:0 0 26px}
+.hero .chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;
+  padding:7px 13px;font-size:13px;color:var(--muted)}
+.chip b{color:var(--text);font-weight:600}
+
+.tier-stack{position:relative;height:430px;display:flex;flex-direction:column;justify-content:center;gap:14px}
+.tier{position:relative;border:1px solid var(--line);border-radius:18px;padding:16px 18px;
+  background:linear-gradient(140deg,var(--panel),var(--panel2));box-shadow:var(--shadow);
+  transform:translateZ(0);overflow:hidden}
+.tier::after{content:"";position:absolute;inset:0;background:
+  linear-gradient(90deg,transparent,rgba(255,255,255,.05),transparent);
+  transform:translateX(-100%);animation:sheen 5s infinite}
+.tier .row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tier .tag{font-size:11px;letter-spacing:2px;color:var(--muted)}
+.tier h3{margin:2px 0 0;font-size:17px}
+.tier .meta{font-size:12px;color:var(--muted)}
+.tier .blocks{display:flex;gap:6px;margin-top:12px}
+.tier .blocks i{height:26px;border-radius:6px;flex:1;opacity:.85;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--c) 70%,#fff),var(--c))}
+.tier.l1{--c:var(--cyan)}
+.tier.l2{--c:var(--violet);margin-left:26px}
+.tier.l3{--c:var(--green);margin-left:52px;opacity:.9}
+.tier .float{position:absolute;right:16px;top:14px;font-size:11px;color:var(--muted);
+  border:1px dashed var(--line);padding:2px 8px;border-radius:999px}
+.hero-note{margin-top:16px;font-size:12px;color:var(--muted)}
+
+/* ---------- sections ---------- */
+section{padding:76px 0;border-top:1px solid var(--line);position:relative;scroll-margin-top:74px}
+.sec-head{max-width:780px;margin-bottom:30px}
+.sec-head .no{font-size:12px;letter-spacing:3px;color:var(--cyan);font-weight:700}
+.sec-head h2{font-size:clamp(24px,3vw,36px);margin:8px 0 10px;letter-spacing:-.5px}
+.sec-head p{color:var(--muted);margin:0}
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s ease}
+.reveal.show{opacity:1;transform:none}
+
+.card{background:linear-gradient(150deg,var(--panel),var(--panel2));border:1px solid var(--line);
+  border-radius:18px;padding:20px;box-shadow:var(--shadow)}
+.card h3{margin:0 0 8px;font-size:16px}
+.card p{margin:0;color:var(--muted);font-size:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid2.align-start{align-items:start}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+
+/* ---------- generic badge ---------- */
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+  letter-spacing:1px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.badge.cyan{color:var(--cyan);border-color:color-mix(in srgb,var(--cyan) 40%,transparent);background:color-mix(in srgb,var(--cyan) 8%,transparent)}
+.badge.violet{color:var(--violet);border-color:color-mix(in srgb,var(--violet) 40%,transparent);background:color-mix(in srgb,var(--violet) 8%,transparent)}
+.badge.amber{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 40%,transparent);background:color-mix(in srgb,var(--amber) 8%,transparent)}
+.badge.red{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,transparent);background:color-mix(in srgb,var(--red) 8%,transparent)}
+.badge.green{color:var(--green);border-color:color-mix(in srgb,var(--green) 40%,transparent);background:color-mix(in srgb,var(--green) 8%,transparent)}
+
+/* ---------- simulator ---------- */
+.sim{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start}
+.sim-side{display:flex;flex-direction:column;gap:16px;position:sticky;top:78px}
+.sim-stage{display:grid;grid-template-columns:1fr 74px 1fr;grid-template-areas:"dev bus host" "step step step";gap:12px;align-items:start}
+.pool-panel{padding:16px}
+.pool-panel.dev{grid-area:dev}
+.pool-panel.host{grid-area:host}
+.step-area{grid-area:step;display:grid;grid-template-columns:1.5fr .9fr;gap:12px;margin-top:2px}
+.step-area .card{display:flex;flex-direction:column;justify-content:center}
+.pool-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.pool-head h4{margin:0;font-size:14px;letter-spacing:.4px}
+.pool-head .sub{font-size:11px;color:var(--muted)}
+.pool{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+.cell{position:relative;height:52px;border-radius:9px;border:1px dashed var(--line);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:12px;color:var(--muted);transition:all .35s ease;overflow:visible}
+.cell .idx{font-size:9px;opacity:.45;font-family:Consolas,monospace}
+.cell.filled{border-style:solid;border-color:var(--c);background:var(--cell-bg);color:var(--text);
+  box-shadow:inset 0 0 18px color-mix(in srgb,var(--c) 12%,transparent)}
+.cell .pid{font-weight:700;font-family:Consolas,monospace;font-size:12px}
+.cell.hit{box-shadow:0 0 0 2px var(--c),0 0 22px color-mix(in srgb,var(--c) 55%,transparent);
+  transform:translateY(-2px)}
+.cell.hit::after{content:"hit";position:absolute;top:-9px;right:-6px;font-size:9px;
+  background:var(--c);color:#06101f;padding:1px 5px;border-radius:999px;font-weight:800}
+.cell.pop{animation:pop .4s cubic-bezier(.2,.9,.3,1.4)}
+.ghost{position:absolute;inset:0;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  font-family:Consolas,monospace;font-weight:700;font-size:12px;color:#fff;
+  background:color-mix(in srgb,var(--red) 70%,#000);pointer-events:none;animation:ghost .8s ease forwards}
+.bus{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  min-height:240px;position:relative;color:var(--muted);font-size:10px;letter-spacing:1px}
+.bus::before{content:"";position:absolute;top:8%;bottom:8%;width:2px;
+  background:linear-gradient(180deg,transparent,var(--line),transparent)}
+.bus .lane{writing-mode:vertical-rl;text-orientation:mixed;padding:8px 2px;
+  border-radius:999px;border:1px solid var(--line);background:var(--panel)}
+.bus .lane.h2d{color:var(--cyan)}
+.bus .lane.d2h{color:var(--violet)}
+.fly-chip{position:fixed;z-index:200;transform:translate(-50%,-50%);padding:4px 8px;border-radius:8px;
+  font-family:Consolas,monospace;font-size:11px;font-weight:700;color:#04101c;
+  background:var(--c);box-shadow:0 6px 20px color-mix(in srgb,var(--c) 45%,transparent);pointer-events:none}
+
+.req-card{padding:14px}
+.req-card .req-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.req-card .req-title b{font-size:13px}
+.req-pages{display:flex;flex-wrap:wrap;gap:4px}
+.req-page{font-family:Consolas,monospace;font-size:11px;padding:3px 6px;border-radius:6px;
+  border:1px solid var(--line);color:var(--muted)}
+.req-page.prefix{color:var(--text);border-color:color-mix(in srgb,var(--cyan) 45%,transparent);
+  background:color-mix(in srgb,var(--cyan) 10%,transparent)}
+.req-page.tail{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 45%,transparent);
+  background:color-mix(in srgb,var(--amber) 10%,transparent)}
+.req-sep{color:var(--muted);font-size:11px;align-self:center;padding:0 2px}
+.req-empty{color:var(--muted);font-size:12px;font-style:italic}
+
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.metric{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.metric .k{font-size:11px;color:var(--muted);letter-spacing:.5px}
+.metric .v{font-size:22px;font-weight:800;font-family:Consolas,monospace;line-height:1.2}
+.metric .v.cyan{color:var(--cyan)} .metric .v.violet{color:var(--violet)} .metric .v.amber{color:var(--amber)}
+.gauge{height:7px;border-radius:999px;background:var(--panel2);overflow:hidden;margin-top:10px}
+.gauge i{display:block;height:100%;width:0;border-radius:999px;
+  background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .5s ease}
+
+.radix{display:flex;flex-direction:column;gap:7px}
+.radix-line{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.radix-line.indent{padding-left:24px}
+.radix-line.cont{padding-left:10px}
+.radix-line.cont::before{content:"↳";color:var(--muted);font-size:11px;margin-right:2px}
+.rnode{position:relative;display:inline-flex;align-items:center;gap:3px;
+  font-family:Consolas,monospace;font-size:10.5px;padding:2px 5px;border-radius:6px;
+  border:1px solid var(--line);background:var(--panel);color:var(--muted);transition:all .3s}
+.rnode.root{color:var(--text);border-color:var(--violet)}
+.rnode .dots{display:inline-flex;gap:2px}
+.rnode .dot{width:4px;height:4px;border-radius:50%;background:var(--panel2);display:inline-block}
+.rnode.in-l1{border-color:color-mix(in srgb,var(--cyan) 55%,transparent);color:var(--text)}
+.rnode.in-l2{border-color:color-mix(in srgb,var(--violet) 55%,transparent);color:var(--text)}
+.rnode.in-l1 .dot.l1{background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+.rnode.in-l2 .dot.l2{background:var(--violet);box-shadow:0 0 6px var(--violet)}
+.rnode.matched{box-shadow:0 0 0 2px color-mix(in srgb,var(--amber) 60%,transparent);transform:translateY(-1px)}
+.rconnect{width:8px;height:1px;background:var(--line)}
+
+.sim-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:10px;
+  padding:7px 13px;font-size:13px;cursor:pointer;transition:all .2s}
+.btn:hover{border-color:var(--cyan);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(120deg,var(--cyan),var(--violet));color:#04101c;border:none;font-weight:800}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.speed{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:7px}
+.stepbar{display:flex;gap:5px;flex-wrap:wrap}
+.stepdot{width:8px;height:8px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);
+  cursor:pointer;transition:all .25s}
+.stepdot.active{background:var(--cyan);box-shadow:0 0 10px var(--cyan);transform:scale(1.25)}
+.step-text{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--cyan);
+  border-radius:12px;padding:13px 16px;min-height:86px}
+.step-text .st{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.step-text .st b{font-size:14px}
+.step-text p{margin:0;color:var(--muted);font-size:13.5px}
+.step-text .code-inline{color:var(--cyan);background:var(--code);padding:1px 5px;border-radius:5px;font-family:Consolas,monospace;font-size:12px}
+
+/* ---------- policy cards ---------- */
+.policy-card{padding:18px;overflow:hidden}
+.policy-card h3{display:flex;align-items:center;justify-content:space-between}
+.policy-vis{display:grid;grid-template-columns:1fr 30px 1fr;gap:8px;margin:16px 0 12px;align-items:center}
+.pcol{display:flex;flex-direction:column;gap:6px}
+.pcol .lab{font-size:10px;color:var(--muted);letter-spacing:1px;text-align:center}
+.pblk{height:22px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);
+  display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);
+  font-family:Consolas,monospace;transition:all .35s}
+.pblk.on{background:color-mix(in srgb,var(--cyan) 18%,transparent);
+  border-color:var(--cyan);color:var(--text)}
+.pblk.host{background:color-mix(in srgb,var(--violet) 18%,transparent);
+  border-color:var(--violet);color:var(--text)}
+.pblk.evict{background:color-mix(in srgb,var(--red) 25%,transparent);
+  border-color:var(--red);color:var(--text);animation:pulseRed .7s}
+.parrow{text-align:center;color:var(--muted);font-size:16px}
+.policy-note{font-size:12px;color:var(--muted);min-height:34px}
+.policy-live{font-size:11px;color:var(--cyan);font-family:Consolas,monospace;margin-top:4px}
+
+/* ---------- code / call chain ---------- */
+.chain{display:flex;flex-direction:column;gap:10px}
+.chain-row{display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:start}
+.chain-no{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:13px;color:#04101c;background:linear-gradient(120deg,var(--cyan),var(--violet))}
+.chain-body{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.chain-body h4{margin:0 0 4px;font-size:14px}
+.chain-body p{margin:0;font-size:13px;color:var(--muted)}
+.chain-body code{font-size:11px;color:var(--cyan);background:var(--code);padding:1px 5px;border-radius:4px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:12px;padding:14px;
+  overflow-x:auto;font-size:12px;line-height:1.7;margin:10px 0 0;color:#c9d7ee}
+:root[data-theme="light"] pre{color:#1c2a44}
+pre .c{color:var(--muted)} pre .k{color:var(--violet)} pre .s{color:var(--green)} pre .n{color:var(--amber)}
+
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tab{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;
+  padding:6px 13px;font-size:12px;cursor:pointer}
+.tab[aria-selected="true"]{color:var(--text);border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
+.tab-panel[hidden]{display:none}
+
+/* ---------- DSV4 anatomy ---------- */
+.anatomy{display:grid;grid-template-columns:1.1fr .9fr;gap:22px;align-items:start}
+.page-box{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;position:relative}
+.page-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.page-title span{font-size:12px;color:var(--muted)}
+.pagebar{height:34px;border-radius:10px;overflow:hidden;display:flex;border:1px solid var(--line)}
+.seg{height:100%;transition:width .7s cubic-bezier(.2,.8,.2,1);position:relative}
+.seg span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;color:#04101c;white-space:nowrap;overflow:hidden}
+.seg.s1{background:linear-gradient(180deg,#67e8f9,#22d3ee)}
+.seg.s2{background:linear-gradient(180deg,#c4b5fd,#a78bfa)}
+.seg.s3{background:linear-gradient(180deg,#fcd34d,#fbbf24)}
+.seg.s4{background:linear-gradient(180deg,#6ee7b7,#34d399)}
+.seg.s5{background:linear-gradient(180deg,#f9a8d4,#f472b6)}
+.anatomy-legend{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.al-row{display:flex;align-items:center;gap:10px;font-size:12px}
+.al-row i{width:12px;height:12px;border-radius:3px;flex:none}
+.al-row .nm{font-family:Consolas,monospace;color:var(--text);min-width:120px}
+.al-row .val{color:var(--muted);margin-left:auto;font-family:Consolas,monospace}
+.ratio-toggle{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.ratio-toggle button{border:none;background:transparent;color:var(--muted);padding:5px 12px;font-size:12px;cursor:pointer}
+.ratio-toggle button[aria-pressed="true"]{background:var(--panel2);color:var(--text)}
+.anatomy-note{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.7}
+
+.fanout{position:relative;height:330px;background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.fanout svg{position:absolute;inset:0;width:100%;height:100%}
+.fnode{position:absolute;font-family:Consolas,monospace;font-size:11px;padding:6px 9px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:8px;white-space:nowrap}
+.fnode.anchor{border-color:var(--cyan);color:var(--cyan)}
+.fnode.pool1{border-color:var(--cyan)} .fnode.pool2{border-color:var(--violet)}
+.fnode.pool3{border-color:var(--amber)} .fnode.pool4{border-color:var(--green)} .fnode.pool5{border-color:var(--pink)}
+.flowline{stroke-dasharray:5 6;animation:dash 1.2s linear infinite}
+.flowline.slow{animation-duration:2.2s}
+
+.geo{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.geo-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.geo-card h4{margin:0 0 8px;font-size:13px}
+.geo-card .mono{font-size:11px;color:var(--muted);line-height:1.7}
+.geo-card.bad{border-color:color-mix(in srgb,var(--red) 45%,transparent)}
+.geo-card.good{border-color:color-mix(in srgb,var(--green) 45%,transparent)}
+.geo-card.bad h4{color:var(--red)}
+.geo-card.good h4{color:var(--green)}
+
+/* ---------- issues ---------- */
+.issue{display:grid;grid-template-columns:70px 1fr;gap:14px;background:var(--panel);
+  border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+.issue .sev{display:flex;align-items:center;justify-content:center;height:38px;border-radius:10px;
+  font-size:11px;font-weight:800;letter-spacing:1px}
+.issue.high .sev{background:color-mix(in srgb,var(--red) 18%,transparent);color:var(--red);
+  border:1px solid color-mix(in srgb,var(--red) 50%,transparent)}
+.issue.mid .sev{background:color-mix(in srgb,var(--amber) 18%,transparent);color:var(--amber);
+  border:1px solid color-mix(in srgb,var(--amber) 50%,transparent)}
+.issue.low .sev{background:color-mix(in srgb,var(--green) 18%,transparent);color:var(--green);
+  border:1px solid color-mix(in srgb,var(--green) 50%,transparent)}
+.issue h4{margin:0 0 4px;font-size:14px}
+.issue p{margin:0;font-size:13px;color:var(--muted)}
+.issue code{font-size:11px}
+
+/* ---------- metrics / checklist ---------- */
+.check{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--muted);margin:8px 0}
+.check .box{width:16px;height:16px;border-radius:5px;border:1px solid var(--line);margin-top:3px;flex:none;
+  display:flex;align-items:center;justify-content:center;color:var(--green);font-size:11px}
+.check.done .box{background:color-mix(in srgb,var(--green) 15%,transparent);border-color:var(--green)}
+.check b{color:var(--text)}
+
+/* ---------- footer ---------- */
+footer{padding:40px 0 60px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.refs{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin-top:10px}
+.refs span{font-family:Consolas,monospace;font-size:11px}
+
+/* ---------- keyframes ---------- */
+@keyframes sheen{0%{transform:translateX(-100%)}55%{transform:translateX(100%)}100%{transform:translateX(100%)}}
+@keyframes pop{0%{transform:scale(.6);opacity:.2}100%{transform:scale(1);opacity:1}}
+@keyframes ghost{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-18px) scale(.85)}}
+@keyframes pulseRed{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--red) 0%,transparent)}
+  50%{box-shadow:0 0 0 5px color-mix(in srgb,var(--red) 35%,transparent)}}
+@keyframes dash{to{stroke-dashoffset:-22}}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes glowPulse{0%,100%{opacity:.55}50%{opacity:1}}
+.floaty{animation:floaty 6s ease-in-out infinite}
+
+/* ---------- responsive ---------- */
+@media (max-width:1000px){
+  .hero .wrap{grid-template-columns:1fr}
+  .hero{min-height:auto}
+  .tier-stack{height:360px}
+  .sim{grid-template-columns:1fr}
+  .sim-side{position:static}
+  .sim-stage{grid-template-columns:1fr;grid-template-areas:"dev" "bus" "host" "step";gap:14px}
+  .step-area{grid-template-columns:1fr}
+  .bus{min-height:52px;flex-direction:row}
+  .bus::before{inset:0;width:0}
+  .bus .lane{writing-mode:horizontal-tb}
+  .anatomy,.geo,.grid2,.grid3{grid-template-columns:1fr}
+  .grid4{grid-template-columns:1fr 1fr}
+}
+@media (max-width:600px){
+  .wrap{padding:0 16px}
+  .pool{grid-template-columns:repeat(4,1fr)}
+  .grid4{grid-template-columns:1fr}
+  .topnav{display:none}
+  .refs{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div class="topbar">
+  <div class="inner">
+    <div class="brand">SGLang · <b>HiCache L2</b> KV Offload</div>
+    <nav class="topnav" aria-label="章节导航">
+      <a href="#why">为什么</a>
+      <a href="#arch">三层结构</a>
+      <a href="#sim">生命周期</a>
+      <a href="#policy">写策略</a>
+      <a href="#impl">实现机制</a>
+      <a href="#dsv4">DSV4</a>
+      <a href="#aiv">A5 传输</a>
+      <a href="#issues">已知问题</a>
+      <a href="#verify">验收</a>
+    </nav>
+    <button class="theme-btn" id="themeBtn" title="切换主题" aria-label="切换亮/暗主题">☾</button>
+  </div>
+</div>
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <span class="kicker">SGLang Internals · 可视化教学</span>
+      <h1>KV 淘汰后去哪儿了？<br><span class="grad">HiCache L2 卸载机制</span></h1>
+      <p class="lead">
+        从 RadixAttention 的 L1 命中，到 host DRAM 的 L2 备份与回载；再到 DeepSeek-V4.1
+        的 SWA / C1 / C2 / indexer 多池结构。用一条请求的时间线，把代码里的 prefetch、
+        write policy、host pool group 和 AIV 传输串起来。
+      </p>
+      <div class="chips">
+        <span class="chip"><b>L1</b> device HBM</span>
+        <span class="chip"><b>L2</b> host DRAM</span>
+        <span class="chip"><b>L3</b> 本例不启用</span>
+        <span class="chip">Ascend A5 · <b>kernel_ascend</b></span>
+      </div>
+      <p class="hero-note">页面中的页数、容量为教学简化；真实值由启动参数与池几何决定。所有代码引用基于 <span class="mono">dsv41-a5@9898f7ce9a</span>。</p>
+    </div>
+    <div class="tier-stack" aria-label="三层缓存结构示意">
+      <div class="tier l1 floaty" style="animation-delay:.1s">
+        <div class="row"><div><div class="tag">TIER · L1</div><h3>Device HBM · KV Pool</h3></div><span class="badge cyan">命中 → 直接 prefill</span></div>
+        <div class="meta">每页 128 token；SWA / C1 / C2 / indexer</div>
+        <div class="blocks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              </div>
+      <div class="tier l2 floaty" style="animation-delay:.5s">
+        <div class="row"><div><div class="tag">TIER · L2</div><h3>Host DRAM · HiCache</h3></div><span class="badge violet">命中 → H2D 回载</span></div>
+        <div class="meta">本机、实例私有；按 ratio 扩容</div>
+        <div class="blocks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              </div>
+      <div class="tier l3 floaty" style="animation-delay:.9s">
+        <div class="row"><div><div class="tag">TIER · L3</div><h3>Storage · 跨实例</h3></div><span class="badge green">本例不启用</span></div>
+        <div class="meta">mooncake / file / hf3fs / npu_memcache …</div>
+        <div class="blocks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              </div>
+    </div>
+  </div>
+</header>
+
+<main>
+<!-- ================= WHY ================= -->
+<section id="why">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="no">01 · WHY</div>
+      <h2>重复的前缀，能不能不重算？</h2>
+      <p>Prefill 的代价随上下文线性增长。RadixAttention 把已算过的 KV 留在 device 上复用；当 device 放不下时，HiCache 把它扩展到 host。</p>
+    </div>
+    <div class="grid3 reveal">
+      <div class="card">
+        <span class="badge cyan">L1 命中</span>
+        <h3 style="margin-top:12px">Device 里还在</h3>
+        <p>请求前缀与 radix tree 匹配，KV 直接就在 HBM。此时只 prefill 未命中的尾部，<code>cached_tokens</code> 增加，不产生任何 host↔device 拷贝。</p>
+      </div>
+      <div class="card">
+        <span class="badge violet">L2 命中</span>
+        <h3 style="margin-top:12px">Device 里没了，Host 里有</h3>
+        <p>树节点仍记录 host 副本。调度器把命中页从 host 回载到 device，再 prefill 剩余 token。代价是一次 H2D，而不是整段重算。</p>
+      </div>
+      <div class="card">
+        <span class="badge amber">都未命中</span>
+        <h3 style="margin-top:12px">老老实实算</h3>
+        <p>L1/L2 都没有，就按正常 prefill 计算；计算出的完整页按写策略备份到 host，供后续请求复用。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ARCH ================= -->
+<section id="arch">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="no">02 · ARCHITECTURE</div>
+      <h2>HiCache 的四个角色</h2>
+      <p>不要把 HiCache 理解成“一个大 memcpy”。它由元数据（树）、记账（host pool group）、控制器（队列 + 事件）和数据面（IO backend）四层组成。</p>
+    </div>
+    <div class="grid4 reveal">
+      <div class="card">
+        <span class="badge cyan">元数据</span>
+        <h3 style="margin-top:10px">HiRadixTree</h3>
+        <p>节点除了 token 序列，还记录“这段 KV 在 L1 还是 L2”。匹配结果是一个 device 前缀 + 一段 host 命中长度。</p>
+      </div>
+      <div class="card">
+        <span class="badge violet">记账</span>
+        <h3 style="margin-top:10px">HostPoolGroup</h3>
+        <p>逻辑页锚点 <code>LogicalHostPool</code> 分配 host 槽位；SWA、压缩 KV、indexer 等 sidecar 复用同一套 host 索引，不重复分配。</p>
+      </div>
+      <div class="card">
+        <span class="badge amber">调度</span>
+        <h3 style="margin-top:10px">CacheController</h3>
+        <p>维护 write / load / prefetch 队列；把一次请求拆成逐层的 H2D、整页的 D2H，并用完成事件保证层序。</p>
+      </div>
+      <div class="card">
+        <span class="badge green">数据面</span>
+        <h3 style="margin-top:10px">IO Backend</h3>
+        <p><code>direct</code> / <code>kernel</code> / <code>kernel_ascend</code> 三种实现；A5 上由 AIV 的 <code>kv_exchange</code> 完成。</p>
+      </div>
+    </div>
+
+    <div class="card reveal" style="margin-top:22px">
+      <h3>一次 offload 的代码骨架</h3>
+      <pre><span class="c"># 1. 参数：--enable-hierarchical-cache 打开整条链路</span>
+<span class="c"># 2. 建树时挂载 host 池与控制器</span>
+UnifiedRadixCache.init_hicache(server_args, params)
+  └─ _DeepSeekV4Strategy.build(...)
+       └─ build_deepseek_v4_hicache_stack(...)   <span class="c"># host pool group + controller</span>
+
+<span class="c"># 3. 请求路径</span>
+match_prefix()        <span class="c"># 返回 device_hit / host_hit 长度（按页对齐）</span>
+controller.load(...)  <span class="c"># host hit → 逐层 H2D；每层记录完成事件</span>
+wait_layer_transfer(layer_id)
+prefill(...)
+controller.write(...) <span class="c"># 按 write policy 做 D2H 备份</span></pre>
+      <p style="margin-top:10px">实现在 <code>python/sglang/srt/mem_cache/hybrid_cache/</code> 与 <code>python/sglang/srt/managers/cache_controller.py</code>。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SIMULATOR ================= -->
+<section id="sim">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="no">03 · LIFECYCLE</div>
+      <h2>跟着一条请求走一遍</h2>
+      <p>下面是一个 10 页 device 池、20 页 host 池的简化模拟。R1 写入前缀，R2 命中 L1；随后几个新前缀把 R1 挤出 device；R6 再次请求 A 前缀时，走 L2 回载。</p>
+    </div>
+
+    <div class="sim reveal">
+      <aside class="sim-side">
+        <div class="card req-card">
+          <div class="req-title"><b>当前请求</b><span class="badge" id="reqBadge">IDLE</span></div>
+          <div id="reqPanel"><div class="req-empty">等待请求…</div></div>
+        </div>
+
+        <div class="card">
+          <div class="req-title"><b>HiRadixTree</b><span class="badge violet">元数据</span></div>
+          <div class="radix" id="radix"></div>
+          <p style="margin-top:10px;font-size:11px;color:var(--muted)">方框边框：<span style="color:var(--cyan)">L1</span> / <span style="color:var(--violet)">L2</span> 有副本；金色描边 = 本次命中。</p>
+        </div>
+
+        <div class="card">
+          <div class="metrics">
+            <div class="metric"><div class="k">cached_tokens</div><div class="v cyan" id="mCached">0</div></div>
+            <div class="metric"><div class="k">host_hit tokens</div><div class="v violet" id="mHost">0</div></div>
+            <div class="metric"><div class="k">device_hit tokens</div><div class="v" id="mDev">0</div></div>
+            <div class="metric"><div class="k">host 池占用</div><div class="v amber" id="mUsed">0/20</div></div>
+          </div>
+          <div class="gauge"><i id="gauge"></i></div>
+        </div>
+
+        <div class="card">
+          <div class="sim-controls">
+            <button class="btn" id="prevBtn">← 上一步</button>
+            <button class="btn primary" id="playBtn">▶ 播放</button>
+            <button class="btn" id="nextBtn">下一步 →</button>
+          </div>
+          <div class="sim-controls" style="margin-top:8px">
+            <button class="btn" id="resetBtn">重置</button>
+            <select class="speed" id="speed" aria-label="播放速度">
+              <option value="1">1×</option>
+              <option value="0.7">0.7×</option>
+              <option value="1.6">1.6×</option>
+              <option value="2.4">2.4×</option>
+            </select>
+          </div>
+          <div class="stepbar" id="stepbar" style="margin-top:12px"></div>
+        </div>
+      </aside>
+
+      <div class="sim-stage">
+        <div class="card pool-panel dev">
+          <div class="pool-head"><h4>L1 · Device HBM</h4><span class="sub">10 pages · page=128 tok</span></div>
+          <div class="pool" id="devicePool"></div>
+          <div class="pool-head" style="margin-top:16px"><h4>L1 说明</h4></div>
+          <p style="margin:0;font-size:11.5px;color:var(--muted);line-height:1.7">device 页是真正参与 attention 的数据。命中 L1 时不产生任何 host↔device 拷贝。</p>
+        </div>
+
+        <div class="bus" aria-hidden="true">
+          <div class="lane h2d">H2D ← load</div>
+          <div class="lane d2h">D2H → backup</div>
+        </div>
+
+        <div class="card pool-panel host">
+          <div class="pool-head"><h4>L2 · Host DRAM</h4><span class="sub">20 pages · write_through</span></div>
+          <div class="pool" id="hostPool"></div>
+          <div class="pool-head" style="margin-top:16px"><h4>L2 说明</h4></div>
+          <p style="margin:0;font-size:11.5px;color:var(--muted);line-height:1.7">host 页是 device 页的字节副本；本机私有。命中 L2 时用一次 H2D 换掉整段重算。</p>
+        </div>
+
+        <div class="step-area">
+          <div class="card">
+            <div class="step-text" id="stepText" aria-live="polite">
+              <div class="st"><b id="stepTitle">准备开始</b></div>
+              <p id="stepDesc">点击“播放”，或按 → 逐步查看。</p>
+            </div>
+          </div>
+          <div class="card">
+            <div style="font-size:12px;color:var(--muted);line-height:1.9">
+              <div><span class="badge cyan">L1 命中</span> 只读 device，不产生拷贝</div>
+              <div style="margin-top:5px"><span class="badge violet">L2 命中</span> host → device 逐层回载</div>
+              <div style="margin-top:5px"><span class="badge amber">未命中</span> 正常 prefill，再按策略备份</div>
+              <div style="margin-top:5px"><span class="badge red">淘汰</span> 红色 ghost = device 页被释放</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= POLICY ================= -->
+<section id="policy">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="no">04 · WRITE POLICY</div>
+      <h2>什么时候把 KV 写进 host？</h2>
+      <p>同一个 host 池，三种写策略决定 D2H 的时机。L2-only 场景最常用 <code>write_through</code>：逻辑最简单，device 淘汰时 host 一定已有副本。</p>
+    </div>
+    <div class="grid3 reveal">
+      <div class="card policy-card" data-policy="through">
+        <h3>write_through <span class="badge cyan">默认</span></h3>
+        <p>prefill 完成即备份；host 始终是 device 的完整镜像。</p>
+        <div class="policy-vis">
+          <div class="pcol"><div class="lab">DEVICE</div><div class="pblk" data-i="0">P0</div><div class="pblk" data-i="1">P1</div><div class="pblk" data-i="2">P2</div></div>
+          <div class="parrow">→</div>
+          <div class="pcol"><div class="lab">HOST</div><div class="pblk" data-h="0">P0</div><div class="pblk" data-h="1">P1</div><div class="pblk" data-h="2">P2</div></div>
+        </div>
+        <div class="policy-note">D2H 立即发生，可能带来写带宽开销。</div>
+        <div class="policy-live">immediate backup</div>
+      </div>
+      <div class="card policy-card" data-policy="back">
+        <h3>write_back <span class="badge violet">省带宽</span></h3>
+        <p>device 淘汰时才备份；host 只在需要时接收。</p>
+        <div class="policy-vis">
+          <div class="pcol"><div class="lab">DEVICE</div><div class="pblk" data-i="0">P0</div><div class="pblk" data-i="1">P1</div><div class="pblk" data-i="2">P2</div></div>
+          <div class="parrow">→</div>
+          <div class="pcol"><div class="lab">HOST</div><div class="pblk" data-h="0">P0</div><div class="pblk" data-h="1">P1</div><div class="pblk" data-h="2">P2</div></div>
+        </div>
+        <div class="policy-note">淘汰与备份耦合；淘汰路径需要额外同步。</div>
+        <div class="policy-live">on eviction</div>
+      </div>
+      <div class="card policy-card" data-policy="selective">
+        <h3>write_through_selective <span class="badge amber">折中</span></h3>
+        <p>只备份部分页（如按热度/长度筛选），其余按需。</p>
+        <div class="policy-vis">
+          <div class="pcol"><div class="lab">DEVICE</div><div class="pblk" data-i="0">P0</div><div class="pblk" data-i="1">P1</div><div class="pblk" data-i="2">P2</div></div>
+          <div class="parrow">→</div>
+          <div class="pcol"><div class="lab">HOST</div><div class="pblk" data-h="0">P0</div><div class="pblk" data-h="1">P1</div><div class="pblk" data-h="2">P2</div></div>
+        </div>
+        <div class="policy-note">命中率与写放大之间的可调折中。</div>
+        <div class="policy-live">selected pages</div>
+      </div>
+    </div>
+    <p class="reveal" style="color:var(--muted);font-size:13px;margin-top:16px">
+      代码入口：<code class="mono">--hicache-write-policy</code> 在 <code class="mono">arg_groups/fields/memory.py</code> 定义；
+      控制器按策略把页放进 <code class="mono">write_queue</code>，由写线程执行 D2H。V4.1 首批推荐 <code class="mono">write_through</code>。
+    </p>
+  </div>
+</section>
+
+<!-- ================= IMPLEMENTATION ================= -->
+<section id="impl">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="no">05 · MECHANISM</div>
+      <h2>实现机制：从参数到 AIV 内核</h2>
+      <p>HiCache 不是一个单独模块，而是“树 + 池 + 控制器 + 传输引擎”的组合。下面按一次请求的顺序拆开。</p>
+    </div>
+
+    <div class="grid2 reveal align-start">
+      <div class="chain">
+        <div class="chain-row"><div class="chain-no">1</div><div class="chain-body">
+          <h4>参数解析与默认值</h4>
+          <p><code>--enable-hierarchical-cache</code>、<code>--hicache-ratio</code>、<code>--hicache-write-policy</code>、<code>--hicache-io-backend</code>。NPU 上自动改写为 <code>kernel_ascend</code>，DSV4 自动选 <code>page_first</code> 和 <code>acl</code> host 内存后端。</p>
+          <p style="margin-top:4px"><code>arg_groups/fields/memory.py</code> · <code>hardware_backend/npu/utils.py</code></p>
+        </div></div>
+        <div class="chain-row"><div class="chain-no">2</div><div class="chain-body">
+          <h4>建树并挂载 host 池</h4>
+          <p><code>UnifiedRadixCache.init_hicache</code> 触发 hybrid stack。DSV4 走 <code>_DeepSeekV4Strategy</code> → <code>build_deepseek_v4_hicache_stack</code>，返回 <code>HostPoolGroup</code> 和 <code>HybridCacheController</code>。</p>
+          <p style="margin-top:4px"><code>mem_cache/registry.py</code> · <code>mem_cache/hybrid_cache/hybrid_pool_assembler.py</code></p>
+        </div></div>
+        <div class="chain-row"><div class="chain-no">3</div><div class="chain-body">
+          <h4>匹配：device 前缀 + host 命中长度</h4>
+          <p>radix tree 返回连续前缀；host 命中按整页向下取整。sidecar（SWA / 压缩池 / indexer）按 <code>ALL_PAGES</code> 或 <code>TRAILING_PAGES</code> 校验完整性。</p>
+          <p style="margin-top:4px"><code>mem_cache/unified_radix_cache.py</code> · <code>managers/schedule_policy.py</code></p>
+        </div></div>
+        <div class="chain-row"><div class="chain-no">4</div><div class="chain-body">
+          <h4>回载：逐层 H2D + 完成事件</h4>
+          <p>控制器为命中页分配 device 槽，按层提交 H2D。每层记录 <code>LayerLoadingEvent</code>；模型在读取某层 KV 前 <code>wait_layer_transfer(layer_id)</code>，保证层序。</p>
+          <p style="margin-top:4px"><code>managers/cache_controller.py</code> · <code>mem_cache/l2_transfer.py</code></p>
+        </div></div>
+        <div class="chain-row"><div class="chain-no">5</div><div class="chain-body">
+          <h4>备份与淘汰</h4>
+          <p>按写策略把完整页 D2H；host 满时 LRU 回收。sidecar 不单独分配 host 槽，而是复用锚点的 host 索引，保证 KV 与 indexer 同生同死。</p>
+          <p style="margin-top:4px"><code>mem_cache/pool_host/group.py</code> · <code>mem_cache/memory_pool_host.py</code></p>
+        </div></div>
+      </div>
+
+      <div class="card">
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" aria-selected="true" data-tab="t1">匹配</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="t2">回载</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="t3">备份</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="t4">传输</button>
+        </div>
+        <div class="tab-panel" id="t1">
+<pre><span class="c"># 树节点同时记录 L1/L2 副本；匹配结果是两段</span>
+device_hit = match_in_device(...)
+host_hit   = match_in_host(...)   <span class="c"># 按 page 向下取整</span>
+<span class="c"># 只有整页齐全的 sidecar 才允许命中</span>
+<span class="k">if</span> not sidecars_complete(host_hit):
+    host_hit = 0</pre>
+        </div>
+        <div class="tab-panel" id="t2" hidden>
+<pre><span class="c"># 每个 host 页 → 一个 device 槽；逐层提交</span>
+<span class="k">for</span> layer <span class="k">in</span> layers:
+    host_pool.load_to_device_per_layer(
+        device_pool, host_indices, device_indices, layer,
+        io_backend=<span class="s">"kernel_ascend"</span>)
+    layer_event.complete(layer)</pre>
+        </div>
+        <div class="tab-panel" id="t3" hidden>
+<pre><span class="c"># write_through：prefill 完即备份整页</span>
+host_indices = controller.write(
+    device_indices, extra_pools=sidecar_xfers)
+<span class="c"># sidecar 复用源页的 host/device 索引</span>
+<span class="c"># host 满 → LRU 淘汰；被引用页跳过</span></pre>
+        </div>
+        <div class="tab-panel" id="t4" hidden>
+<pre><span class="c"># A5：AIV kv_exchange，host 必须先注册到 device VA</span>
+transfer_kv_all_layer_kv_split_lf_pf(
+    device_indices=..., host_indices=...,
+    device_k=dev_view, host_k=host_view,
+    page_size=<span class="n">128</span>, impl=<span class="s">"auto"</span>)
+<span class="c"># dev_view: [1, pages, slots, 1, dim]</span>
+<span class="c"># 不支持 NPU graph capture</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid3 reveal" style="margin-top:22px">
+      <div class="card"><span class="badge cyan">关键数据</span><h3 style="margin-top:10px">LayerLoadingEvent</h3><p>每层一个 device event；<code>wait(layer)</code> 让注意力只等待自己需要的那一层，形成 H2D 与计算的重叠。</p></div>
+      <div class="card"><span class="badge violet">关键数据</span><h3 style="margin-top:10px">PoolTransfer</h3><p>一次 L2 传输的描述：pool 名、host/device 索引、来源池、命中策略。sidecar 通过 <code>indices_from_pool</code> 复用源页索引。</p></div>
+      <div class="card"><span class="badge amber">关键数据</span><h3 style="margin-top:10px">Priority / Queue</h3><p>写队列与读队列分离；prefill 前后台线程执行 D2H，调度线程继续推进其他请求。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= DSV4 ================= -->
+<section id="dsv4">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="no">06 · DEEPSEEK-V4 / V4.1</div>
+      <h2>DSV4 的 KV 不是“一个池”</h2>
+      <p>DeepSeek-V4 系列把 KV 拆成窗口 KV、压缩 KV、indexer、压缩状态等多个池。HiCache 必须为每一种区域建 host 池，且让它们共享同一套页生命周期。</p>
+    </div>
+
+    <div class="grid4 reveal">
+      <div class="card"><span class="badge cyan">窗口</span><h3 style="margin-top:10px">SWA KV</h3><p>mxfp8_bf16 行，每 token 544 B（512 维）。滑窗命中只需最后 N 页（<code>TRAILING_PAGES</code>）。</p></div>
+      <div class="card"><span class="badge violet">压缩</span><h3 style="margin-top:10px">C1 / C2 KV</h3><p>V4.1 压缩比 1/2。C1 每 full page 128 槽，C2 每 full page 64 槽；mxfp4 行 320 B/token。</p></div>
+      <div class="card"><span class="badge amber">索引</span><h3 style="margin-top:10px">indexer K / scale</h3><p>两级 indexer 的 packed fp4 K（64 B/token）+ e8m0 scale（4 B/token），决定 sparse attention 的 top-k。</p></div>
+      <div class="card"><span class="badge green">状态</span><h3 style="margin-top:10px">compressor state</h3><p>V4 的 C4 持久 ring 会进 host；V4.1 的 ratio-2 状态是请求级，回载后按页边界重建，不进 HiCache。</p></div>
+    </div>
+
+    <div class="anatomy reveal" style="margin-top:22px">
+      <div class="page-box">
+        <div class="page-title">
+          <b>一个 full page（128 token）里有什么？</b>
+          <div class="ratio-toggle" role="group" aria-label="压缩比">
+            <button id="r1Btn" aria-pressed="true">ratio 1</button>
+            <button id="r2Btn" aria-pressed="false">ratio 2</button>
+          </div>
+        </div>
+        <div class="pagebar" id="pagebar">
+          <div class="seg s1" style="width:50%"><span>SWA 544 B/tok</span></div>
+          <div class="seg s2" style="width:30%"><span>C1 KV 320 B/tok</span></div>
+          <div class="seg s5" style="width:12%"><span>idx K</span></div>
+          <div class="seg s4" style="width:8%"><span>scale</span></div>
+        </div>
+        <div class="anatomy-legend" id="legacyLegend">
+          <div class="al-row"><i style="background:#22d3ee"></i><span class="nm">SWA window</span><span class="val" data-v="swa">128 × 544 B = 68.0 KB</span></div>
+          <div class="al-row"><i style="background:#a78bfa"></i><span class="nm">C1 compressed KV</span><span class="val" data-v="cmp">128 × 320 B = 40.0 KB</span></div>
+          <div class="al-row"><i style="background:#f472b6"></i><span class="nm">indexer K (fp4)</span><span class="val" data-v="ik">128 × 64 B = 8.0 KB</span></div>
+          <div class="al-row"><i style="background:#34d399"></i><span class="nm">indexer scale</span><span class="val" data-v="is">128 × 4 B = 0.5 KB</span></div>
+        </div>
+        <p class="anatomy-note" id="anatomyNote">
+          ratio 1：一个 full page 覆盖 128 个压缩槽；indexer 的 native page 为 64 槽，因此 <code>I = 2</code> 个 index page。
+        </p>
+        <div style="margin-top:10px;font-size:11px;color:var(--muted)">
+          * 以 nope 448 + rope 64、index_head_dim=128、V41 行为例；实际宽度由 <code>NPUDSV4KVLayout.kv_info()</code> 计算。
+        </div>
+      </div>
+
+      <div class="fanout" aria-label="sidecar 复用 host 索引">
+        <svg id="fanSvg" aria-hidden="true"></svg>
+        <div class="fnode anchor" style="left:22px;top:150px">LogicalHostPool<br>slot p</div>
+        <div class="fnode pool1" style="right:20px;top:28px">SWA host pool</div>
+        <div class="fnode pool2" style="right:20px;top:86px">C1 KV host pool</div>
+        <div class="fnode pool3" style="right:20px;top:144px">C2 KV host pool</div>
+        <div class="fnode pool4" style="right:20px;top:202px">indexer K pool</div>
+        <div class="fnode pool5" style="right:20px;top:260px">indexer scale pool</div>
+        <div class="fnode" style="left:22px;bottom:18px;color:var(--muted);border-style:dashed">同一个 host 页号<br>fan-out 到所有 sidecar</div>
+      </div>
+    </div>
+
+    <div class="grid2 reveal" style="margin-top:22px">
+      <div class="card">
+        <h3>装配路径（代码）</h3>
+        <pre><span class="c"># _DeepSeekV4Strategy.build</span>
+host_pool_group, cache_controller =
+    build_deepseek_v4_hicache_stack(
+      params, kvcache,
+      host_swa_evict_fn=...,       <span class="c"># SWA 尾页回收</span>
+      host_c128_evict_fn=...,      <span class="c"># 仅 V4</span>
+      c128_attn_allocator=...,     <span class="c"># 仅 V4</span>
+    )
+<span class="c"># entries: KV(anchor), SWA, C1/C2, indexers, ...</span>
+<span class="c"># sidecar: indices_from_pool=KV/SWA</span></pre>
+      </div>
+      <div class="card">
+        <h3>一次命中时发生了什么</h3>
+        <ol style="margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13.5px;line-height:1.9">
+          <li>树匹配 A1–A5，host 有、device 没有 → <code>host_hit=5 页</code>。</li>
+          <li>锚点分配 5 个 device 槽，必要时淘汰旧页。</li>
+          <li>SWA / C1 / C2 / indexer K / scale 五个池，用同一组索引逐层 H2D。</li>
+          <li>注意力读第 l 层前等待该层完成事件。</li>
+          <li>只 prefill 尾部；<code>cached_tokens=640</code>。</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="issue high reveal" style="margin-top:22px">
+      <div class="sev">HIGH</div>
+      <div>
+        <h4>V4.1 低压缩比路径的页几何尚未闭环（G1）</h4>
+        <p>KV 的 <code>item_bytes</code> 用 <code>shape[1] * element_size</code> 计算，少乘行宽；indexer 的 host 行是 2-D，而 AIV 传输需要 5-D PA_ND 视图；ratio-1 的 indexer 还只展开 64 个槽（<code>S=128</code>）。详见
+        <a href="../FE/DeepSeekV4.1HiCacheL2独立设计方案/analysis/gap_analysis.md">gap_analysis.md</a>。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= AIV ================= -->
+<section id="aiv">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="no">07 · ASCEND A5</div>
+      <h2>Host↔Device 拷贝：AIV 分片传输</h2>
+      <p>NPU 上没法直接用 cudaMemcpy。HiCache 使用 <code>transfer_kv_*_kv_split</code>，底层是 CANN 的 <code>kv_exchange</code> AIV 算子；host 内存必须先注册进 device 虚拟地址空间。</p>
+    </div>
+
+    <div class="grid2 reveal">
+      <div class="card">
+        <h3 style="display:flex;justify-content:space-between">数据面 <span class="badge cyan">arch35 · A5</span></h3>
+        <pre><span class="c"># 备份（all-layer D2H）</span>
+transfer_kv_all_layer_kv_split_lf_pf(
+    device_indices, host_indices,
+    device_k=[1, pages, slots, 1, dim],
+    host_k  =[pages, 1, slots, 1, dim],
+    page_size=slots, impl=<span class="s">"auto"</span>)
+
+<span class="c"># 回载（per-layer H2D）</span>
+transfer_kv_per_layer_kv_split_pf_lf(
+    ..., device_layer_id, host_layer_id)</pre>
+        <p style="margin-top:8px">限制：host 页必须是完整、连续的 slot run；payload 不做量化转换；AIV 路径不支持 NPU graph capture。</p>
+      </div>
+      <div class="card">
+        <h3>Host 内存后端</h3>
+        <div class="check done"><span class="box">✓</span><span><b>acl</b>：<code>aclrtHostRegister(ACL_HOST_REGISTER_MAPPED)</code>，分配时逐块注册。DSV4 默认。</span></div>
+        <div class="check"><span class="box"> </span><span><b>memfabric</b>：<code>Offload</code> 预保留整个 DRAM 区间，<code>ensure_capacity</code> 固定总额。当前 V4.1 预留未覆盖 C1/C2（G2）。</span></div>
+        <div class="check"><span class="box">✓</span><span><b>page_first</b>：host 池按 <code>[page, layer, bytes]</code> 组织，适合 AIV 的整页搬运。</span></div>
+        <div class="check"><span class="box">✓</span><span><b>逐层事件</b>：H2D 每层完成后才能被注意力读取；避免看到半页数据。</span></div>
+      </div>
+    </div>
+
+    <div class="geo reveal" style="margin-top:20px">
+      <div class="geo-card good">
+        <h4>✓ 正确的 5-D 几何（KV 池）</h4>
+        <div class="mono">device: [1, npu_pages, S, 1, dim]<br>host&nbsp;&nbsp;: [pages, 1, S, 1, dim]<br>page_size = S<br>index = page * S + arange(S)</div>
+        <p style="margin:8px 0 0;font-size:12px;color:var(--muted)">C1: S=128，C2: S=64；两者 slot_page_size 都是 128，但展开槽数不同。</p>
+      </div>
+      <div class="geo-card bad">
+        <h4>✗ 低压缩比 indexer 的当前代码</h4>
+        <div class="mono">host row: [full_pages, byte_len]  (2-D)<br>推 native_page_size = shape[1] = 字节数<br>ratio-1 只展开 K=64，而 S=128</div>
+        <p style="margin:8px 0 0;font-size:12px;color:var(--muted)">需要用 I 个 native page 组成一个 full page 的 run；见 <a href="../FE/DeepSeekV4.1HiCacheL2独立设计方案/design/code_change_plan.md">code_change_plan.md</a>。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ISSUES ================= -->
+<section id="issues">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="no">08 · KNOWN ISSUES</div>
+      <h2>这条路径在 DSV4.1 上的未闭环点</h2>
+      <p>教学页不掩盖问题：框架在，但 V4.1 低压缩比 host 池还需要修复与 A5 实测。以下按优先级排列。</p>
+    </div>
+    <div class="reveal">
+      <div class="issue high">
+        <div class="sev">HIGH</div>
+        <div><h4>G1 · 低压缩比 host 池几何</h4>
+          <p>KV 的 <code>item_bytes</code> 少乘 <code>dim</code>；indexer 2-D 页行与 Ascend 5-D 视图不一致；ratio-1 indexer 展开长度不足。影响：备份/回载越界或 top-k 错误。</p></div>
+      </div>
+      <div class="issue mid">
+        <div class="sev">MED</div>
+        <div><h4>G2 · memfabric 预留漏 C1/C2</h4>
+          <p><code>reserve_dsv4_paged_host_memory</code> 只统计 SWA/C4/C128/C4 state；ACL 默认不受影响，memfabric 会少预留。</p></div>
+      </div>
+      <div class="issue mid">
+        <div class="sev">MED</div>
+        <div><h4>G5 · 没有 V4.1 host 池单测与 A5 E2E</h4>
+          <p>现有 NPU HiCache 用例覆盖 Qwen3 / DeepSeek-R1 / V4 C4，未覆盖 V4.1 低压缩比。必须构造“device 淘汰后再命中”的 L2 用例。</p></div>
+      </div>
+      <div class="issue low">
+        <div class="sev">LOW</div>
+        <div><h4>G3 · 不支持 --hicache-size</h4>
+          <p>DSV4 启动期直接拒绝按 GB 定容，只能用 <code>--hicache-ratio</code>。首批接受该限制。</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= VERIFY ================= -->
+<section id="verify">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="no">09 · VERIFY</div>
+      <h2>怎么证明“真的走了 L2”</h2>
+      <p>重复请求命中 L1 也会让 <code>cached_tokens</code> 变大，不能证明 host 路径。必须先用其它请求把 device 页挤出去，再看分层指标。</p>
+    </div>
+    <div class="grid3 reveal">
+      <div class="card">
+        <span class="badge cyan">方法</span>
+        <h3 style="margin-top:10px">先挤出 device</h3>
+        <p>请求 A → 发送足够多的不同长前缀填满 device → 再请求 A。此时若仍命中，只可能来自 host。</p>
+      </div>
+      <div class="card">
+        <span class="badge violet">指标</span>
+        <h3 style="margin-top:10px">host_hit 必须是正</h3>
+        <p><code>sglang:prefill_effective_tokens_total{mode="host_hit"}</code> 在请求窗口内增长；<code>cached_tokens</code> 只说明命中，不区分层级。</p>
+      </div>
+      <div class="card">
+        <span class="badge amber">正确性</span>
+        <h3 style="margin-top:10px">greedy 逐 token 对比</h3>
+        <p>同一 prompt 在“HiCache off”和“强制 L2 命中”下比较输出；不一致优先检查 indexer 与压缩状态重建。</p>
+      </div>
+    </div>
+    <div class="card reveal" style="margin-top:20px">
+      <h3>验收清单</h3>
+      <div class="grid2">
+        <div>
+          <div class="check done"><span class="box">✓</span><span>启动日志出现 <b>SWA / C1 / C2 / indexer</b> 各 host 池的 GB 分配</span></div>
+          <div class="check done"><span class="box">✓</span><span>短 prompt（&lt; 1 页）不缓存</span></div>
+          <div class="check done"><span class="box">✓</span><span>不同前缀不误命中</span></div>
+        </div>
+        <div>
+          <div class="check done"><span class="box">✓</span><span>device 淘汰后重复前缀 → <b>host_hit &gt; 0</b></span></div>
+          <div class="check done"><span class="box">✓</span><span>host 池占用按容量公式增长并回落</span></div>
+          <div class="check done"><span class="box">✓</span><span>压力下无泄漏、无崩溃</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <div style="color:var(--text);font-weight:700;margin-bottom:6px">SGLang HiCache L2 · 可视化教学</div>
+      <div>基于 <span class="mono">sglang@dsv41-a5 (9898f7ce9a)</span> 代码分析；示意数字用于讲解，不替代实测。</div>
+      <div style="margin-top:8px">配套设计文档：<a href="../FE/DeepSeekV4.1HiCacheL2独立设计方案/README.md">DeepSeekV4.1HiCacheL2独立设计方案</a></div>
+    </div>
+    <div class="refs">
+      <span>arg_groups/fields/memory.py</span>
+      <span>managers/cache_controller.py</span>
+      <span>mem_cache/hybrid_cache/hybrid_pool_assembler.py</span>
+      <span>mem_cache/hybrid_cache/hybrid_cache_controller.py</span>
+      <span>mem_cache/pool_host/group.py</span>
+      <span>mem_cache/l2_transfer.py</span>
+      <span>mem_cache/memory_pool_host.py</span>
+      <span>hardware_backend/npu/utils.py</span>
+      <span>hardware_backend/npu/dsv4/dsv4_memory_pool.py</span>
+      <span>mem_cache/deepseek_v4_memory_pool.py</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* =========================================================
+   Theme + scroll progress + reveal
+   ========================================================= */
+const root = document.documentElement;
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.addEventListener('click', () => {
+  const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+  root.dataset.theme = next;
+  themeBtn.textContent = next === 'dark' ? '☾' : '☀';
+});
+
+const progress = document.getElementById('progress');
+addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const max = h.scrollHeight - h.clientHeight;
+  progress.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+}, {passive: true});
+
+const io = new IntersectionObserver((rows) => {
+  rows.forEach(r => { if (r.isIntersecting) r.target.classList.add('show'); });
+}, {threshold: .12});
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+/* =========================================================
+   Code tabs
+   ========================================================= */
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const group = tab.parentElement;
+    group.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', 'false'));
+    tab.setAttribute('aria-selected', 'true');
+    const card = tab.closest('.card');
+    card.querySelectorAll('.tab-panel').forEach(p => p.hidden = true);
+    const panel = document.getElementById(tab.dataset.tab);
+    if (panel) panel.hidden = false;
+  });
+});
+
+/* =========================================================
+   Theme-aware helpers
+   ========================================================= */
+function hexToRgba(hex, a) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h, 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return `rgba(${r},${g},${b},${a})`;
+}
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* =========================================================
+   Simulator
+   ========================================================= */
+const COLORS = {A:'#22d3ee', B:'#a78bfa', C:'#fbbf24', D:'#34d399', Q:'#f472b6'};
+const DEV_N = 10, HOST_N = 20;
+const P = id => ({id, color: COLORS[id[0]] || '#94a3b8'});
+function mk(entries) { const a = Array(DEV_N).fill(null); for (const [i, id] of entries) a[i] = P(id); return a; }
+function mkh(entries) { const a = Array(HOST_N).fill(null); for (const [i, id] of entries) a[i] = P(id); return a; }
+
+const EMPTY_D = Array(DEV_N).fill(null);
+const EMPTY_H = Array(HOST_N).fill(null);
+
+const D_R1 = mk([[0,'A1'],[1,'A2'],[2,'A3'],[3,'A4'],[4,'A5'],[5,'A6']]);
+const H_R1 = mkh([[0,'A1'],[1,'A2'],[2,'A3'],[3,'A4'],[4,'A5'],[5,'A6']]);
+const D_R3 = mk([[0,'A1'],[1,'A2'],[2,'A3'],[3,'A4'],[4,'A5'],[5,'A6'],[6,'B1'],[7,'B2'],[8,'B3']]);
+const H_R3 = mkh([[0,'A1'],[1,'A2'],[2,'A3'],[3,'A4'],[4,'A5'],[5,'A6'],[6,'B1'],[7,'B2'],[8,'B3']]);
+const D_R4 = mk([[0,'A4'],[1,'A5'],[2,'A6'],[3,'B1'],[4,'B2'],[5,'B3'],[6,'C1'],[7,'C2'],[8,'C3'],[9,'C4']]);
+const H_R4 = mkh([[0,'A1'],[1,'A2'],[2,'A3'],[3,'A4'],[4,'A5'],[5,'A6'],[6,'B1'],[7,'B2'],[8,'B3'],[9,'C1'],[10,'C2'],[11,'C3'],[12,'C4']]);
+const D_R5 = mk([[0,'B2'],[1,'B3'],[2,'C1'],[3,'C2'],[4,'C3'],[5,'C4'],[6,'D1'],[7,'D2'],[8,'D3'],[9,'D4']]);
+const H_R5 = mkh([[0,'A1'],[1,'A2'],[2,'A3'],[3,'A4'],[4,'A5'],[5,'A6'],[6,'B1'],[7,'B2'],[8,'B3'],[9,'C1'],[10,'C2'],[11,'C3'],[12,'C4'],[13,'D1'],[14,'D2'],[15,'D3'],[16,'D4']]);
+const D_R6 = mk([[0,'A1'],[1,'A2'],[2,'A3'],[3,'A4'],[4,'A5'],[6,'D1'],[7,'D2'],[8,'D3'],[9,'D4']]);
+const H_R6 = mkh([[0,'A1'],[1,'A2'],[2,'A3'],[3,'A4'],[4,'A5'],[5,'A6'],[6,'B1'],[7,'B2'],[8,'B3'],[9,'C1'],[10,'C2'],[11,'C3'],[12,'C4'],[13,'D1'],[14,'D2'],[15,'D3'],[16,'D4'],[17,'Q1']]);
+const D_R6F = mk([[0,'A1'],[1,'A2'],[2,'A3'],[3,'A4'],[4,'A5'],[5,'Q1'],[6,'D1'],[7,'D2'],[8,'D3'],[9,'D4']]);
+
+const REQ = {
+  R1: {name:'R1', pages:['A1','A2','A3','A4','A5'], tail:'A6', note:'首次请求 A 前缀'},
+  R2: {name:'R2', pages:['A1','A2','A3','A4','A5'], tail:'A6', note:'与 R1 完全相同'},
+  R3: {name:'R3', pages:['A1','A2','A3','A4','A5','B1','B2'], tail:'B3', note:'共享 A 前缀，扩展 B'},
+  R4: {name:'R4', pages:['C1','C2','C3'], tail:'C4', note:'全新前缀 C'},
+  R5: {name:'R5', pages:['D1','D2','D3'], tail:'D4', note:'全新前缀 D'},
+  R6: {name:'R6', pages:['A1','A2','A3','A4','A5'], tail:'Q1', note:'再次请求 A 前缀'}
+};
+
+const frames = [
+  {
+    tag:'IDLE', title:'准备开始', desc:'device 与 host 都是空的。下面的每一次点击，都对应调度器与控制器里的一个真实阶段。',
+    req:null, device:EMPTY_D, host:EMPTY_H, md:[], mh:[],
+    metrics:{cached:0, dev:0, host:0, used:0}, trans:[]
+  },
+  {
+    tag:'R1 · ARRIVE', title:'R1 到达：cold miss', desc:'HiRadixTree 从 root 开始匹配。device 没有、host 也没有，因此 device_hit = host_hit = 0，需要完整 prefill 6 页。',
+    req:REQ.R1, device:EMPTY_D, host:EMPTY_H, md:[], mh:[],
+    metrics:{cached:0, dev:0, host:0, used:0}, trans:[]
+  },
+  {
+    tag:'R1 · PREFILL', title:'R1 prefill：KV 写入 device', desc:'6 个完整页写入 L1。注意：只有整页才会进入缓存；不足 128 token 的尾部不缓存。',
+    req:REQ.R1, device:D_R1, host:EMPTY_H, md:[], mh:[],
+    metrics:{cached:0, dev:0, host:0, used:0}, trans:[]
+  },
+  {
+    tag:'R1 · BACKUP', title:'write_through：立即 D2H 备份', desc:'prefill 完成后，6 个页立即备份到 host。树节点现在同时记录 L1 与 L2 副本；host 池占用 6/20。',
+    req:REQ.R1, device:D_R1, host:H_R1, md:[], mh:[],
+    metrics:{cached:0, dev:0, host:0, used:6},
+    trans:[{dir:'d2h', pairs:[[0,0],[1,1],[2,2],[3,3],[4,4],[5,5]]}]
+  },
+  {
+    tag:'R2 · L1 HIT', title:'R2 相同前缀：L1 命中', desc:'前缀完全在 device 中，直接复用 6 页。cached_tokens = 6 × 128 = 768；没有 host 访问，也没有 D2H/H2D。',
+    req:REQ.R2, device:D_R1, host:H_R1, md:[0,1,2,3,4,5], mh:[],
+    metrics:{cached:768, dev:768, host:0, used:6}, trans:[]
+  },
+  {
+    tag:'R3 · MATCH', title:'R3 到达：A 前缀命中 L1', desc:'R3 = A1–A5 + B1–B2 | B3。前 5 页在 device 命中；B 段未命中，准备计算 3 页（B1/B2/B3）。',
+    req:REQ.R3, device:D_R1, host:H_R1, md:[0,1,2,3,4], mh:[],
+    metrics:{cached:640, dev:1408, host:0, used:6}, trans:[]
+  },
+  {
+    tag:'R3 · PREFILL', title:'R3 prefill：只算未命中的 B 段', desc:'A 段直接复用；B1–B3 写入 device。device 现在有 9 页，接近 10 页容量。',
+    req:REQ.R3, device:D_R3, host:H_R1, md:[], mh:[],
+    metrics:{cached:640, dev:1408, host:0, used:6}, trans:[]
+  },
+  {
+    tag:'R3 · BACKUP', title:'B 段备份到 host', desc:'B1–B3 进入 host 池。host 现在同时持有 A 与 B 两条前缀，共 9 页。',
+    req:REQ.R3, device:D_R3, host:H_R3, md:[], mh:[],
+    metrics:{cached:640, dev:1408, host:0, used:9},
+    trans:[{dir:'d2h', pairs:[[6,6],[7,7],[8,8]]}]
+  },
+  {
+    tag:'R4 · NEW', title:'R4 全新前缀：device 满，淘汰 A 段', desc:'C 前缀未命中。device 已有 9 页，需要 4 页 → 按 LRU 淘汰 A1–A3（host 已有副本，所以直接释放 device）。C1–C4 写入。',
+    req:REQ.R4, device:D_R4, host:H_R3, md:[], mh:[],
+    metrics:{cached:0, dev:1408, host:0, used:9}, trans:[]
+  },
+  {
+    tag:'R4 · BACKUP', title:'C 段备份到 host', desc:'C1–C4 进入 host。注意：被淘汰的 A1–A3 仍在 host 里，树节点也还保留它们的 L2 元数据。',
+    req:REQ.R4, device:D_R4, host:H_R4, md:[], mh:[],
+    metrics:{cached:0, dev:1408, host:0, used:13},
+    trans:[{dir:'d2h', pairs:[[6,9],[7,10],[8,11],[9,12]]}]
+  },
+  {
+    tag:'R5 · NEW', title:'R5 全新前缀：继续淘汰', desc:'D 前缀未命中。device 再次腾出 4 页（A4–A6、B1），写入 D1–D4。此时 A 前缀在 device 中已经一页不剩。',
+    req:REQ.R5, device:D_R5, host:H_R4, md:[], mh:[],
+    metrics:{cached:0, dev:1408, host:0, used:13}, trans:[]
+  },
+  {
+    tag:'R5 · BACKUP', title:'D 段备份到 host', desc:'D1–D4 进入 host。host 持有 A/B/C/D 的所有页，共 17 页。device 中只剩 B2/B3 + C + D。',
+    req:REQ.R5, device:D_R5, host:H_R5, md:[], mh:[],
+    metrics:{cached:0, dev:1408, host:0, used:17},
+    trans:[{dir:'d2h', pairs:[[6,13],[7,14],[8,15],[9,16]]}]
+  },
+  {
+    tag:'R6 · L2 HIT', title:'R6 再次请求 A：走 L2', desc:'A1–A5 都不在 device，但树记录它们在 host。host_hit = 5 页；控制器腾出 device 槽（淘汰 B2/B3/C1–C4），把 A1–A5 H2D 回载。cached_tokens = 640。',
+    req:REQ.R6, device:D_R6, host:H_R5, md:[], mh:[0,1,2,3,4],
+    metrics:{cached:640, dev:1408, host:640, used:17},
+    trans:[{dir:'h2d', pairs:[[0,0],[1,1],[2,2],[3,3],[4,4]]}]
+  },
+  {
+    tag:'R6 · TAIL', title:'只 prefill 新尾页，然后备份', desc:'A 段回载完成，只计算新的尾页 Q1；Q1 再按 write_through 备份。整次请求只算了 1 页，而不是 6 页。',
+    req:REQ.R6, device:D_R6F, host:H_R6, md:[0,1,2,3,4], mh:[],
+    metrics:{cached:640, dev:1408, host:640, used:18},
+    trans:[{dir:'d2h', pairs:[[5,17]]}]
+  },
+  {
+    tag:'DONE', title:'总结：host 是 device 的“后备箱”', desc:'L1 命中不产生拷贝；L2 命中用一次 H2D 换掉整段重算；write_through 让 host 始终有完整副本。真实系统还会叠加 L3、PD 分离、投机解码等维度。',
+    req:null, device:D_R6F, host:H_R6, md:[], mh:[],
+    metrics:{cached:640, dev:1408, host:640, used:18}, trans:[]
+  }
+];
+
+/* ---------- DOM refs ---------- */
+const devicePool = document.getElementById('devicePool');
+const hostPool = document.getElementById('hostPool');
+const reqPanel = document.getElementById('reqPanel');
+const reqBadge = document.getElementById('reqBadge');
+const stepTitle = document.getElementById('stepTitle');
+const stepDesc = document.getElementById('stepDesc');
+const mCached = document.getElementById('mCached');
+const mHost = document.getElementById('mHost');
+const mDev = document.getElementById('mDev');
+const mUsed = document.getElementById('mUsed');
+const gauge = document.getElementById('gauge');
+const stepbar = document.getElementById('stepbar');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const speedSel = document.getElementById('speed');
+
+let idx = 0;
+let playing = false;
+let timer = null;
+let lastDevice = EMPTY_D.slice();
+let lastHost = EMPTY_H.slice();
+let activeChips = [];
+let pendingTimeouts = [];
+let counters = new Map();
+
+/* ---------- tree ---------- */
+const TREE_ROWS = [
+  {items:['root','A1','A2','A3','A4']},
+  {items:['A5','A6'], cls:'cont'},
+  {items:['B1','B2','B3'], cls:'indent'},
+  {items:['root','C1','C2','C3','C4']},
+  {items:['root','D1','D2','D3','D4','Q1']}
+];
+function buildTree() {
+  const radix = document.getElementById('radix');
+  TREE_ROWS.forEach(({items, cls}) => {
+    const line = document.createElement('div');
+    line.className = 'radix-line' + (cls ? ' ' + cls : '');
+    items.forEach((label, i) => {
+      if (i > 0) {
+        const c = document.createElement('span');
+        c.className = 'rconnect';
+        line.appendChild(c);
+      }
+      const n = document.createElement('span');
+      n.className = 'rnode' + (label === 'root' ? ' root' : '');
+      if (label !== 'root') n.dataset.p = label;
+      n.innerHTML = label + '<span class="dots"><i class="dot l1"></i><i class="dot l2"></i></span>';
+      line.appendChild(n);
+    });
+    radix.appendChild(line);
+  });
+}
+buildTree();
+
+function renderTree(device, host, md, mh) {
+  const matchedIds = new Set();
+  md.forEach(i => { if (device[i]) matchedIds.add(device[i].id); });
+  mh.forEach(i => { if (host[i]) matchedIds.add(host[i].id); });
+  document.querySelectorAll('.rnode[data-p]').forEach(n => {
+    const id = n.dataset.p;
+    n.classList.toggle('in-l1', device.some(p => p && p.id === id));
+    n.classList.toggle('in-l2', host.some(p => p && p.id === id));
+    n.classList.toggle('matched', matchedIds.has(id));
+  });
+}
+
+/* ---------- request ---------- */
+function renderReq(req) {
+  if (!req) {
+    reqPanel.innerHTML = '<div class="req-empty">等待请求…</div>';
+    reqBadge.textContent = 'IDLE';
+    return;
+  }
+  reqBadge.textContent = req.name;
+  const pages = req.pages.map(p => `<span class="req-page prefix">${p}</span>`).join('');
+  const tail = `<span class="req-sep">|</span><span class="req-page tail">${req.tail}</span>`;
+  reqPanel.innerHTML = `<div class="req-pages">${pages}${tail}</div>
+    <div style="margin-top:8px;font-size:11px;color:var(--muted)">${req.note}</div>`;
+}
+
+/* ---------- pool render ---------- */
+function makeCell(side, i, page, prevPage, matched) {
+  const cell = document.createElement('div');
+  cell.className = 'cell' + (page ? ' filled' : '');
+  cell.dataset.side = side;
+  cell.dataset.i = i;
+  if (page) {
+    cell.style.setProperty('--c', page.color);
+    cell.style.setProperty('--cell-bg', hexToRgba(page.color, .16));
+    cell.innerHTML = `<span class="pid">${page.id}</span><span class="idx">#${i}</span>`;
+    if (matched) cell.classList.add('hit');
+    if (!prevPage || prevPage.id !== page.id) cell.classList.add('pop');
+  } else {
+    cell.innerHTML = `<span class="idx">#${i}</span>`;
+  }
+  return cell;
+}
+
+function spawnGhost(cell, page) {
+  const g = document.createElement('div');
+  g.className = 'ghost';
+  g.style.setProperty('--red', 'var(--red)');
+  g.textContent = page.id;
+  cell.appendChild(g);
+  setTimeout(() => g.remove(), 850);
+}
+
+function renderPool(el, side, slots, prevSlots, matched) {
+  el.innerHTML = '';
+  slots.forEach((page, i) => {
+    const cell = makeCell(side, i, page, prevSlots[i], matched.has(i));
+    el.appendChild(cell);
+    if (!page && prevSlots[i]) spawnGhost(cell, prevSlots[i]);
+  });
+}
+
+/* ---------- counters ---------- */
+function animateNumber(el, value) {
+  if (reduceMotion) { el.textContent = value; return; }
+  const key = el.id;
+  const from = counters.get(key) ?? 0;
+  if (from === value) { el.textContent = value; return; }
+  counters.set(key, value);
+  const t0 = performance.now();
+  const dur = 480;
+  function tick(t) {
+    const k = Math.min(1, (t - t0) / dur);
+    const eased = 1 - Math.pow(1 - k, 3);
+    el.textContent = Math.round(from + (value - from) * eased);
+    if (k < 1) requestAnimationFrame(tick);
+    else el.textContent = value;
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ---------- transfer chips ---------- */
+function clearChips() {
+  activeChips.forEach(c => c.remove());
+  activeChips = [];
+  pendingTimeouts.forEach(id => clearTimeout(id));
+  pendingTimeouts = [];
+}
+
+function flyChip(fromEl, toEl, page, dir) {
+  if (!fromEl || !toEl || !page) return;
+  if (reduceMotion) return;
+  const a = fromEl.getBoundingClientRect();
+  const b = toEl.getBoundingClientRect();
+  const chip = document.createElement('div');
+  chip.className = 'fly-chip';
+  chip.style.setProperty('--c', page.color);
+  chip.textContent = (dir === 'h2d' ? '↑ ' : '↓ ') + page.id;
+  chip.style.left = (a.left + a.width / 2) + 'px';
+  chip.style.top = (a.top + a.height / 2) + 'px';
+  document.body.appendChild(chip);
+  activeChips.push(chip);
+  const dx = (b.left + b.width / 2) - (a.left + a.width / 2);
+  const dy = (b.top + b.height / 2) - (a.top + a.height / 2);
+  const anim = chip.animate([
+    { transform: 'translate(-50%,-50%) scale(.9)', opacity: .95 },
+    { transform: `translate(${dx}px,${dy}px) translate(-50%,-50%) scale(.72)`, opacity: 1 }
+  ], { duration: 780, easing: 'cubic-bezier(.3,.8,.3,1)' });
+  anim.onfinish = () => { chip.remove(); activeChips = activeChips.filter(c => c !== chip); };
+}
+
+function runTransfers(trans) {
+  if (!trans || !trans.length) return;
+  const f = frames[idx];
+  trans.forEach(t => {
+    const st = t.dir === 'h2d' ? 120 : 220;
+    t.pairs.forEach((pair, k) => {
+      const [from, to] = pair;
+      const id = setTimeout(() => {
+        if (t.dir === 'd2h') {
+          flyChip(devicePool.children[from], hostPool.children[to], f.device[from], 'd2h');
+        } else {
+          flyChip(hostPool.children[from], devicePool.children[to], f.host[from], 'h2d');
+        }
+      }, st + k * 140);
+      pendingTimeouts.push(id);
+    });
+  });
+}
+
+/* ---------- step dots ---------- */
+frames.forEach((f, i) => {
+  const d = document.createElement('button');
+  d.className = 'stepdot';
+  d.title = f.tag;
+  d.setAttribute('aria-label', `第 ${i + 1} 步：${f.tag}`);
+  d.addEventListener('click', () => { pause(); go(i); });
+  stepbar.appendChild(d);
+});
+
+/* ---------- render ---------- */
+function render(step, animateTransfers = true) {
+  const f = frames[step];
+  clearChips();
+  const md = new Set(f.md), mh = new Set(f.mh);
+
+  // pools: draw with previous state for ghosts/animation
+  renderPool(devicePool, 'dev', f.device, lastDevice, md);
+  renderPool(hostPool, 'host', f.host, lastHost, mh);
+
+  // tree / request / text
+  renderTree(f.device, f.host, f.md, f.mh);
+  renderReq(f.req);
+  stepTitle.textContent = f.title;
+  stepDesc.textContent = f.desc;
+
+  // metrics
+  animateNumber(mCached, f.metrics.cached);
+  animateNumber(mHost, f.metrics.host);
+  animateNumber(mDev, f.metrics.dev);
+  mUsed.textContent = `${f.metrics.used}/${HOST_N}`;
+  gauge.style.width = `${(f.metrics.used / HOST_N) * 100}%`;
+
+  // dots
+  [...stepbar.children].forEach((d, i) => d.classList.toggle('active', i === step));
+
+  // buttons
+  prevBtn.disabled = step === 0;
+  nextBtn.disabled = step === frames.length - 1;
+
+  // transfers (after layout)
+  requestAnimationFrame(() => { if (animateTransfers) runTransfers(f.trans); });
+
+  // store previous state
+  lastDevice = f.device.slice();
+  lastHost = f.host.slice();
+}
+
+function go(step) {
+  const target = Math.max(0, Math.min(frames.length - 1, step));
+  const backward = target < idx;
+  if (backward) {
+    // Going back: suppress ghost/pop/transfer animations for the target state.
+    lastDevice = frames[target].device.slice();
+    lastHost = frames[target].host.slice();
+  }
+  idx = target;
+  render(idx, !backward);
+  if (playing && idx === frames.length - 1) pause();
+}
+
+function scheduleNext() {
+  if (!playing) return;
+  const delay = 2500 / parseFloat(speedSel.value || '1');
+  timer = setTimeout(() => {
+    if (idx < frames.length - 1) {
+      go(idx + 1);
+      scheduleNext();
+    } else {
+      pause();
+    }
+  }, delay);
+}
+
+function play() {
+  if (playing) return;
+  if (idx === frames.length - 1) go(0);
+  playing = true;
+  playBtn.textContent = '❚❚ 暂停';
+  scheduleNext();
+}
+
+function pause() {
+  playing = false;
+  if (timer) clearTimeout(timer);
+  timer = null;
+  playBtn.textContent = '▶ 播放';
+}
+
+prevBtn.addEventListener('click', () => { pause(); go(idx - 1); });
+nextBtn.addEventListener('click', () => { pause(); go(idx + 1); });
+playBtn.addEventListener('click', () => playing ? pause() : play());
+resetBtn.addEventListener('click', () => { pause(); go(0); });
+speedSel.addEventListener('change', () => { if (playing) { clearTimeout(timer); scheduleNext(); } });
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') { pause(); go(idx + 1); }
+  if (e.key === 'ArrowLeft') { pause(); go(idx - 1); }
+});
+
+/* =========================================================
+   Write policy mini animations
+   ========================================================= */
+function setupPolicyCards() {
+  const cards = [...document.querySelectorAll('.policy-card')];
+  let tick = 0;
+  function reset(card) {
+    card.querySelectorAll('.pblk').forEach(b => b.classList.remove('on', 'host', 'evict'));
+  }
+  function cycle() {
+    tick++;
+    cards.forEach((card, ci) => {
+      const type = card.dataset.policy;
+      const dev = [...card.querySelectorAll('.pblk[data-i]')];
+      const host = [...card.querySelectorAll('.pblk[data-h]')];
+      reset(card);
+      dev.forEach(b => b.classList.add('on'));
+      const step = tick % 4;
+      if (type === 'through') {
+        if (step >= 1) host.forEach((b, i) => { if (i <= step - 1) b.classList.add('host'); });
+      } else if (type === 'back') {
+        if (step >= 1) {
+          const i = Math.min(2, step - 1);
+          dev[i].classList.add('evict');
+          host[i].classList.add('host');
+        }
+      } else {
+        if (step >= 1) {
+          host[0].classList.add('host');
+          host[2].classList.add('host');
+        }
+      }
+    });
+  }
+  cycle();
+  setInterval(cycle, 1800);
+}
+setupPolicyCards();
+
+/* =========================================================
+   DSV4 page anatomy (ratio toggle)
+   ========================================================= */
+const anatomy = {
+  swaSeg: document.querySelector('#pagebar .s1'),
+  cmpSeg: document.querySelector('#pagebar .s2'),
+  ikSeg: document.querySelector('#pagebar .s5'),
+  isSeg: document.querySelector('#pagebar .s4'),
+  note: document.getElementById('anatomyNote')
+};
+function setRatio(ratio) {
+  const r1 = ratio === 1;
+  document.getElementById('r1Btn').setAttribute('aria-pressed', r1);
+  document.getElementById('r2Btn').setAttribute('aria-pressed', !r1);
+  const slots = r1 ? 128 : 64;
+  const cmpBytes = slots * 320;
+  const ikBytes = slots * 64;
+  const isBytes = slots * 4;
+  const swaBytes = 128 * 544;
+  const total = swaBytes + cmpBytes + ikBytes + isBytes;
+  const pct = b => (b / total * 100).toFixed(1) + '%';
+  anatomy.swaSeg.style.width = pct(swaBytes);
+  anatomy.cmpSeg.style.width = pct(cmpBytes);
+  anatomy.ikSeg.style.width = pct(ikBytes);
+  anatomy.isSeg.style.width = pct(isBytes);
+  anatomy.swaSeg.querySelector('span').textContent = 'SWA 544 B/tok';
+  anatomy.cmpSeg.querySelector('span').textContent = `C${ratio} KV 320 B/tok`;
+  anatomy.ikSeg.querySelector('span').textContent = 'idx K';
+  anatomy.isSeg.querySelector('span').textContent = 'scale';
+  document.querySelector('[data-v="swa"]').textContent = `128 × 544 B = 68.0 KB`;
+  document.querySelector('[data-v="cmp"]').textContent = `${slots} × 320 B = ${(cmpBytes/1024).toFixed(1)} KB`;
+  document.querySelector('[data-v="ik"]').textContent = `${slots} × 64 B = ${(ikBytes/1024).toFixed(1)} KB`;
+  document.querySelector('[data-v="is"]').textContent = `${slots} × 4 B = ${(isBytes/1024).toFixed(2)} KB`;
+  const I = slots / 64;
+  anatomy.note.innerHTML = r1
+    ? `ratio 1：一个 full page 覆盖 ${slots} 个压缩槽；indexer 的 native page 为 64 槽，因此 <code>I = ${I}</code> 个 index page。当前代码只展开 64 个槽，是 G1c。`
+    : `ratio 2：一个 full page 覆盖 ${slots} 个压缩槽；indexer 的 native page 为 64 槽，因此 <code>I = ${I}</code>，几何恰好对齐。`;
+}
+document.getElementById('r1Btn').addEventListener('click', () => setRatio(1));
+document.getElementById('r2Btn').addEventListener('click', () => setRatio(2));
+setRatio(1);
+
+/* =========================================================
+   Sidecar fanout SVG
+   ========================================================= */
+(function buildFanout() {
+  const svg = document.getElementById('fanSvg');
+  const NS = 'http://www.w3.org/2000/svg';
+  let resizeTimer = null;
+
+  function draw() {
+    const W = svg.clientWidth || svg.parentElement.clientWidth || 560;
+    const H = svg.clientHeight || svg.parentElement.clientHeight || 330;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = '';
+    const x1 = W * 0.20, y1 = H * 0.50, x2 = W * 0.76;
+    const ys = [0.14, 0.32, 0.50, 0.68, 0.86].map(k => H * k);
+    const colors = ['var(--cyan)', 'var(--violet)', 'var(--amber)', 'var(--green)', 'var(--pink)'];
+    ys.forEach((y2, i) => {
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', `M ${x1} ${y1} C ${W * 0.38} ${y1}, ${W * 0.56} ${y2}, ${x2} ${y2}`);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke-width', '1.6');
+      path.setAttribute('opacity', '.55');
+      path.setAttribute('class', 'flowline');
+      path.style.stroke = colors[i];
+      path.style.animationDelay = (i * 0.18) + 's';
+      svg.appendChild(path);
+    });
+  }
+
+  draw();
+  addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(draw, 120);
+  });
+})();
+
+/* =========================================================
+   Init
+   ========================================================= */
+render(0);
+
+if (location.hash) {
+  requestAnimationFrame(() => {
+    const el = document.querySelector(location.hash);
+    if (el) el.scrollIntoView({block: "start"});
+  });
+}
+</script>
+</body>
+</html>

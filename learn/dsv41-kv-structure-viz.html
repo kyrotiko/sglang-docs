@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeepSeek-V4.1：SWA / C1·C2 / indexer K·scale 动画讲解</title>
+<style>
+:root{
+  --bg:#070b14; --panel:#0f1a2e; --panel2:#14233c; --text:#e8eefb;
+  --muted:#8ea3c2; --line:rgba(148,163,184,.2);
+  --cyan:#22d3ee; --violet:#a78bfa; --amber:#fbbf24; --green:#34d399;
+  --pink:#f472b6; --red:#f87171; --code:#0a1322;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:radial-gradient(circle at 80% 0%,rgba(34,211,238,.08),transparent 40%),
+  radial-gradient(circle at 10% 30%,rgba(167,139,250,.07),transparent 40%),var(--bg);
+  color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  line-height:1.65;min-height:100vh
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+header{padding:44px 0 22px}
+header .k{font-size:11px;letter-spacing:3px;color:var(--cyan);font-weight:800}
+header h1{font-size:clamp(26px,3.4vw,42px);line-height:1.16;margin:10px 0 8px;letter-spacing:-.5px}
+header h1 .g{background:linear-gradient(100deg,var(--cyan),var(--violet),var(--pink));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+header p{margin:0;color:var(--muted);font-size:14.5px;max-width:760px}
+
+.layout{display:grid;grid-template-columns:330px 1fr;gap:20px;align-items:start;margin:10px 0 26px}
+.side{position:sticky;top:16px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px}
+.step-tag{font-size:11px;letter-spacing:2px;color:var(--cyan);font-weight:800}
+.side h2{font-size:19px;margin:6px 0 8px;line-height:1.35}
+.side h2 .badge{font-size:10px;vertical-align:middle;margin-left:6px}
+.side p{font-size:13.5px;color:var(--muted);margin:0 0 14px;min-height:88px}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;
+  border:1px solid var(--line);font-size:10px;font-weight:700;letter-spacing:1px}
+.badge.cyan{color:var(--cyan);border-color:rgba(34,211,238,.45);background:rgba(34,211,238,.08)}
+.badge.amber{color:var(--amber);border-color:rgba(251,191,36,.45);background:rgba(251,191,36,.08)}
+.badge.violet{color:var(--violet);border-color:rgba(167,139,250,.45);background:rgba(167,139,250,.08)}
+.badge.red{color:var(--red);border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.08)}
+
+.ctrls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);
+  color:var(--text);border-radius:10px;padding:8px 13px;font-size:13px;transition:.2s}
+button:hover{border-color:var(--cyan);transform:translateY(-1px)}
+button.primary{background:linear-gradient(120deg,var(--cyan),var(--violet));color:#04101c;
+  border:none;font-weight:800}
+button:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--panel2)}
+.seg button{border:none;border-radius:0;background:transparent;padding:7px 12px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--text)}
+.switch{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--muted);
+  border:1px dashed var(--line);border-radius:10px;padding:9px 11px;margin-top:8px;cursor:pointer}
+.switch input{accent-color:var(--red);width:15px;height:15px}
+.switch.warn{border-color:rgba(248,113,113,.5);color:var(--red)}
+.side .hint{font-size:11.5px;color:var(--muted);margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+
+.canvas{position:relative;background:linear-gradient(160deg,var(--panel),#0c1526);
+  border:1px solid var(--line);border-radius:20px;padding:22px;min-height:520px;overflow:hidden}
+#overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5}
+.block{margin-bottom:14px;position:relative}
+.block-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;
+  color:var(--muted);letter-spacing:.5px;margin-bottom:8px}
+.block-head b{color:var(--text);font-size:12.5px;letter-spacing:0}
+.block-head span{font-family:Consolas,monospace;font-size:10.5px}
+
+.tokens-wrap{position:relative}
+.token-row{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;position:relative;z-index:2}
+.token{height:56px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  font-size:12.5px;transition:all .45s ease;position:relative}
+.token .w{font-weight:700;white-space:nowrap;font-size:clamp(10px,1.1vw,14px)}
+.token .i{font-family:Consolas,monospace;font-size:9px;color:var(--muted);opacity:.8}
+.token.q{border-color:var(--amber);background:rgba(251,191,36,.12)}
+.token.win{border-color:var(--cyan);background:rgba(34,211,238,.13);
+  box-shadow:inset 0 0 22px rgba(34,211,238,.11)}
+.token.pulse{animation:pulse 1.6s ease-in-out infinite}
+.token.dim{opacity:.32}
+.window-box{position:absolute;top:-7px;bottom:-7px;border:2px solid var(--cyan);
+  border-radius:13px;opacity:0;pointer-events:none;transition:opacity .35s;
+  background:rgba(34,211,238,.05);z-index:3}
+.window-box.show{opacity:1}
+.window-box span{position:absolute;top:-19px;left:6px;font-size:10px;color:var(--cyan);
+  letter-spacing:1px;white-space:nowrap;background:var(--bg);padding:0 5px;border-radius:4px}
+
+.flow{display:flex;align-items:center;justify-content:center;gap:10px;color:var(--muted);
+  font-size:11px;margin:10px 0;letter-spacing:1px}
+.flow .line{height:1px;width:60px;background:linear-gradient(90deg,transparent,var(--line),transparent)}
+.flow .ratio{font-family:Consolas,monospace;color:var(--violet)}
+
+.slot-row,.score-row{display:grid;grid-template-columns:repeat(var(--n,6),1fr);gap:6px}
+.slot{height:50px;border:1px dashed var(--line);border-radius:9px;background:var(--panel2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  transition:all .4s ease;opacity:.25;position:relative}
+.slot.show{opacity:1}
+.slot .l{font-family:Consolas,monospace;font-size:11px;font-weight:700}
+.slot .p{font-size:8.5px;color:var(--muted);white-space:nowrap}
+.slot.sel{border-style:solid;border-color:var(--green);background:rgba(52,211,153,.14);
+  box-shadow:0 0 0 1px rgba(52,211,153,.35),0 0 18px rgba(52,211,153,.14)}
+.slot.dim{opacity:.28}
+.slot .rank{position:absolute;top:-7px;right:-5px;font-size:8px;background:var(--green);
+  color:#04101c;border-radius:999px;padding:1px 5px;font-weight:800;display:none}
+.slot.sel .rank{display:block}
+
+.score-row{height:120px;align-items:end;margin-top:2px}
+.score-col{height:100%;display:flex;flex-direction:column;justify-content:flex-end;
+  align-items:center;gap:3px;opacity:.25;transition:opacity .4s}
+.score-col.show{opacity:1}
+.bar{width:64%;height:2px;border-radius:5px 5px 2px 2px;background:var(--violet);
+  transition:height .55s cubic-bezier(.2,.8,.2,1),background .3s;min-height:2px}
+.bar.top{background:linear-gradient(180deg,#6ee7b7,var(--green));
+  box-shadow:0 0 12px rgba(52,211,153,.4)}
+.bar.bad{background:linear-gradient(180deg,#fca5a5,var(--red))}
+.sv{font-family:Consolas,monospace;font-size:9px;color:var(--muted)}
+.score-col.top .sv{color:var(--green)}
+.score-col.bad .sv{color:var(--red)}
+
+.formula{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:12px;
+  font-family:Consolas,monospace;font-size:12px;color:var(--muted)}
+.chip{border-radius:7px;padding:3px 8px;border:1px solid var(--line);background:var(--panel2)}
+.chip.q{border-color:rgba(251,191,36,.5);color:var(--amber)}
+.chip.k{border-color:rgba(34,211,238,.5);color:var(--cyan)}
+.chip.s{border-color:rgba(167,139,250,.5);color:var(--violet);transition:.3s}
+.chip.s.broken{border-color:var(--red);color:var(--red);text-decoration:line-through;
+  background:rgba(248,113,113,.08)}
+.chip.s.broken::after{content:" ✕";text-decoration:none}
+.read-note{margin-top:14px;font-size:12.5px;color:var(--muted);min-height:24px;
+  border-left:3px solid var(--line);padding-left:10px}
+.read-note b{color:var(--text)}
+.read-note.warn{border-left-color:var(--red);color:var(--red)}
+
+.merge-chip{position:fixed;z-index:300;transform:translate(-50%,-50%);padding:3px 7px;border-radius:7px;font-size:11px;font-weight:700;color:#04101c;background:var(--violet);box-shadow:0 4px 14px rgba(167,139,250,.45);pointer-events:none}
+.beam{fill:none;stroke:var(--green);stroke-width:2;stroke-dasharray:7 7;
+  animation:dash 1.1s linear infinite;filter:drop-shadow(0 0 5px rgba(52,211,153,.5))}
+.merge{fill:none;stroke:rgba(148,163,184,.7);stroke-width:1.4;stroke-dasharray:3 4}
+@keyframes dash{to{stroke-dashoffset:-28}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.0)}50%{box-shadow:0 0 0 6px rgba(251,191,36,.18)}}
+
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:30px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:16px}
+.card h3{margin:0 0 6px;font-size:14px;display:flex;align-items:center;gap:8px}
+.card p{margin:0;font-size:12.5px;color:var(--muted)}
+.card .num{font-family:Consolas,monospace;font-size:11px;color:var(--cyan);margin-top:8px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+
+.summary{background:linear-gradient(140deg,var(--panel),#0d1a30);border:1px solid var(--line);
+  border-radius:18px;padding:22px;margin:24px 0 40px}
+.summary h2{margin:0 0 10px;font-size:18px}
+.formula-big{font-family:Consolas,monospace;font-size:clamp(12px,1.6vw,16px);color:var(--text);
+  background:var(--code);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto;line-height:2}
+.formula-big .c1{color:var(--cyan)} .formula-big .c2{color:var(--violet)}
+.formula-big .c3{color:var(--green)} .formula-big .c4{color:var(--amber)}
+.formula-big .muted{color:var(--muted)}
+.summary p{color:var(--muted);font-size:13px;margin:12px 0 0}
+footer{border-top:1px solid var(--line);padding:18px 0 34px;color:var(--muted);font-size:11.5px}
+footer code{color:var(--cyan);background:var(--code);padding:1px 4px;border-radius:4px}
+
+@media (max-width:980px){
+  .layout{grid-template-columns:1fr}
+  .side{position:static}
+  .cards{grid-template-columns:1fr 1fr}
+}
+@media (max-width:640px){
+  .wrap{padding:0 14px}
+  .token-row{grid-template-columns:repeat(6,1fr)}
+  .window-box{display:none}
+  .cards{grid-template-columns:1fr}
+  .canvas{padding:15px}
+  .slot .p{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="k">DEEPSEEK-V4.1 · KV STRUCTURE</div>
+    <h1>SWA / C1·C2 / indexer K·scale<br><span class="g">到底在干什么？</span></h1>
+    <p>用一个 12 token 的小例子看清楚：近处的 token 直接看，远处的 token 先压缩、再让 indexer 挑重点。页面里的窗口长度、top-k 都缩小了，真实值会大得多。</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="layout">
+    <aside class="side">
+      <div class="step-tag" id="stepTag">STEP 0 / 6</div>
+      <h2 id="stepTitle">先看一条序列<span class="badge amber" id="modeBadge">演示</span></h2>
+      <p id="stepDesc">12 个 token，最后一个是当前 query q。q 要决定：这次 attention 该看哪些历史？</p>
+
+      <div class="ctrls">
+        <button id="prevBtn">← 上一步</button>
+        <button class="primary" id="playBtn">▶ 播放</button>
+        <button id="nextBtn">下一步 →</button>
+      </div>
+
+      <div class="ctrls" style="align-items:center">
+        <span style="font-size:11.5px;color:var(--muted)">压缩池</span>
+        <span class="seg">
+          <button id="r2Btn" aria-pressed="true">C2 · ratio 2</button>
+          <button id="r1Btn" aria-pressed="false">C1 · ratio 1</button>
+        </span>
+      </div>
+
+      <label class="switch" id="scaleSwitch">
+        <input type="checkbox" id="scaleLoss">
+        模拟 indexer scale 丢失
+      </label>
+
+      <div class="hint">
+        <b style="color:var(--text)">演示参数</b><br>
+        window = 5 tokens<br>
+        ratio 2 → 6 个压缩槽<br>
+        ratio 1 → 12 个压缩槽<br>
+        top-k = 3
+      </div>
+    </aside>
+
+    <div class="canvas" id="canvas">
+      <svg id="overlay"></svg>
+
+      <div class="block">
+        <div class="block-head"><b>原始序列</b><span>query 在最后 · t11</span></div>
+        <div class="tokens-wrap" id="tokensWrap">
+          <div class="token-row" id="tokenRow"></div>
+          <div class="window-box" id="windowBox"><span>SWA · 最近 5 个 token</span></div>
+        </div>
+      </div>
+
+      <div class="flow">
+        <span class="line"></span>
+        <span>压缩</span>
+        <span class="ratio" id="ratioHint">2 token → 1 槽</span>
+        <span>↓</span>
+        <span class="line"></span>
+      </div>
+
+      <div class="block">
+        <div class="block-head"><b>压缩 KV 池</b><span id="poolName">C2 · 6 槽 · 320 B/槽</span></div>
+        <div class="slot-row" id="slotRow"></div>
+      </div>
+
+      <div class="block">
+        <div class="block-head"><b>indexer 打分</b><span>Q · (K × scale)</span></div>
+        <div class="score-row" id="scoreRow"></div>
+        <div class="formula">
+          <span class="chip q">Q</span><span>·</span>
+          <span class="chip k">K · FP4</span><span>×</span>
+          <span class="chip s" id="scaleChip">scale · E8M0</span>
+          <span>→</span><span class="chip">score</span>
+        </div>
+      </div>
+
+      <div class="read-note" id="readNote">这里会显示：本次 attention 实际读了哪些 token / 槽。</div>
+    </div>
+  </section>
+
+  <section class="cards">
+    <div class="card">
+      <h3><span class="dot" style="background:var(--cyan)"></span> SWA</h3>
+      <p>最近 W 个 token 保留原样 KV。看得最清，但只覆盖一小段窗口。</p>
+      <div class="num">544 B/token · mxfp8</div>
+    </div>
+    <div class="card">
+      <h3><span class="dot" style="background:var(--violet)"></span> C1 / C2</h3>
+      <p>把历史 token 压成 latent：ratio 2 每两个 token 一槽，ratio 1 每 token 一槽。</p>
+      <div class="num">320 B/槽 · mxfp4</div>
+    </div>
+    <div class="card">
+      <h3><span class="dot" style="background:var(--pink)"></span> indexer K</h3>
+      <p>专门用来打分的压缩 K，不是最终 attention 的 KV。越小，打分越便宜。</p>
+      <div class="num">64 B/token · packed FP4</div>
+    </div>
+    <div class="card">
+      <h3><span class="dot" style="background:var(--green)"></span> indexer scale</h3>
+      <p>FP4 K 的块缩放，每 32 个值一个。没有它，K 就没法还原，分数会乱。</p>
+      <div class="num">4 B/token · E8M0</div>
+    </div>
+  </section>
+
+  <section class="summary">
+    <h2>把它们拼起来</h2>
+    <div class="formula-big">
+      <span class="muted">ratio > 0 的层：attention 读取 =</span> <span class="c1">窗口侧</span>（最近 W 个 token 的原样 KV）<br>
+      &nbsp;&nbsp;+ <span class="c3">压缩侧</span>（indexer 打分 → top-k → 选中的 C1/C2 槽）<br>
+      <span class="muted">top-k 来自</span> Q · (<span class="c2">K</span> × <span class="c4">scale</span>) <span class="muted">，K 只有 kv_source 层持有，consumer 层共享。</span>
+    </div>
+    <p>一句话：<b>SWA 管近处，C1/C2 管远处，indexer K/scale 负责决定看远处的哪些位置。</b></p>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    基于 <code>sglang@dsv41-a5</code> 的 <code>layers/attention/dsv4/dsv41_sparse.py</code>、
+    <code>hardware_backend/npu/dsv4/dsv4_memory_pool.py</code>、
+    <code>hardware_backend/npu/attention/ascend_dsv4_backend.py</code> 整理。
+    演示数字为教学简化；真实默认值：window=128、index_topk=512、index_head_dim=128、64 个 index head（以 checkpoint 为准）。
+  </div>
+</footer>
+
+<script>
+/* ================= data ================= */
+const TOKENS = ['我','今天','去','公园','看','花','天气','很','好','湖边','风','q'];
+const WINDOW = 5;
+const TOPK = 3;
+const SCORES = {
+  2: [0.92, 0.18, 0.74, 0.41, 0.85, 0.23],
+  1: [0.92, 0.55, 0.18, 0.66, 0.74, 0.33, 0.41, 0.59, 0.85, 0.27, 0.48, 0.23]
+};
+const WRONG = {
+  2: [0.11, 0.47, 0.93, 0.22, 0.38, 0.71],
+  1: [0.31, 0.72, 0.11, 0.58, 0.19, 0.83, 0.05, 0.46, 0.27, 0.64, 0.39, 0.22]
+};
+
+const state = {step: 0, ratio: 2, scaleLost: false, playing: false, timer: null};
+let prevStep = -1;
+let activeChips = [];
+
+/* ================= dom ================= */
+const tokenRow = document.getElementById('tokenRow');
+const slotRow = document.getElementById('slotRow');
+const scoreRow = document.getElementById('scoreRow');
+const tokensWrap = document.getElementById('tokensWrap');
+const windowBox = document.getElementById('windowBox');
+const overlay = document.getElementById('overlay');
+const canvas = document.getElementById('canvas');
+const stepTag = document.getElementById('stepTag');
+const stepTitle = document.getElementById('stepTitle');
+const stepDesc = document.getElementById('stepDesc');
+const readNote = document.getElementById('readNote');
+const poolName = document.getElementById('poolName');
+const ratioHint = document.getElementById('ratioHint');
+const scaleChip = document.getElementById('scaleChip');
+const scaleSwitch = document.getElementById('scaleSwitch');
+const scaleLoss = document.getElementById('scaleLoss');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const playBtn = document.getElementById('playBtn');
+const r1Btn = document.getElementById('r1Btn');
+const r2Btn = document.getElementById('r2Btn');
+
+/* ================= helpers ================= */
+function slots() {
+  if (state.ratio === 1) {
+    return TOKENS.map((_, i) => ({label: `c${i}`, idxs: [i], pair: `t${i}`}));
+  }
+  const out = [];
+  for (let i = 0; i < TOKENS.length; i += 2) {
+    out.push({label: `c${i / 2}`, idxs: [i, i + 1], pair: `t${i}+t${i + 1}`});
+  }
+  return out;
+}
+function scoresNow() {
+  const base = state.scaleLost ? WRONG : SCORES;
+  return base[state.ratio].slice();
+}
+function topkNow() {
+  const s = scoresNow();
+  return s.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0])
+    .slice(0, TOPK).map(x => x[1]).sort((a, b) => a - b);
+}
+function stepText() {
+  const ratio = state.ratio;
+  const t = [
+    {title: '先看一条序列', desc: '12 个 token，最后一个是当前 query q。q 要决定：这次 attention 该看哪些历史？'},
+    {title: 'SWA：近处直接看', desc: '最近的 5 个 token 永远保留原样 KV（mxfp8，544 B/token）。窗口 attention 每次都读它们，不需要压缩。'},
+    {title: '远处：压缩成槽', desc: ratio === 2
+      ? '每 2 个 token 用一个小网络合成 1 个压缩 KV 槽（C2，320 B/槽）。slot = 位置 // 2。'
+      : '每个 token 一个压缩槽（C1，320 B/槽）。ratio 1 不做时间合并，但仍然是一个学习出来的压缩 latent。'},
+    {title: 'indexer：给槽打分', desc: 'query 的 index Q 与每个槽的 index K 做点积；K 是 packed FP4，要配 E8M0 scale 才能还原。分数表示“这个槽和 q 有多相关”。'},
+    {title: 'top-k：只留重点', desc: '只保留分数最高的 3 个槽（演示值；真实 index_topk 默认 512）。其余槽这次不参与 attention。'},
+    {title: '拼在一起', desc: '最终 attention 读窗口里的 5 个 token，加上 top-k 选中的 3 个压缩槽。近处看清、远处翻摘要。'},
+    {title: 'scale 不能丢', desc: 'index K 是 4-bit 的，必须配合每 32 个值一个 E8M0 scale 才能还原。没有 scale，分数会乱，top-k 会选错槽。'}
+  ][state.step];
+  if (state.scaleLost && state.step >= 3) {
+    return {
+      title: 'scale 丢失：分数乱了',
+      desc: 'indexer K 是 packed FP4，当前没有 scale 可以还原它。注意分数已经变成错误值，top-k 也选到了别的槽。'
+    };
+  }
+  return t;
+}
+
+/* ================= render ================= */
+function render() {
+  clearChips();
+  const s = stepText();
+  stepTag.textContent = `STEP ${state.step} / 6`;
+  stepTitle.innerHTML = s.title + ' <span class="badge ' +
+    (state.scaleLost && state.step >= 3 ? 'red' : state.step >= 4 ? 'cyan' : 'amber') + '">' +
+    (state.scaleLost && state.step >= 3 ? 'scale off' : state.ratio === 2 ? 'C2' : 'C1') + '</span>';
+  stepDesc.textContent = s.desc;
+
+  /* tokens */
+  tokenRow.innerHTML = '';
+  TOKENS.forEach((w, i) => {
+    const el = document.createElement('div');
+    el.className = 'token';
+    if (i === TOKENS.length - 1) el.classList.add('q');
+    if (state.step >= 1 && i >= TOKENS.length - WINDOW) el.classList.add('win');
+    if (state.step >= 5 && i === TOKENS.length - 1) el.classList.add('pulse');
+    el.innerHTML = `<span class="w">${w}</span><span class="i">t${i}</span>`;
+    el.dataset.i = i;
+    tokenRow.appendChild(el);
+  });
+
+  /* window box */
+  if (state.step >= 1) {
+    windowBox.classList.add('show');
+    requestAnimationFrame(positionWindow);
+  } else {
+    windowBox.classList.remove('show');
+  }
+
+  /* slots */
+  const sl = slots();
+  slotRow.innerHTML = '';
+  slotRow.style.setProperty('--n', sl.length);
+  const tk = topkNow();
+  sl.forEach((slot, i) => {
+    const el = document.createElement('div');
+    el.className = 'slot' + (state.step >= 2 ? ' show' : '');
+    if (state.step >= 4 && tk.includes(i)) el.classList.add('sel');
+    if (state.step >= 5 && !tk.includes(i)) el.classList.add('dim');
+    el.dataset.i = i;
+    el.innerHTML = `<span class="l">${slot.label}</span><span class="p">${slot.pair}</span>
+      <span class="rank">#${tk.indexOf(i) + 1}</span>`;
+    slotRow.appendChild(el);
+  });
+
+  /* scores */
+  const sc = scoresNow();
+  scoreRow.innerHTML = '';
+  scoreRow.style.setProperty('--n', sc.length);
+  sc.forEach((v, i) => {
+    const col = document.createElement('div');
+    col.className = 'score-col' + (state.step >= 3 ? ' show' : '');
+    if (state.step >= 4 && tk.includes(i)) col.classList.add('top');
+    if (state.scaleLost) col.classList.add('bad');
+    const h = state.step >= 3 ? Math.max(3, Math.round(v * 95)) : 2;
+    col.innerHTML = `<div class="sv">${state.step >= 3 ? v.toFixed(2) : '—'}</div>
+      <div class="bar${state.step >= 4 && tk.includes(i) ? ' top' : ''}${state.scaleLost ? ' bad' : ''}" style="height:${h}px"></div>`;
+    col.dataset.i = i;
+    scoreRow.appendChild(col);
+  });
+
+  /* labels */
+  poolName.textContent = state.ratio === 2
+    ? 'C2 · 6 槽 · 320 B/槽 · slot = 位置 // 2'
+    : 'C1 · 12 槽 · 320 B/槽 · slot = 位置';
+  ratioHint.textContent = state.ratio === 2 ? '2 token → 1 槽' : '1 token → 1 槽';
+  scaleChip.classList.toggle('broken', state.scaleLost);
+  scaleSwitch.classList.toggle('warn', state.scaleLost);
+
+  /* read note */
+  readNote.className = 'read-note' + (state.scaleLost && state.step >= 3 ? ' warn' : '');
+  if (state.step >= 5) {
+    const names = tk.map(i => sl[i] ? sl[i].label : '');
+    readNote.innerHTML = state.scaleLost
+      ? `当前读取：窗口 5 个 token + 压缩槽 <b>${names.join(', ')}</b>——但 top-k 已被错误的 K 带偏。`
+      : `本次读取：窗口 <b>t7–t11</b> + 压缩槽 <b>${names.join(', ')}</b>。其余槽跳过。`;
+  } else if (state.step === 3) {
+    readNote.innerHTML = '分数越高，越可能被后面的 attention 读取。K 是 packed FP4，右边显示它的块缩放。';
+  } else if (state.step === 4) {
+    readNote.innerHTML = `选中的槽：<b>${tk.map(i => sl[i] ? sl[i].label : '').join(', ')}</b>。下一步看它们怎么和窗口一起被读取。`;
+  } else {
+    readNote.textContent = '这里会显示：本次 attention 实际读了哪些 token / 槽。';
+  }
+
+  /* buttons */
+  prevBtn.disabled = state.step === 0;
+  nextBtn.disabled = state.step === 6;
+
+  /* overlay after layout */
+  requestAnimationFrame(() => {
+    drawOverlay(sl, tk);
+    if (state.step === 2 && prevStep < 2) animateMerge(sl);
+  });
+  prevStep = state.step;
+}
+
+function positionWindow() {
+  const cells = [...tokenRow.children];
+  if (cells.length < WINDOW) return;
+  const start = cells.length - WINDOW;
+  const a = cells[start].getBoundingClientRect();
+  const b = cells[cells.length - 1].getBoundingClientRect();
+  const wr = tokensWrap.getBoundingClientRect();
+  windowBox.style.left = (a.left - wr.left - 4) + 'px';
+  windowBox.style.width = (b.right - a.left + 8) + 'px';
+}
+
+function drawOverlay(sl, tk) {
+  overlay.innerHTML = '';
+  if (!overlay.getBoundingClientRect().width) return;
+  const cr = canvas.getBoundingClientRect();
+  const W = cr.width, H = cr.height;
+  overlay.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  /* merge lines: token(s) -> slot */
+  if (state.step >= 2) {
+    const tokens = [...tokenRow.children];
+    const slotEls = [...slotRow.children];
+    sl.forEach((slot, i) => {
+      const target = slotEls[i];
+      if (!target) return;
+      const tr = target.getBoundingClientRect();
+      const tx = tr.left - cr.left + tr.width / 2;
+      const ty = tr.top - cr.top;
+      const srcs = slot.idxs.map(j => tokens[j]).filter(Boolean);
+      if (!srcs.length) return;
+      const mid = srcs.reduce((acc, el) => {
+        const r = el.getBoundingClientRect();
+        return {x: acc.x + (r.left - cr.left + r.width / 2) / srcs.length,
+                y: acc.y + (r.bottom - cr.top) / srcs.length};
+      }, {x: 0, y: 0});
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', `M ${mid.x} ${mid.y} C ${mid.x} ${mid.y + 18}, ${tx} ${ty - 18}, ${tx} ${ty - 2}`);
+      p.setAttribute('class', 'merge');
+      overlay.appendChild(p);
+    });
+  }
+
+  /* attention beams: q -> selected slots */
+  if (state.step >= 5) {
+    const q = tokenRow.children[tokenRow.children.length - 1];
+    if (!q) return;
+    const qr = q.getBoundingClientRect();
+    const qx = qr.left - cr.left + qr.width / 2;
+    const qy = qr.bottom - cr.top;
+    [...slotRow.children].forEach((el, i) => {
+      if (!tk.includes(i)) return;
+      const r = el.getBoundingClientRect();
+      const x = r.left - cr.left + r.width / 2;
+      const y = r.top - cr.top;
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', `M ${qx} ${qy} C ${qx} ${qy + 30}, ${x} ${y - 30}, ${x} ${y - 2}`);
+      p.setAttribute('class', 'beam');
+      overlay.appendChild(p);
+    });
+  }
+}
+
+/* ================= merge animation ================= */
+function animateMerge(sl) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const tokens = [...tokenRow.children];
+  const slotEls = [...slotRow.children];
+  clearChips();
+  sl.forEach((slot, i) => {
+    const target = slotEls[i];
+    if (!target) return;
+    slot.idxs.forEach((j, k) => {
+      const src = tokens[j];
+      if (!src) return;
+      const chip = document.createElement('div');
+      chip.className = 'merge-chip';
+      chip.textContent = TOKENS[j];
+      document.body.appendChild(chip);
+      activeChips.push(chip);
+      const a = src.getBoundingClientRect();
+      const b = target.getBoundingClientRect();
+      chip.style.left = (a.left + a.width / 2) + 'px';
+      chip.style.top = (a.top + a.height / 2) + 'px';
+      const dx = (b.left + b.width / 2) - (a.left + a.width / 2);
+      const dy = (b.top + b.height / 2) - (a.top + a.height / 2);
+      const anim = chip.animate([
+        {transform: 'translate(-50%,-50%) scale(1)', opacity: .95},
+        {transform: `translate(${dx}px,${dy}px) translate(-50%,-50%) scale(.55)`, opacity: 0}
+      ], {duration: 700, delay: i * 90 + k * 40, easing: 'cubic-bezier(.3,.8,.3,1)'});
+      anim.onfinish = () => chip.remove();
+    });
+  });
+}
+function clearChips() {
+  activeChips.forEach(c => c.remove());
+  activeChips = [];
+}
+
+/* ================= controls ================= */
+function go(step) {
+  state.step = Math.max(0, Math.min(6, step));
+  render();
+  if (state.playing && state.step === 6) pause();
+}
+function play() {
+  if (state.playing) return;
+  if (state.step === 6) go(0);
+  state.playing = true;
+  playBtn.textContent = '❚❚ 暂停';
+  tick();
+}
+function tick() {
+  if (!state.playing) return;
+  state.timer = setTimeout(() => {
+    if (!state.playing) return;
+    if (state.step < 6) { go(state.step + 1); tick(); }
+    else pause();
+  }, 2400);
+}
+function pause() {
+  state.playing = false;
+  clearTimeout(state.timer);
+  playBtn.textContent = '▶ 播放';
+}
+prevBtn.addEventListener('click', () => { pause(); go(state.step - 1); });
+nextBtn.addEventListener('click', () => { pause(); go(state.step + 1); });
+playBtn.addEventListener('click', () => state.playing ? pause() : play());
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') { pause(); go(state.step + 1); }
+  if (e.key === 'ArrowLeft') { pause(); go(state.step - 1); }
+});
+
+function setRatio(r) {
+  state.ratio = r;
+  r2Btn.setAttribute('aria-pressed', r === 2);
+  r1Btn.setAttribute('aria-pressed', r === 1);
+  if (state.step < 2) state.step = 2;
+  render();
+}
+r2Btn.addEventListener('click', () => setRatio(2));
+r1Btn.addEventListener('click', () => setRatio(1));
+
+scaleLoss.addEventListener('change', () => {
+  state.scaleLost = scaleLoss.checked;
+  if (state.scaleLost && state.step < 3) state.step = 3;
+  render();
+});
+
+/* ================= init ================= */
+addEventListener('resize', () => {
+  positionWindow();
+  drawOverlay(slots(), topkNow());
+});
+render();
+</script>
+</body>
+</html>
