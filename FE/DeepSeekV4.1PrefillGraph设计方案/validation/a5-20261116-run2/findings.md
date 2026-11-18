@@ -1,6 +1,6 @@
 # A5 第二轮探针结论
 
-本文固定在 `5633d68b04` 和当时 SDK。2026-11-17 合入 randgun 后 writer/mHC 已换公开入口，旧 custom schema 缺失不再直接否定新路径；适用范围和复验见 [合并记录](../../analysis/randgun_merge_20261117.md)。以下设备事实和原始结果保持不变。
+本文固定在 `5633d68b04` 和当时 SDK。2026-11-17 合入 randgun 后 writer/mHC 已换公开入口，旧 custom schema 缺失不再直接否定新路径。以下设备事实和原始结果保持不变。
 
 结果创建时间：2026-11-16 20:03:25 UTC。原始结果：[raw/report.md](raw/report.md)、[raw/report.json](raw/report.json)；来源校验：[manifest.json](manifest.json)。回传 Python 仅用于 hash 和文本一致性校验，没有运行或导入。
 

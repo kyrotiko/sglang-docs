@@ -2,17 +2,17 @@
 
 运行文件：[verify_dsv41_prefill_graph.py](verify_dsv41_prefill_graph.py)。只需复制这个 `.py`，不下载或加载模型权重。
 
-**当前 revision 7，预期主仓 `dsv41-a5-graph-gpt@d3700bf0a9`。** [第五轮](../validation/a5-20261117-run5/findings.md)已取得 ratio 0/1 完整 idle 序列和 ratio 2 首轮 idle 的单卡正面证据；ratio 2 后续 live odd-prefix case 有 17 个 compressed cache 字节差异，仍保留 FAIL。第六轮已确认不插入 idle 也会在 compressor 原始输出出现差异；revision 7 增加隔离和同步诊断，不修改服务代码或决定 idle 回退策略。原 17 组及第三/四轮独立 CPU FP32 reference FAIL 保留，不能改写为独立精度通过。
+**当前 revision 7；脚本内的预期基线 `d3700bf0a9` 是采集时的标签，实际主仓 SHA 以各轮 findings 为准。** [第五轮](../validation/a5-20261117-run5/findings.md)已取得 ratio 0/1 完整 idle 序列和 ratio 2 首轮 idle 的单卡正面证据；ratio 2 后续 live odd-prefix case 有 17 个 compressed cache 字节差异，仍保留 FAIL。第六轮已确认不插入 idle 也会在 compressor 原始输出出现差异；revision 7 增加隔离和同步诊断，不修改服务代码或决定 idle 回退策略。原 17 组及第三/四轮独立 CPU FP32 reference FAIL 保留，不能改写为独立精度通过。
 
-首两轮 [run1](../validation/a5-20261116-run1/findings.md) / [run2](../validation/a5-20261116-run2/findings.md) 与 [randgun 合并记录](../analysis/randgun_merge_20261117.md)保留为对应旧环境/代码的历史快照。第三轮的硬件和 SDK 内容均有变化，即使包版本号相同也不自动等同。
+首两轮 [run1](../validation/a5-20261116-run1/findings.md) / [run2](../validation/a5-20261116-run2/findings.md) 保留为对应旧环境/代码的历史快照。第三轮的硬件和 SDK 内容均有变化，即使包版本号相同也不自动等同。
 
-主仓 idle metadata 已在自己的 `dsv41-a5-graph-gpt@182ba91e09` 接入，289 项 CPU 回归通过；下一步是该提交的真实 DP 整模验证，见[接入与运行记录](../validation/gpt-idle-metadata-20261118.md)。单算子脚本仍保留 revision 7，不需要因此重新跑同类探针。
+第五至七轮的 idle 与 compressor 边界结论见上述 findings；单算子脚本仍保留 revision 7，不需要重新跑同类探针。
 
 ## 当前结论：独立 compressor 的 eager 重复也失败
 
 [第七轮](../validation/a5-20261117-run7/findings.md)已完成。相同 GPU x/state、同 stream 且显式同步，奇数 prefix 的长 extend 在 eager 重复中已发生有效 row 0 差异；偶数 prefix 长 extend 和奇数 prefix 单 token 对照通过。合成链 replay 前加同步仍失败。这里的 eager 调用发生在同进程 capture 之后，尚未排除 capture 初始化或全局 workspace 的影响。
 
-现有数据已可转交算子方核对 CYCLE 的 ABI/状态容量和首 pair 读写顺序，见[复现材料](../analysis/compressor_odd_prefix_reproducer.md)。不用再原样重复这些探针，也不据此禁用 idle、放宽阈值或改服务算法。脚本仍为 revision 7，留作算子方复现及对应修复后的回归。
+现有数据已可转交算子方核对 CYCLE 的 ABI/状态容量和首 pair 读写顺序，见[第七轮](../validation/a5-20261117-run7/findings.md)。不用再原样重复这些探针，也不据此禁用 idle、放宽阈值或改服务算法。脚本仍为 revision 7，留作算子方复现及对应修复后的回归。
 
 ## 第七轮已完成命令（保留复现）
 

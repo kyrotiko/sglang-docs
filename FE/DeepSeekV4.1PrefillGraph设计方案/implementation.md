@@ -12,7 +12,7 @@
 
 | 文件 | 改动 |
 | --- | --- |
-| `python/sglang/srt/hardware_backend/npu/attention/ascend_dsv4_backend.py` | 把 `_supports_dsv4_prefill_graph_capture()` 拆成 V4/V4.1 两个判定；V4.1 在契约未完成时返回 False；增加 `not (has_low_ratio and (has_c4 or has_c128))` 断言；日志说明“V4.1 prefill graph contract disabled, sources/attention stay eager breaks” |
+| `python/sglang/srt/hardware_backend/npu/attention/ascend_dsv4_backend.py` | 把 `_supports_dsv4_prefill_graph_capture()` 拆成 V4/V4.1 两个判定；V4.1 在契约未完成时返回 False；增加 `_dsv4_is_v41_model and (has_c4 or has_c128)` 的互斥断言；日志说明“V4.1 prefill graph not enabled, sources/attention stay eager breaks” |
 | `test/registered/unit/npu/attention/test_npu_ascend_dsv4_backend.py` | V4.1 low-ratio 的 capability 返回 False；V4 路径不变；draft worker False；CP/DCP 仍显式报错 |
 | `test/registered/unit/npu/graph_runner/test_dsv4_prefill_graph_metadata.py` | 保持 V4 用例通过 |
 
@@ -32,14 +32,15 @@
 
 | 文件/函数 | 改动 |
 | --- | --- |
-| `dsv4_prefill_graph.py` `Dsv4PrefillGraphMetadata` | 增加 generation 字段；`allocate` 按代际分配；V4.1 字段见 design.md §5.2；`fill/refresh/_bind` 按代际分支；`kernel_metadata` 从 seed 动态取 key；`topk_by_layer`；地址自检 |
-| `ascend_dsv4_backend.py` `_dsv41_window_indices` / `_dsv41_cmp_topk_length` | 抽出纯 helper：显式 `positions/live_mask/capacity` 输入，返回容量形状 buffer；eager 包装保留 |
+| `dsv4_prefill_graph.py` | 新增共享基类 `_Dsv4PrefillGraphMetadataBase`（allocate/fill/refresh、共享序列标量、kernel metadata 拷贝、topk staging）；`Dsv4PrefillGraphMetadata` 保持 V4，新增 `Dsv41PrefillGraphMetadata` 完整承载 V4.1 字段（见 design.md §5.2）；backend 用 `_dsv4_is_v41_model` 显式选择类 |
+| `ascend_dsv4_backend.py` `_dsv41_window_indices` / `_dsv41_cmp_topk_length` | 抽出纯 helper `_dsv41_fill_window_buffers` / `_dsv41_fill_cmp_lengths` / `_dsv41_fill_ratio_rows`：显式 `positions/live_mask/capacity` 输入，返回容量形状 buffer；eager 包装保留 |
 | `ascend_dsv4_backend.py` `_dsv41_attention_kernel_metadata` / `_dsv41_index_kernel_metadata` | 抽成 `*_dispatch_metadata(*, cu, lengths, kv_lens, positions, ...)`；eager 与 refresh 共用 |
 | `ascend_dsv4_backend.py` `_validate_v41_candidate_spec()` | 硬性校验 block size > 0 与 candidate block 数；记录 `cdiv(index_topk, block)` 与 `candidate_topk_blocks` 的覆盖关系，配置不满足时告警；页行整除由 `_dsv41_qsli_cache` 在使用时硬性检查 |
 | `ascend_dsv4_backend.py` `can_run_prefill_cuda_graph` / `vote_prefill_cuda_graph` | 拒绝 MIXED、超 context；DP vote 与本地一致 |
-| `test/registered/unit/npu/graph_runner/test_dsv41_prefill_graph_metadata.py` | 新增；见 §2 |
+| `test/registered/unit/npu/attention/test_npu_dsv41_low_ratio_backend.py` | 新增 `TestV41PrefillGraphMetadata` 等用例；见 §2 |
+| `test/registered/unit/npu/graph_runner/test_dsv4_prefill_graph_metadata.py` | 补 V4 容器不含 V4.1 字段的隔离断言 |
 
-本 PR 仍保持 `_DSV41_PREFILL_GRAPH_CONTRACT_READY=False`，图契约不启用。这样 metadata 逻辑可以先在 CPU 上稳定，不会影响在线路径。该常量也是后续唯一的总回滚开关。
+PR-0 的闸门就是 `_supports_dsv41_prefill_graph_capture()` 本身：未实现时返回 False。最终代码不再保留额外的全局布尔开关；需要回退时用 CLI 关闭整张 prefill graph，或让该 predicate 返回 False。
 
 ### PR-2：原子启用 source + attention 入图
 
@@ -49,14 +50,14 @@
 
 | 文件/函数 | 改动 |
 | --- | --- |
-| `ascend_dsv4_backend.py` `_supports_v41_prefill_graph_capture` | 返回 True（仅当 arch35/PP/CP/DCP/candidate 等条件满足） |
-| `ascend_dsv4_backend.py` `LowRatioCompressAscendBackendMixin` | 实例属性 `low_ratio_prefill_graph = use_captured_forward_metadata and contract`；更新过时注释 |
+| `ascend_dsv4_backend.py` `_supports_dsv41_prefill_graph_capture` | 返回 True（仅当 arch35/PP/candidate 等条件满足） |
+| `ascend_dsv4_backend.py` `LowRatioCompressAscendBackendMixin` | 实例属性 `low_ratio_prefill_graph = _dsv4_is_v41_model and use_captured_forward_metadata`；更新过时注释 |
 | `ascend_dsv4_backend.py` `_low_ratio_index_topk` | 通过 `graph_state.stage_topk(layer_id, topk)` 绑定逐层输出 |
 | `ascend_dsv4_backend.py` `_forward_low_ratio_attention` | 有 graph_state 时从 `topk_by_layer[layer_id]` 取本层 topk |
 | `deepseek_v4.py` | 无需改路由；`_low_ratio_sources_break` 自动读 backend 属性 |
 | `prefill_cuda_graph_runner.py` | 仅当 bucket 大于 context 或 batch 超出容量时给出明确错误；不改变主流程 |
-| `test/registered/unit/npu/attention/test_npu_dsv41_low_ratio_backend.py` | 增加 helper、路由配对、逐层 topk 用例 |
-| `test/registered/unit/npu/graph_runner/test_dsv41_prefill_graph_metadata.py` | 增加 refresh 闭环用例 |
+| `test/registered/unit/npu/attention/test_npu_dsv41_low_ratio_backend.py` | 增加 helper、路由配对、逐层 topk、refresh 闭环和准入用例 |
+| `test/registered/unit/npu/graph_runner/test_dsv4_prefill_graph_metadata.py` | 保持 V4 生命周期回归 |
 
 完成条件（CPU）：
 
@@ -114,7 +115,7 @@
 
 ### 2.3 纯 helper
 
-对 `_dsv41_attention_row_buffers`、`_dsv41_attention_dispatch_metadata`、`_dsv41_index_dispatch_metadata` 的 CPU 测试使用已有的 fake `ds41` stub：
+对 `_dsv41_fill_window_buffers`、`_dsv41_fill_cmp_lengths`、`_dsv41_fill_ratio_rows`、`_dsv41_attention_dispatch_metadata`、`_dsv41_index_dispatch_metadata` 的 CPU 测试使用已有的 fake `ds41` stub：
 
 - 容量输入 + live cu：死行长度为 0；
 - ratio1/2 的 position/loc 公式与 eager `_dsv41_ratio_row_values` 一致；
@@ -179,7 +180,7 @@ replay：
 
 ### 3.2 P2：真实 metadata 容器刷新
 
-不手工构造 metadata，而是使用 `Dsv4PrefillGraphMetadata`：
+不手工构造 metadata，而是使用 `Dsv41PrefillGraphMetadata`：
 
 1. capture 一个 bucket；
 2. 用 5 组 live batch（长度/prefix/page 不同）调用 `refresh`；
@@ -213,7 +214,7 @@ replay：
 
 每次结果记录：模型/checkpoint revision、主仓 SHA、A5 型号和卡数、CANN/driver/torch/torch_npu/sgl-kernel-npu、SDK 算子包、TP/EP/DP/CP/DCP/PP、量化、KV dtype、Engram、DSpark、prefill buckets、request/context 上限、完整启动命令。
 
-启动配置以模型 cookbook 和本分支实际 A5 配置为准；`test/` 配置只作为可复现 CI 配置并注明差异。
+启动配置以模型 cookbook（`docs/cookbook/autoregressive/DeepSeek/DeepSeek-V4_1.mdx`）和本分支实际 A5 配置为准；`test/` 配置只作为可复现 CI 配置并注明差异。
 
 ### 4.2 正确性矩阵
 
@@ -228,7 +229,7 @@ replay：
 | 投机 | 无投机与 DSpark target prefill；draft 侧 eager |
 | 回退 | 无 bucket、超 capacity、MIXED、未验证拓扑：各 rank 一致拒绝或 eager |
 
-准确率使用 `sgl-eval`，同一 harness、同一采样参数；graph/eager 只改变 prefill graph 开关。不能用手写评分或旧 `run_eval`。
+准确率使用 `sgl-eval`，同一 harness、同一采样参数；测试内走 `sglang.test.sgl_eval_utils.run_sgl_eval`，服务外部 CLI 使用 `test` extra 固定版本。graph/eager 只改变 prefill graph 开关；不能用手写评分或旧 `run_eval`。
 
 ### 4.3 性能 A/B
 

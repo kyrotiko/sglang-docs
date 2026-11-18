@@ -67,6 +67,6 @@
 
 ## 5. 下一步
 
-现有证据已足以向算子方提交可复现的 correctness 问题，见[可转交材料](../../analysis/compressor_odd_prefix_reproducer.md)。先请其确认部署 ABI、实际 kernel 源码/构建 revision，以及首 pair 的历史读取与环形 state 写回顺序。无需再全量重复 probe、只增加外部同步、放宽阈值或默认禁用 idle。
+现有证据已足以向算子方提交可复现的 correctness 问题（复现命令见 [scripts/README.md](../../scripts/README.md)）。先请其确认部署 ABI、实际 kernel 源码/构建 revision，以及首 pair 的历史读取与环形 state 写回顺序。无需再全量重复 probe、只增加外部同步、放宽阈值或默认禁用 idle。
 
 本轮没有新增验证脚本版本，也没有改主仓执行策略；保留全部 PASS/FAIL，等待算子契约确认或对应修复后做有针对性的设备回归。

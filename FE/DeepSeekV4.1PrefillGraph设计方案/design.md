@@ -2,6 +2,8 @@
 
 基线：`sglang@dsv41-a5@9898f7ce9a`。本文不改变现有 breakable NPU graph 的 runner/segment 生命周期，只定义 V4.1 的捕获契约、固定状态和使能条件。
 
+本目录已合并原参考方案。设计结论以本文和 [implementation.md](implementation.md) 为准；原参考方案的 A5 单算子证据保留在 `validation/`，两套方案的分歧见第 10 节。
+
 ## 1. 问题定义
 
 ### 1.1 目标
@@ -44,7 +46,7 @@
 
 ### P1 代际独占，不做通用变体注册
 
-一个 backend 实例按模型 `compress_ratios` 只命中 V4 或 V4.1 其中一套契约。V4.1 不借用 V4 的 c4/c128 字段，V4 也不分配 V4.1 字段。实现上保留一个生命周期类（`Dsv4PrefillGraphMetadata`），内部用 generation 分支；不引入 dataclass、通用 owner、variant registry 或第二套 runner。
+一个 backend 实例按模型代际只命中 V4 或 V4.1 其中一套契约。实现上是共享生命周期基类 `_Dsv4PrefillGraphMetadataBase` 加两个完整协议类 `Dsv4PrefillGraphMetadata`（ratio 4/128）和 `Dsv41PrefillGraphMetadata`（ratio 1/2）；backend 用模型代际 `_dsv4_is_v41_model` 显式选择类，而不是用 low-ratio 布尔值隐式判断。基类只放两代语义完全相同的操作：共享序列标量的容量分配、capture/replay 入口、逐层 topk staging、kernel metadata 原地拷贝和公共绑定。V4.1 不借用 V4 的 c4/c128 字段，V4 对象也不携带 V4.1 字段。不引入 dataclass、通用 owner、variant registry 或第二套 runner。
 
 ### P2 producer 与 consumer 原子捕获
 
@@ -95,7 +97,7 @@ capture 后：
 - 不把 `kernel_metadata` 字典换键或换 tensor；
 - 所有越界、缺键、形状变化都抛出明确错误。
 
-这与 `Dsv4PrefillGraphMetadata` 现有契约一致（`dsv4_prefill_graph.py:14-19`）。V4.1 额外把 key 集合和 metadata numel 也纳入校验。
+这与基类生命周期的既有契约一致（`dsv4_prefill_graph.py`）。V4.1 额外把 key 集合和 metadata numel 也纳入校验。
 
 ### P6 逐层输出绑定
 
@@ -120,7 +122,7 @@ capture 阶段（每个 token bucket 一次）
     -> dummy ForwardBatch: B=1, req_pool_indices=[0], positions=0, out_cache_loc=0
   init_forward_metadata_for_breakable_cuda_graph_capture(batch)
     -> eager init_forward_metadata(batch)          # 生成 seed
-    -> Dsv4PrefillGraphMetadata.allocate(generation=v41, seed, T_cap, B_cap=1)
+    -> backend 按代际选择 Dsv41PrefillGraphMetadata.allocate(seed, T_cap, B_cap=1)
          - 分配容量 buffer
          - 把 seed 值按尾部规则填入
          - 绑定到 capture metadata
@@ -166,7 +168,6 @@ replay 阶段（每次命中 bucket）
 ```
 if self._dsv4_has_low_ratio:
     if not is_npu_arch35(): raise
-    if not _DSV41_PREFILL_GRAPH_CONTRACT_READY: return False
     if parallel.attn_cp_size != 1 or parallel.attn_dcp_size != 1: raise
     if parallel.pp_size != 1: raise
     if self.is_draft_worker: return False
@@ -175,7 +176,7 @@ if self._dsv4_has_low_ratio:
 # V4 原路径
 ```
 
-`_DSV41_PREFILL_GRAPH_CONTRACT_READY` 是唯一的总开关：PR-0 为 False，PR-1/PR-2 落地后为 True；置 False 即可让 V4.1 整体回到 eager break。**不引入用户可见开关**；配置不支持时回退 eager，不新增环境变量。
+能力判定本身就是闸门：未实现的配置返回 False，V4.1 整体留在 eager break；实现完整后不再保留额外的全局布尔开关。**不引入用户可见开关**；配置不支持时回退 eager，不新增环境变量。需要整张 prefill graph 回退时使用现有 CLI。
 
 ### 4.2 使能后果
 
@@ -190,7 +191,7 @@ if self._dsv4_has_low_ratio:
 当它为 True 时，V4.1 mixin 的 `low_ratio_prefill_graph` 也置 True，使 `_low_ratio_sources_break()` 返回 False，source 留在图内：
 
 ```
-low_ratio_prefill_graph = use_captured_forward_metadata and _DSV41_PREFILL_GRAPH_CONTRACT_READY
+low_ratio_prefill_graph = use_captured_forward_metadata and model_is_v41
 ```
 
 两者必须成对设置。只改一个会形成半捕获，违反 P2。
@@ -591,7 +592,7 @@ BCG 只捕获 transformer body；LM head、logits processor、prompt logprob 走
 | --- | --- | --- | --- |
 | D1 | 先让 low-ratio 返回 False，作为过渡基线 | 只作为 PR-0 的安全闸门，不作为交付形态 | 过渡基线本身没有 attention 图覆盖；交付必须原子捕获 |
 | D2 | source 可暂留 eager，用固定输出 bridge | 不允许半捕获；source 与 attention 同进同出 | topk 桥接的带宽/内存代价，以及 candidate/topk 生命周期复杂度 |
-| D3 | 扩展 `Dsv4PrefillGraphMetadata`，共享 allocate/fill/refresh/bind | 采用，但增加动态 kernel key、代际分支、纯 helper 重构 | 避免 V4 key 硬编码和 replay 依赖 live metadata 副作用 |
+| D3 | 扩展 `Dsv4PrefillGraphMetadata`，共享 allocate/fill/refresh/bind | 采用共享生命周期，但拆成基类 + 两个协议类；动态 kernel key、纯 helper 重构 | 避免两个代际的布局/sentinel 混在一个容器里，也避免 replay 依赖 live metadata 副作用 |
 | D4 | 同 bucket 动态长度时 shape 必须匹配并原地更新 | 进一步要求 dispatch metadata 用容量 buffer 重建 | live 形状的 metadata 尾部语义不明确；容量形状与探针一致 |
 | D5 | 优先复用槽 0 | 采用，并补源码依据与 device 断言 | `free_slots=range(1,size+1)`、pair state 每 slot 一 bank |
 | D6 | 首批固定实际 DP idle 策略 | 明确首版靠现有 inactive-rank 回退，不实现 idle replay | compressor/MQSMLA 的 idle ABI 未验证 |
