@@ -177,13 +177,15 @@ def run_case(*, impl: str, pages: int, page_size: int, native_page_size: int,
     d2h_ok = torch.equal(host, expected_host)
     result["d2h_ok"] = d2h_ok
 
-    # H2D: load into a zeroed device view and compare with the original bytes.
+    # H2D: load from the already-registered host buffer.  Do not pass a fresh
+    # permuted copy here: AIV resolves host addresses from the registration
+    # table, so every host operand must be the registered tensor itself.
     device_out = torch.zeros_like(device_view)
     load(
         device_indices,
         host_indices,
         device_out,
-        expected_host,
+        host,
         empty_device,
         empty_host,
         page_size=page_size,
