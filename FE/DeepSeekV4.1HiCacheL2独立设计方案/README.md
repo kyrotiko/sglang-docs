@@ -58,6 +58,7 @@
 | [代码改动清单](design/code_change_plan.md) | 逐文件/函数的改动建议与提交顺序 |
 | [验收与验证计划](validation/acceptance_plan.md) | CPU 契约测试、A5 单卡功能/正确性/性能/压力测试与通过标准 |
 | [A5 验证脚本](validation/scripts/README.md) | 可直接上 A5 跑的算子 full-page 探测、HiCache E2E、G10 默认 ratio 复现 |
+| [A5 算子探测结果（2026-11-18）](validation/a5_operator_probe_2026-11-18.md) | `page_size=128` + `layers=2` 的 AIV D2H/H2D 已通过，full-page 传输假设成立 |
 | [交互式教学页](../../learn/sglang-hicache-kv-offload-viz.html) | 动画演示 L1/L2 生命周期、写策略、DSV4 多池几何与 A5 AIV 传输 |
 | [SWA / C1·C2 / indexer K·scale 动画讲解](../../learn/dsv41-kv-structure-viz.html) | 12 token 小例子：窗口、压缩槽、indexer 打分与 top-k 动画 |
 | [full page 拆解动画](../../learn/dsv41-fullpage-transfer-viz.html) | 一页如何按 SWA / C1·C2 / indexer 拆成多次 D2H、H2D 传输 |

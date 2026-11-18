@@ -29,6 +29,8 @@ python a5_kv_exchange_probe.py --impl ascendc_aiv --out probe_out/op_aiv
 
 如果 `ascendc_aiv` 的 128 失败而 64 通过，说明我们设计的 full-page 传输不能直接用，需要改为在 host 侧保留 native page 行；请把 `probe_out/op_aiv/*.json` 返回。
 
+2026-11-18 已在 A5 上验证：`page_size=64` 与 `128`、`layers=2` 的 AIV D2H/H2D 都通过，见 [../a5_operator_probe_2026-11-18.md](../a5_operator_probe_2026-11-18.md)。
+
 ## 2. HiCache L2 端到端（约 5–15 分钟）
 
 会启动两个 server：

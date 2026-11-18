@@ -2,7 +2,7 @@
 
 所有测试基于 `dsv41-a5-hicache-l2` 工作区；未实施 [代码改动清单](../design/code_change_plan.md) 前，G1 相关用例预期失败，可作为复现基线。
 
-可直接上 A5 跑的探测脚本见 [scripts/README.md](scripts/README.md)：先跑 `a5_kv_exchange_probe.py` 验证 full-page 传输，再跑 `a5_hicache_e2e_probe.py` 复现 G1/G10。
+可直接上 A5 跑的探测脚本见 [scripts/README.md](scripts/README.md)：先跑 `a5_kv_exchange_probe.py` 验证 full-page 传输，再跑 `a5_hicache_e2e_probe.py` 复现 G1/G10。2026-11-18 的算子探测结果（`page_size=128`、`layers=2`、AIV D2H/H2D 均 PASS）见 [a5_operator_probe_2026-11-18.md](a5_operator_probe_2026-11-18.md)。
 
 ## 0. 环境与启动
 
