@@ -96,6 +96,35 @@ python a5_hicache_e2e_probe.py \
 
 在**应用本设计的 commit 1–5** 后，`geometry_checks` 应全部 `ok`，第一次 A 请求应成功；若仍失败，报告里的 candidate log tail 就是定位依据。
 
+## 2.1 KV 页字节级 round-trip（模型输出不可重复时用这个）
+
+A5 上 greedy 输出本身不可重复（baseline 连发两次都能不同），所以不能用文本相等判断 host 回载是否正确。`a5_hicache_page_roundtrip.py` 绕过模型：
+
+- 用 `_dsv4_low_ratio_regions` 构造和真实 V4.1 相同的 SWA/C1/C2/indexer/scale 全页 buffer；
+- 构造真实的 `DeepSeekV4PagedHostPool`；
+- 填充确定性字节；
+- 走真实 AIV `kernel_ascend` D2H 备份和 H2D 回载；
+- 逐字节比较 host 页和回载后的 device 页。
+
+```bash
+SGLANG_HICACHE_HOST_MEM_BACKEND=acl \
+PYTHONPATH=/mnt/share/y00627667/repos/sglang/python \
+python a5_hicache_page_roundtrip.py
+```
+
+期望 7 个 case 全部：
+
+```text
+swa / c1_kv / c1_indexer / c1_scale / c2_kv / c2_indexer / c2_scale
+d2h=True h2d=True mismatch=0
+```
+
+这个测试和模型采样完全无关；它通过，再加上 E2E 里的 `cached_tokens_details.host > 0`，就能证明：
+
+- host 池几何和 page 映射对；
+- D2H/H2D 字节没有丢/错；
+- C1/C2 的 ratio 1/2 都覆盖。
+
 ## 3. 默认 ratio 的启动路径（G10，约 1–2 分钟）
 
 ```bash
