@@ -148,6 +148,8 @@ class Server:
             "text": prompt,
             "sampling_params": {
                 "temperature": 0,
+                "top_k": 1,
+                "top_p": 1.0,
                 "max_new_tokens": max_new_tokens,
                 "ignore_eos": True,
             },
