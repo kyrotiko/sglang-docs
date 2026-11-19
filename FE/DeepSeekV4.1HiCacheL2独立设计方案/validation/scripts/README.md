@@ -78,6 +78,7 @@ python a5_hicache_e2e_probe.py \
 - `--extra-args`：模型/并行相关的额外参数，整体加引号传入；`--json-model-override-args` 单独用参数传，避免嵌套引号。
 - `--a-pages 8`：prompt A 的长度（约 8 个 full page）。
 - `--max-total-tokens` / `--filler-pages` / `--filler-count` 可按机器和内存调整。
+- `--repeat-a 2`：baseline 连发两次冷请求、candidate 连发两次 prefill 请求，用来区分“模型本身不确定”和“host 回载错误”。如果 `baseline_repeatable=false`，`output_matches_baseline` 不能单独作为正确性判据。
 
 脚本会记录：
 

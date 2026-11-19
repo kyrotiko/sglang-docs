@@ -417,12 +417,19 @@ def run_e2e(args) -> dict:
     report["baseline"]["log"] = str(log_path)
     if ok:
         try:
-            result = baseline.generate(
-                prompt_a, args.output_tokens, args.request_timeout
-            )
+            texts = []
+            metas = []
+            for _ in range(args.repeat_a):
+                result = baseline.generate(
+                    prompt_a, args.output_tokens, args.request_timeout
+                )
+                texts.append(result.get("text"))
+                metas.append(result.get("meta_info", {}))
             report["baseline"]["prompt_chars"] = len(prompt_a)
-            report["baseline"]["text"] = result.get("text")
-            report["baseline"]["meta_info"] = result.get("meta_info", {})
+            report["baseline"]["texts"] = texts
+            report["baseline"]["metas"] = metas
+            report["baseline"]["text"] = texts[0]
+            report["baseline"]["meta_info"] = metas[0]
             report["baseline"]["ok"] = True
         except Exception:
             report["baseline"]["ok"] = False
@@ -483,11 +490,18 @@ def run_e2e(args) -> dict:
             'mode="host_hit"',
         )
 
-        first = candidate.generate(
-            prompt_a, args.output_tokens, args.request_timeout
-        )
-        report["candidate"]["first_text"] = first.get("text")
-        report["candidate"]["first_meta_info"] = first.get("meta_info", {})
+        first_texts = []
+        first_metas = []
+        for _ in range(args.repeat_a):
+            first = candidate.generate(
+                prompt_a, args.output_tokens, args.request_timeout
+            )
+            first_texts.append(first.get("text"))
+            first_metas.append(first.get("meta_info", {}))
+        report["candidate"]["first_texts"] = first_texts
+        report["candidate"]["first_metas"] = first_metas
+        report["candidate"]["first_text"] = first_texts[0]
+        report["candidate"]["first_meta_info"] = first_metas[0]
         report["candidate"]["first_ok"] = True
 
         # Fill device with unique prefixes.  Total unique tokens stay below
@@ -569,6 +583,17 @@ def run_e2e(args) -> dict:
     checks["hit_cached_tokens_positive"] = (
         report["candidate"].get("hit_cached_tokens") or 0
     ) > 0
+    baseline_texts = report["baseline"].get("texts") or []
+    candidate_texts = report["candidate"].get("first_texts") or []
+    checks["baseline_repeatable"] = (
+        len(baseline_texts) < 2 or len(set(baseline_texts)) == 1
+    )
+    checks["candidate_prefill_repeatable"] = (
+        len(candidate_texts) < 2 or len(set(candidate_texts)) == 1
+    )
+    checks["hit_matches_candidate"] = (
+        candidate_texts and hit_text is not None and candidate_texts[0] == hit_text
+    )
     checks["output_matches_baseline"] = (
         baseline_text is not None
         and hit_text is not None
@@ -637,6 +662,12 @@ def main() -> int:
     parser.add_argument("--startup-timeout", type=float, default=900.0)
     parser.add_argument("--request-timeout", type=float, default=600.0)
     parser.add_argument("--output-tokens", type=int, default=16)
+    parser.add_argument(
+        "--repeat-a",
+        type=int,
+        default=1,
+        help="send A this many times before fillers to check repeatability",
+    )
     parser.add_argument("--a-pages", type=int, default=8)
     parser.add_argument("--filler-pages", type=int, default=2)
     parser.add_argument("--fill-factor", type=float, default=1.3,
