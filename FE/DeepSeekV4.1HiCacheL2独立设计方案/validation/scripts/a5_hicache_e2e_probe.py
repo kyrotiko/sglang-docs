@@ -76,10 +76,18 @@ def find_key(obj, key: str):
 
 
 class Server:
-    def __init__(self, *, name: str, port: int, log_path: Path):
+    def __init__(
+        self,
+        *,
+        name: str,
+        port: int,
+        log_path: Path,
+        routed_dp_rank: int | None = None,
+    ):
         self.name = name
         self.port = port
         self.log_path = log_path
+        self.routed_dp_rank = routed_dp_rank
         self.proc: subprocess.Popen | None = None
 
     @property
@@ -144,6 +152,8 @@ class Server:
                 "ignore_eos": True,
             },
         }
+        if self.routed_dp_rank is not None:
+            payload["routed_dp_rank"] = self.routed_dp_rank
         value = http_json(
             f"{self.base_url}/generate", payload=payload, timeout=timeout_s
         )
@@ -287,8 +297,10 @@ def build_prompts(page_size: int, a_pages: int, filler_pages: int):
 
     def body(tag: str, chars: int) -> str:
         head = f"[{tag}] "
-        repeats = max(1, (chars - len(head)) // len(base) + 1)
-        return head + (base * repeats)[: max(0, chars - len(head))]
+        # Put the tag in every chunk: fillers must not share long radix pages.
+        chunk = f"{base} tag={tag}."
+        repeats = max(1, (chars - len(head)) // len(chunk) + 1)
+        return head + (chunk * repeats)[: max(0, chars - len(head))]
 
     prompt_a = body("DOC-A", a_chars) + "\n\nReply with the single word OK."
     return prompt_a, filler_chars, body
@@ -318,6 +330,8 @@ def server_cmd(
     ]
     if args.mem_fraction_static is not None:
         cmd += ["--mem-fraction-static", str(args.mem_fraction_static)]
+    if args.max_total_tokens is not None:
+        cmd += ["--max-total-tokens", str(args.max_total_tokens)]
     if args.json_model_override_args:
         cmd += ["--json-model-override-args", args.json_model_override_args]
     cmd += extra
@@ -332,9 +346,14 @@ def start_server(
     log_path: Path,
     timeout_s: float,
     env_updates: dict | None = None,
+    routed_dp_rank: int | None = None,
 ):
-    server = Server(name=name, port=int(cmd[cmd.index("--port") + 1]),
-                    log_path=log_path)
+    server = Server(
+        name=name,
+        port=int(cmd[cmd.index("--port") + 1]),
+        log_path=log_path,
+        routed_dp_rank=routed_dp_rank,
+    )
     server.start(cmd, env_updates=env_updates)
     if not server.wait_ready(timeout_s):
         tail = server.tail_log(80)
@@ -392,6 +411,7 @@ def run_e2e(args) -> dict:
         log_path,
         args.startup_timeout,
         env_updates=env_updates,
+        routed_dp_rank=args.routed_dp_rank,
     )
     report["baseline"]["started"] = ok
     report["baseline"]["log"] = str(log_path)
@@ -433,6 +453,7 @@ def run_e2e(args) -> dict:
         log_path,
         args.startup_timeout,
         env_updates=env_updates,
+        routed_dp_rank=args.routed_dp_rank,
     )
     report["candidate"]["started"] = ok
     report["candidate"]["log"] = str(log_path)
@@ -474,8 +495,13 @@ def run_e2e(args) -> dict:
         a_tokens = args.page_size * args.a_pages
         target_tokens = int(max_tokens * args.fill_factor)
         filler_tokens = args.page_size * args.filler_pages
-        filler_count = max(
-            1, min(args.max_fillers, (target_tokens - a_tokens) // filler_tokens)
+        filler_count = (
+            max(1, args.filler_count)
+            if args.filler_count is not None
+            else max(
+                1,
+                min(args.max_fillers, (target_tokens - a_tokens) // filler_tokens),
+            )
         )
         report["candidate"]["filler_count"] = filler_count
         report["candidate"]["target_unique_tokens"] = target_tokens
@@ -577,6 +603,7 @@ def run_g10(args) -> dict:
         log_path,
         min(args.startup_timeout, 180),
         env_updates=probe_env(args),
+        routed_dp_rank=args.routed_dp_rank,
     )
     report["started"] = ok
     report["log"] = str(log_path)
@@ -591,6 +618,18 @@ def main() -> int:
     parser.add_argument("--model-path", required=True)
     parser.add_argument("--tp-size", type=int, default=8)
     parser.add_argument("--mem-fraction-static", type=float, default=None)
+    parser.add_argument(
+        "--max-total-tokens",
+        type=int,
+        default=None,
+        help="cap the device KV pool; keeps the forced-eviction fill practical",
+    )
+    parser.add_argument(
+        "--routed-dp-rank",
+        type=int,
+        default=0,
+        help="pin requests to one DP rank (-1 disables); needed for L2 hit checks",
+    )
     parser.add_argument("--page-size", type=int, default=128)
     parser.add_argument("--hicache-ratio", type=float, default=2.0)
     parser.add_argument("--port", type=int, default=30000)
@@ -603,6 +642,12 @@ def main() -> int:
     parser.add_argument("--fill-factor", type=float, default=1.3,
                         help="unique device tokens / device capacity")
     parser.add_argument("--max-fillers", type=int, default=300)
+    parser.add_argument(
+        "--filler-count",
+        type=int,
+        default=None,
+        help="fixed number of unique filler requests; overrides the estimate",
+    )
     parser.add_argument("--device-tokens", type=int, default=32768,
                         help="fallback when /get_server_info has no max_total_num_tokens")
     parser.add_argument(
@@ -626,6 +671,8 @@ def main() -> int:
     parser.add_argument("--g10", action="store_true",
                         help="also test --enable-hierarchical-cache without ratio")
     args = parser.parse_args()
+    if args.routed_dp_rank is not None and args.routed_dp_rank < 0:
+        args.routed_dp_rank = None
 
     if args.out_dir is None:
         args.out_dir = Path("probe_out") / f"hicache_e2e_{datetime.now():%Y%m%d_%H%M%S}"

@@ -66,12 +66,18 @@ python a5_hicache_e2e_probe.py \
 
 其他 `export`（HCCL/DEEPEP/SGLANG_OPT_* 等）可以让 probe 继承：把启动脚本里 `python3 -m` 之前的 export 段复制成 `env.sh`，先 `source env.sh` 再跑 probe；或者用 `--env KEY=VALUE` 逐个补。`--env` 可重复。
 
+关于强制 L2 命中的三个关键点：
+
+- `--max-total-tokens 32768`：把 device KV 池压到 32k token，否则默认池 2M token，挤 device 要发几百万 token，不现实。
+- `--routed-dp-rank 0`：DP8 下 round-robin 会把第一次 A 和重发 A 分到不同 rank，各自的 radix tree 不同，必然 miss；probe 默认把所有请求钉在 rank 0。
+- `--filler-pages 4 --filler-count 95`：每个 filler 内容带唯一 tag，不能共享 radix 页；95 个约 370 token 的 filler 足以挤出 32k device 池，同时总量仍小于 `1.2 × 32k` 的 host 容量。
+
 可选项：
 
 - `--mem-fraction-static 0.83`：按模型实际配方传。
 - `--extra-args`：模型/并行相关的额外参数，整体加引号传入；`--json-model-override-args` 单独用参数传，避免嵌套引号。
-- `--a-pages 8 --filler-pages 2 --fill-factor 1.3`：默认让唯一前缀总量约为 device 容量的 1.3 倍，仍小于 `ratio=2` 的 host 容量。
-- `--max-fillers 300`：避免机器太慢时跑太久。
+- `--a-pages 8`：prompt A 的长度（约 8 个 full page）。
+- `--max-total-tokens` / `--filler-pages` / `--filler-count` 可按机器和内存调整。
 
 脚本会记录：
 
