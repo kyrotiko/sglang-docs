@@ -161,6 +161,7 @@ EXTRA_ARGS=(
   --moe-a2a-backend deepep
   --deepep-mode auto
   --kv-cache-dtype auto
+  --enable-metrics
   --watchdog-timeout 9000
   --max-running-requests 200
   --max-prefill-tokens 16384

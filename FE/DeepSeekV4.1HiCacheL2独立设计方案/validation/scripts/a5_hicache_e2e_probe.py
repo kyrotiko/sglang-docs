@@ -152,7 +152,16 @@ class Server:
         return value if isinstance(value, dict) else {"raw": value}
 
     def metrics_text(self) -> str:
-        return http_text(f"{self.base_url}/metrics", timeout=10.0)
+        try:
+            return http_text(f"{self.base_url}/metrics", timeout=10.0)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                log(
+                    f"[{self.name}] /metrics is disabled; launch with "
+                    "--enable-metrics to check host_hit"
+                )
+                return ""
+            raise
 
     def tail_log(self, n: int = 80) -> list[str]:
         try:

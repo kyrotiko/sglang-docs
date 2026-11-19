@@ -57,7 +57,7 @@ python a5_hicache_e2e_probe.py \
   --mem-fraction-static 0.83 \
   --sglang-path "$HOME/repos/sglang/python" \
   --json-model-override-args '{"architectures": ["DeepseekV4ForCausalLM"]}' \
-  --extra-args "--attention-backend dsv4 --enable-dp-attention --dp-size 8 --enable-dp-lm-head --reasoning-parser deepseek-v4 --language-model-only --moe-a2a-backend deepep --deepep-mode auto --kv-cache-dtype auto --watchdog-timeout 9000 --max-running-requests 200 --max-prefill-tokens 16384 --chunked-prefill-size 4096 --cuda-graph-bs-decode 1 2 4 8" \
+  --extra-args "--attention-backend dsv4 --enable-dp-attention --dp-size 8 --enable-dp-lm-head --reasoning-parser deepseek-v4 --language-model-only --moe-a2a-backend deepep --deepep-mode auto --kv-cache-dtype auto --enable-metrics --watchdog-timeout 9000 --max-running-requests 200 --max-prefill-tokens 16384 --chunked-prefill-size 4096 --cuda-graph-bs-decode 1 2 4 8" \
   --env SGLANG_DSV4_FP4_EXPERTS=True \
   --out-dir probe_out/e2e
 ```
