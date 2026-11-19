@@ -27,7 +27,9 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROBE="$SCRIPT_DIR/a5_hicache_e2e_probe.py"
 
 TP_SIZE=${TP_SIZE:-8}
-ENABLE_DP=${ENABLE_DP:-0}
+# V4.1 A5 keeps all 64 query heads on every rank, which needs DP attention.
+# Set ENABLE_DP=0 only for a model/backend that supports head-split TP.
+ENABLE_DP=${ENABLE_DP:-1}
 DP_SIZE=${DP_SIZE:-8}
 MEM_FRACTION_STATIC=${MEM_FRACTION_STATIC:-0.83}
 HICACHE_RATIO=${HICACHE_RATIO:-1.2}

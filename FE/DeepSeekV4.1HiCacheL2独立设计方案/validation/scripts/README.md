@@ -62,7 +62,7 @@ python a5_hicache_e2e_probe.py \
   --out-dir probe_out/e2e
 ```
 
-上面是 **target-only**，不带 DSpark。第一次验证也可以先去掉 `--enable-dp-attention --dp-size 8`，先跑 TP8，确认 HiCache 主链路后再加 DP。当前首批不支持 DSpark + HiCache：draft SWA 是 V4 的 608 B/token，target 是 V4.1 的 544 B/token，必须拆成独立 draft SWA host pool（G6）。不要把这些 `--speculative-*` 参数加进 `--extra-args`。
+上面是 **target-only**，不带 DSpark。V4.1 在 A5 上要求每个 rank 保留全部 64 个 query head，因此这条 A5 配方需要 `--enable-dp-attention --dp-size 8 --enable-dp-lm-head`。脚本默认 `ENABLE_DP=1`；不要用纯 TP8 跑这个模型，否则会命中 `needs all 64 query heads ... got 8`。当前首批不支持 DSpark + HiCache：draft SWA 是 V4 的 608 B/token，target 是 V4.1 的 544 B/token，必须拆成独立 draft SWA host pool（G6）。不要把这些 `--speculative-*` 参数加进 `--extra-args`。
 
 其他 `export`（HCCL/DEEPEP/SGLANG_OPT_* 等）可以让 probe 继承：把启动脚本里 `python3 -m` 之前的 export 段复制成 `env.sh`，先 `source env.sh` 再跑 probe；或者用 `--env KEY=VALUE` 逐个补。`--env` 可重复。
 
