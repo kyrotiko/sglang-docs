@@ -33,6 +33,16 @@ python a5_kv_exchange_probe.py --impl ascendc_aiv --out probe_out/op_aiv
 
 ## 2. HiCache L2 端到端（约 5–15 分钟）
 
+最省事的是直接用封装脚本（已包含下面所有环境变量和 target-only 参数）：
+
+```bash
+SGLANG_ROOT=/mnt/share/y00627667/repos/sglang \
+HICACHE_RATIO=1.2 FILL_FACTOR=1.05 \
+./run_a5_hicache_target_e2e.sh
+```
+
+它会先检查 `sglang` 确实从 `$SGLANG_ROOT/python` 导入，然后启动 baseline + candidate 并跑完整探测。下面是手动版说明。
+
 会启动两个 server：
 
 - baseline：`--disable-radix-cache`，记录 prompt A 的冷启动 greedy 输出；
