@@ -16,7 +16,7 @@
 #   SGLANG_ROOT=/mnt/share/y00627667/repos/sglang \
 #   ./run_a5_hicache_target_e2e.sh
 
-set -euo pipefail
+set -eo pipefail
 
 MODEL_PATH=${MODEL_PATH:-/mnt/share/weight/DeepSeek-V4.1-Flash-1017}
 SGLANG_ROOT=${SGLANG_ROOT:-$HOME/repos/sglang}
