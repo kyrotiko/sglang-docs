@@ -38,17 +38,28 @@ python a5_kv_exchange_probe.py --impl ascendc_aiv --out probe_out/op_aiv
 - baseline：`--disable-radix-cache`，记录 prompt A 的冷启动 greedy 输出；
 - candidate：`--enable-hierarchical-cache --hicache-ratio 2.0 --hicache-write-policy write_through`，先发 A，再用大量唯一前缀挤 device，最后重发 A，检查 `host_hit` 指标。
 
+**注意**：probe 启动的是新的 `python -m sglang.launch_server` 子进程，不会自动继承你 `serve_dspark_hicache.sh` 里的 `PYTHONPATH`/`export`。如果当前 shell 没有设置，子进程会用到 `/sgl-workspace/sglang` 之类的另一份代码，模型加载就会在 HiCache 之前失败。至少要用 `--sglang-path` 指到本分支：
+
 ```bash
 python a5_hicache_e2e_probe.py \
   --model-path /path/to/DeepSeek-V4.1-Flash \
   --tp-size 8 \
+  --mem-fraction-static 0.83 \
+  --sglang-path "$HOME/repos/sglang/python" \
+  --json-model-override-args '{"architectures": ["DeepseekV4ForCausalLM"]}' \
+  --extra-args "--attention-backend dsv4 --enable-dp-attention --dp-size 8 --enable-dp-lm-head --reasoning-parser deepseek-v4 --language-model-only --moe-a2a-backend deepep --deepep-mode auto --kv-cache-dtype auto --watchdog-timeout 9000 --max-running-requests 200 --max-prefill-tokens 16384 --chunked-prefill-size 4096 --cuda-graph-bs-decode 1 2 4 8" \
+  --env SGLANG_DSV4_FP4_EXPERTS=True \
   --out-dir probe_out/e2e
 ```
 
+上面是 **target-only**，不带 DSpark。第一次验证也可以先去掉 `--enable-dp-attention --dp-size 8`，先跑 TP8，确认 HiCache 主链路后再加 DP。当前首批不支持 DSpark + HiCache：draft SWA 是 V4 的 608 B/token，target 是 V4.1 的 544 B/token，必须拆成独立 draft SWA host pool（G6）。不要把这些 `--speculative-*` 参数加进 `--extra-args`。
+
+其他 `export`（HCCL/DEEPEP/SGLANG_OPT_* 等）可以让 probe 继承：把启动脚本里 `python3 -m` 之前的 export 段复制成 `env.sh`，先 `source env.sh` 再跑 probe；或者用 `--env KEY=VALUE` 逐个补。`--env` 可重复。
+
 可选项：
 
-- `--mem-fraction-static 0.8`：按模型实际配方传。
-- `--extra-args "--attention-backend dsv4"`：如果启动命令还需要额外参数，整体加引号传入。
+- `--mem-fraction-static 0.83`：按模型实际配方传。
+- `--extra-args`：模型/并行相关的额外参数，整体加引号传入；`--json-model-override-args` 单独用参数传，避免嵌套引号。
 - `--a-pages 8 --filler-pages 2 --fill-factor 1.3`：默认让唯一前缀总量约为 device 容量的 1.3 倍，仍小于 `ratio=2` 的 host 容量。
 - `--max-fillers 300`：避免机器太慢时跑太久。
 

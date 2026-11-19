@@ -9,7 +9,7 @@ What it does:
   3. Records startup pool geometry, host-hit metrics, cached_tokens, output
      equality, and server logs.
   4. Optionally starts a server with only --enable-hierarchical-cache to
-     reproduce G10 (default-ratio auto-size failure).
+     test the default-ratio auto-size path (G10).
 
 It does not modify the repository.  All output goes to --out-dir.
 
@@ -86,11 +86,13 @@ class Server:
     def base_url(self) -> str:
         return f"http://127.0.0.1:{self.port}"
 
-    def start(self, cmd: list[str]) -> None:
+    def start(self, cmd: list[str], env_updates: dict | None = None) -> None:
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         env = os.environ.copy()
+        env.update(env_updates or {})
         env["PYTHONUNBUFFERED"] = "1"
         log(f"[{self.name}] starting: {' '.join(shlex.quote(x) for x in cmd)}")
+        log(f"[{self.name}] PYTHONPATH={env.get('PYTHONPATH', '')}")
         self._log_file = self.log_path.open("w", encoding="utf-8", errors="replace")
         self.proc = subprocess.Popen(
             cmd,
@@ -307,21 +309,46 @@ def server_cmd(
     ]
     if args.mem_fraction_static is not None:
         cmd += ["--mem-fraction-static", str(args.mem_fraction_static)]
+    if args.json_model_override_args:
+        cmd += ["--json-model-override-args", args.json_model_override_args]
     cmd += extra
     if args.extra_args:
         cmd += shlex.split(args.extra_args)
     return cmd, log_path
 
 
-def start_server(name: str, cmd: list[str], log_path: Path, timeout_s: float):
+def start_server(
+    name: str,
+    cmd: list[str],
+    log_path: Path,
+    timeout_s: float,
+    env_updates: dict | None = None,
+):
     server = Server(name=name, port=int(cmd[cmd.index("--port") + 1]),
                     log_path=log_path)
-    server.start(cmd)
+    server.start(cmd, env_updates=env_updates)
     if not server.wait_ready(timeout_s):
         tail = server.tail_log(80)
         server.stop()
         return server, False, tail
     return server, True, []
+
+
+def probe_env(args) -> dict:
+    env = {}
+    if args.sglang_path:
+        existing = os.environ.get("PYTHONPATH")
+        env["PYTHONPATH"] = (
+            f"{args.sglang_path}{os.pathsep}{existing}"
+            if existing
+            else args.sglang_path
+        )
+    for item in args.env:
+        key, sep, value = item.partition("=")
+        if not sep or not key:
+            raise ValueError(f"--env expects KEY=VALUE, got {item!r}")
+        env[key] = value
+    return env
 
 
 def run_e2e(args) -> dict:
@@ -336,6 +363,11 @@ def run_e2e(args) -> dict:
     prompt_a, filler_chars, body = build_prompts(
         args.page_size, args.a_pages, args.filler_pages
     )
+    env_updates = probe_env(args)
+    report["probe_env"] = {
+        "sglang_path": args.sglang_path,
+        "env_keys": sorted(env_updates),
+    }
 
     # Baseline: cold output with radix cache disabled.
     baseline_port = args.port
@@ -346,7 +378,11 @@ def run_e2e(args) -> dict:
         log_name="baseline",
     )
     baseline, ok, tail = start_server(
-        "baseline", cmd, log_path, args.startup_timeout
+        "baseline",
+        cmd,
+        log_path,
+        args.startup_timeout,
+        env_updates=env_updates,
     )
     report["baseline"]["started"] = ok
     report["baseline"]["log"] = str(log_path)
@@ -383,7 +419,11 @@ def run_e2e(args) -> dict:
         log_name="candidate",
     )
     candidate, ok, tail = start_server(
-        "candidate", cmd, log_path, args.startup_timeout
+        "candidate",
+        cmd,
+        log_path,
+        args.startup_timeout,
+        env_updates=env_updates,
     )
     report["candidate"]["started"] = ok
     report["candidate"]["log"] = str(log_path)
@@ -482,6 +522,7 @@ def run_e2e(args) -> dict:
     baseline_text = report["baseline"].get("text")
     hit_text = report["candidate"].get("hit_text")
     checks = report["checks"]
+    checks["baseline_started"] = bool(report["baseline"].get("started"))
     checks["candidate_started"] = bool(report["candidate"].get("started"))
     checks["first_request_ok"] = bool(report["candidate"].get("first_ok"))
     checks["host_hit_delta_positive"] = (
@@ -522,7 +563,11 @@ def run_g10(args) -> dict:
         log_name="g10_default_ratio",
     )
     server, ok, tail = start_server(
-        "g10", cmd, log_path, min(args.startup_timeout, 180)
+        "g10",
+        cmd,
+        log_path,
+        min(args.startup_timeout, 180),
+        env_updates=probe_env(args),
     )
     report["started"] = ok
     report["log"] = str(log_path)
@@ -551,6 +596,23 @@ def main() -> int:
     parser.add_argument("--max-fillers", type=int, default=300)
     parser.add_argument("--device-tokens", type=int, default=32768,
                         help="fallback when /get_server_info has no max_total_num_tokens")
+    parser.add_argument(
+        "--sglang-path",
+        default=None,
+        help="prepend this python/ directory to PYTHONPATH for the server subprocess",
+    )
+    parser.add_argument(
+        "--env",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="extra environment variable for the server subprocess; repeatable",
+    )
+    parser.add_argument(
+        "--json-model-override-args",
+        default=None,
+        help="passed unchanged to --json-model-override-args",
+    )
     parser.add_argument("--extra-args", default="")
     parser.add_argument("--g10", action="store_true",
                         help="also test --enable-hierarchical-cache without ratio")
@@ -587,9 +649,14 @@ def main() -> int:
                 f"actual={check['actual_item_bytes']} expected="
                 f"{check['expected_item_bytes']} ok={check['ok']}"
             )
-        log(f"candidate log tail:\n" + "\n".join(
-            e2e.get("candidate", {}).get("log_tail", [])[-40:]
-        ))
+        if e2e.get("baseline", {}).get("log_tail"):
+            log(f"baseline log tail:\n" + "\n".join(
+                e2e["baseline"]["log_tail"][-40:]
+            ))
+        if e2e.get("candidate", {}).get("log_tail"):
+            log(f"candidate log tail:\n" + "\n".join(
+                e2e["candidate"]["log_tail"][-40:]
+            ))
     if "g10" in report:
         g10 = report["g10"]
         log(f"\nG10 started={g10['started']} log={g10['log']}")
