@@ -122,6 +122,24 @@ HICACHE_TRACE op=H2D pool=deepseek_v4_c1 layer=0 device_page=... host_page=... d
 
 这是临时诊断代码，环境变量不设置就不生效。
 
+G8 的压缩状态清理也可以一起打点：
+
+```bash
+TRACE_COMPRESSOR=1 \
+TRACE_PAGES=16 \
+SGLANG_ROOT=/mnt/share/y00627667/repos/sglang \
+ENABLE_DP=1 HICACHE_RATIO=1.2 \
+bash ./run_a5_hicache_target_e2e.sh
+```
+
+会打印：
+
+```text
+HICACHE_COMPRESSOR op=clear req=<idx> ratio=2 ring_crc=<crc>
+```
+
+它验证 host 命中请求复用的 req slot 在进入 prefill 前，ratio-2 pending-pair ring 已经被清空；768 这种偶数页边界不应留下 pending pair。
+
 ## 2.1 KV 页字节级 round-trip（模型输出不可重复时用这个）
 
 A5 上 greedy 输出本身不可重复（baseline 连发两次都能不同），所以不能用文本相等判断 host 回载是否正确。`a5_hicache_page_roundtrip.py` 绕过模型：
