@@ -2,7 +2,7 @@
 
 ## 运行配置
 
-- 代码：`dsv41-a5-hicache-l2` @ `13d596d980`（含临时 CRC trace）
+- 代码：`dsv41-a5-hicache-l2` @ 诊断时 `13d596d980`（临时 CRC trace）；trace 已在 `ab30299513` 清理
 - 模型：DeepSeek-V4.1-Flash-1017，A5 单机 8 卡
 - 启动：DP8，`--max-total-tokens 32768`，`--hicache-ratio 1.2`，`write_through`
 - 探测：`TRACE_PAGES=16`，`FILLER_COUNT=95`，`REPEAT_A=2`
@@ -63,4 +63,4 @@ HICACHE_COMPRESSOR op=clear req=25 ratio=2 ring_crc=250218f5   (×321)
 ## 仍未闭环
 
 - `hicache_host_used_tokens` 在 host 命中时仍为 0，指标没有覆盖 sidecar/回载；属于可观测性缺口，不影响本次 L2 结论。
-- CRC / compressor trace 是临时诊断代码（`13d596d980`、`35961346b0`），正式合入前应移除或改成受控 debug 工具。
+- CRC / compressor trace 是临时诊断代码（`13d596d980`、`35961346b0`），已在 `ab30299513` 移除；上面的数字保留作历史证据。

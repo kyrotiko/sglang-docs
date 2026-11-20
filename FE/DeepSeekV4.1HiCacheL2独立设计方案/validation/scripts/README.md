@@ -96,50 +96,6 @@ python a5_hicache_e2e_probe.py \
 
 在**应用本设计的 commit 1–5** 后，`geometry_checks` 应全部 `ok`，第一次 A 请求应成功；若仍失败，报告里的 candidate log tail 就是定位依据。
 
-## 2.0 临时页 checksum 日志（最贴近真实 E2E）
-
-如果不想跑额外脚本，可以让 server 在传输边界打页 checksum：
-
-```bash
-TRACE_PAGES=16 \
-SGLANG_ROOT=/mnt/share/y00627667/repos/sglang \
-ENABLE_DP=1 HICACHE_RATIO=1.2 \
-bash ./run_a5_hicache_target_e2e.sh
-```
-
-它会设置 `SGLANG_HICACHE_TRACE_PAGES=16`，在 `kernel_ascend` 的 D2H/H2D 边界同步后打印每个池 layer 0 的一页：
-
-```text
-HICACHE_TRACE op=D2H pool=deepseek_v4_c1 layer=0 device_page=... host_page=... device_crc=... host_crc=...
-HICACHE_TRACE op=H2D pool=deepseek_v4_c1 layer=0 device_page=... host_page=... device_crc=... host_crc=...
-```
-
-判读：
-
-- 同一个 `pool` + `host_page` 的 D2H `host_crc` 与 H2D `device_crc`/`host_crc` 应一致；
-- 不一致说明真实回载路径有字节错误，比文本对比直接；
-- `TRACE_PAGES=0` 时完全没有日志和额外同步，正常性能路径不受影响。
-
-这是临时诊断代码，环境变量不设置就不生效。
-
-G8 的压缩状态清理也可以一起打点：
-
-```bash
-TRACE_COMPRESSOR=1 \
-TRACE_PAGES=16 \
-SGLANG_ROOT=/mnt/share/y00627667/repos/sglang \
-ENABLE_DP=1 HICACHE_RATIO=1.2 \
-bash ./run_a5_hicache_target_e2e.sh
-```
-
-会打印：
-
-```text
-HICACHE_COMPRESSOR op=clear req=<idx> ratio=2 ring_crc=<crc>
-```
-
-它验证 host 命中请求复用的 req slot 在进入 prefill 前，ratio-2 pending-pair ring 已经被清空；768 这种偶数页边界不应留下 pending pair。
-
 ## 2.1 KV 页字节级 round-trip（模型输出不可重复时用这个）
 
 A5 上 greedy 输出本身不可重复（baseline 连发两次都能不同），所以不能用文本相等判断 host 回载是否正确。`a5_hicache_page_roundtrip.py` 绕过模型：
