@@ -137,12 +137,15 @@ def roundtrip(
     )
     host_indices = device_indices.clone()
     dummy_pool = SimpleNamespace()
+    # Compare through the same page view the AIV op receives; indexing
+    # host.kv_buffer directly is not equivalent for every layout.
+    host_view = host._host_page_view(0)
 
     host.backup_from_device_all_layer(
         dummy_pool, host_indices, device_indices, "kernel_ascend"
     )
     torch.npu.synchronize()
-    host_page = host.kv_buffer[0, 0].detach().cpu().clone()
+    host_page = host_view[0, 0].detach().cpu().clone()
     d2h_ok = torch.equal(host_page.view_as(expected), expected)
 
     device_buffer[0].zero_()
@@ -154,6 +157,8 @@ def roundtrip(
         "kernel_ascend",
     )
     torch.npu.synchronize()
+    host_page_after = host_view[0, 0].detach().cpu().clone()
+    host_after_ok = torch.equal(host_page_after.view_as(expected), expected)
     h2d_ok = torch.equal(device_buffer[0].detach().cpu(), expected)
 
     # Keep a small artifact for post-mortem; never dump full model KV.
@@ -170,6 +175,7 @@ def roundtrip(
         "item_bytes": item_bytes,
         "d2h_ok": d2h_ok,
         "h2d_ok": h2d_ok,
+        "host_after_h2d_ok": host_after_ok,
         "mismatch_bytes": mismatch,
     }
 
@@ -251,6 +257,7 @@ def main() -> int:
             report["cases"].append(result)
             print(
                 f"{name}: d2h={result['d2h_ok']} h2d={result['h2d_ok']} "
+                f"host_after_h2d={result['host_after_h2d_ok']} "
                 f"mismatch={result['mismatch_bytes']}"
             )
     except Exception:
