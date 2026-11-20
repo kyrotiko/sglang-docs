@@ -133,6 +133,15 @@ A5 上 greedy 输出本身不可重复（baseline 连发两次都能不同），
 - 逐字节比较 host 页和回载后的 device 页。
 
 ```bash
+SGLANG_ROOT=/mnt/share/y00627667/repos/sglang \
+bash ./run_a5_page_roundtrip.sh
+```
+
+或者手动 source Ascend 环境（`acl` 模块在其中）：
+
+```bash
+source /usr/local/Ascend/ascend-toolkit/latest/set_env.sh
+source /usr/local/Ascend/nnal/atb/set_env.sh
 SGLANG_HICACHE_HOST_MEM_BACKEND=acl \
 PYTHONPATH=/mnt/share/y00627667/repos/sglang/python \
 python a5_hicache_page_roundtrip.py
