@@ -46,8 +46,21 @@ candidate_prefill_repeatable = false
 
 这是 A5 上 MoE/DeepEP 的数值不确定性，不是 HiCache 数据错误。`hit_matches_candidate` / `output_matches_baseline` 因此不能作为准入门槛；页级 CRC 才是可靠判据。
 
+## G8 压缩状态清理 trace（2026-11-20）
+
+同一轮 E2E 打开 `TRACE_COMPRESSOR=1`：
+
+```text
+HICACHE_COMPRESSOR op=clear req=25 ratio=2 ring_crc=250218f5   (×321)
+```
+
+- 321 次 ratio-2 request-state clear 的 ring CRC 全部相同；
+- host 命中前缀 768 是 128 的整数倍，也是偶数，ratio-2 pending pair 为空；
+- CPU 不变量测试 `test_ratio2_compressor_state_is_cleared_at_page_boundary` 覆盖：request slot clear 后 ring 为 0/-inf，`seq_len=768` 时 `transfer_indices` 为空，`seq_len=769` 才返回 pending pair。
+
+结论：**host 命中请求在进入 prefill 前不会继承上一个请求的 ratio-2 pending state**。由于 A5 模型输出本身不可重复，压缩状态与冷启动的数值等价仍不能靠文本证明；这里验证的是清理/边界不变量。
+
 ## 仍未闭环
 
-- G8：压缩器 request-scoped state 的页边界重建仍没有独立验证；KV/indexer 页字节正确不等于压缩状态重建一定正确。
 - `hicache_host_used_tokens` 在 host 命中时仍为 0，指标没有覆盖 sidecar/回载；属于可观测性缺口，不影响本次 L2 结论。
-- CRC trace 是临时诊断代码（`13d596d980`），正式合入前应移除或改成受控 debug 工具。
+- CRC / compressor trace 是临时诊断代码（`13d596d980`、`35961346b0`），正式合入前应移除或改成受控 debug 工具。
