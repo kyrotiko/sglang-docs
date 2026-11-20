@@ -24,7 +24,7 @@
 
 - 代码分支：`dsv41-a5-hicache-l2`，commit `b376ac9e25`（低压缩比页几何/预留/断言）与 `4ddf6b5246`（V4 paged pools auto-size）。
 - CPU：`test_dsv4_hicache_l2.py`、`test_dsv4_compressed_pools.py`、`test_hicache_auto_size.py` 共 48 passed。
-- A5：`a5_kv_exchange_probe.py` 的 `page_size=128`、`layers=2` AIV D2H/H2D 已通过；sglang 侧 HiCache E2E 仍待跑。
+- A5：`a5_kv_exchange_probe.py` 的 `page_size=128`、`layers=2` AIV D2H/H2D 已通过；DP8 E2E 已出现 host 命中 768 token，7 个池的 D2H/H2D 页 CRC 全部一致。详见 [E2E 结果](validation/a5_hicache_e2e_result_2026-11-20.md)。
 
 ## 结论摘要
 
@@ -65,6 +65,7 @@
 | [验收与验证计划](validation/acceptance_plan.md) | CPU 契约测试、A5 单卡功能/正确性/性能/压力测试与通过标准 |
 | [A5 验证脚本](validation/scripts/README.md) | 可直接上 A5 跑的算子 full-page 探测、HiCache E2E、G10 默认 ratio 复现 |
 | [A5 算子探测结果（2026-11-18）](validation/a5_operator_probe_2026-11-18.md) | `page_size=128` + `layers=2` 的 AIV D2H/H2D 已通过，full-page 传输假设成立 |
+| [A5 HiCache L2 E2E 结果（2026-11-20）](validation/a5_hicache_e2e_result_2026-11-20.md) | DP8 下 host 命中 768 token，7 个池的 D2H/H2D 页 CRC 全部一致 |
 | [交互式教学页](../../learn/sglang-hicache-kv-offload-viz.html) | 动画演示 L1/L2 生命周期、写策略、DSV4 多池几何与 A5 AIV 传输 |
 | [SWA / C1·C2 / indexer K·scale 动画讲解](../../learn/dsv41-kv-structure-viz.html) | 12 token 小例子：窗口、压缩槽、indexer 打分与 top-k 动画 |
 | [full page 拆解动画](../../learn/dsv41-fullpage-transfer-viz.html) | 一页如何按 SWA / C1·C2 / indexer 拆成多次 D2H、H2D 传输 |
