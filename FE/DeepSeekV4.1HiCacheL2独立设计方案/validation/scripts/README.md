@@ -143,7 +143,7 @@ bash ./run_a5_page_roundtrip.sh
 source /usr/local/Ascend/ascend-toolkit/latest/set_env.sh
 source /usr/local/Ascend/nnal/atb/set_env.sh
 SGLANG_HICACHE_HOST_MEM_BACKEND=acl \
-PYTHONPATH=/mnt/share/y00627667/repos/sglang/python \
+PYTHONPATH="/mnt/share/y00627667/repos/sglang/python${PYTHONPATH:+:$PYTHONPATH}" \
 python a5_hicache_page_roundtrip.py
 ```
 

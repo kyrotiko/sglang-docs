@@ -19,7 +19,7 @@ sampling and of whether the model output is repeatable.
 Run on A5 after the HiCache code is checked out:
 
     SGLANG_HICACHE_HOST_MEM_BACKEND=acl \
-    PYTHONPATH=$HOME/repos/sglang/python \
+    PYTHONPATH="$HOME/repos/sglang/python${PYTHONPATH:+:$PYTHONPATH}" \
     python a5_hicache_page_roundtrip.py
 """
 
