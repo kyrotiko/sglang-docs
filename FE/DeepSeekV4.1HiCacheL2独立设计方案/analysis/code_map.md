@@ -67,7 +67,7 @@ V4.1 与 V4 的关键差异：`compress_ratios` 为 1/2（低压缩比），没�
 | 池 | 装配位置 | 说明 |
 | --- | --- | --- |
 | FULL 锚点 | `LogicalHostPool`（`868-880`） | 只做 host 槽位记账，不持有字节；所有 sidecar 复用它的 host 索引 |
-| SWA | `882-911` | 支持把 DSpark/MTP draft 的 SWA 层追加进同一 host 池 |
+| SWA | `882-911` | 行宽一致时把 MTP draft 的 SWA 层追加进同一 host 池；行宽不一致时走 `DRAFT_SWA` sidecar（`build_swa_draft_pools`） |
 | C4 / C128 | `913-1071` | V4 路径；V4.1 无 C128 |
 | C1 / C2 + indexer | `600-690`, `1073-1077` | V4.1 低压缩比路径；`page_aligned_only=True`（只做整页传输） |
 | 持久状态 | `979-1015` | ratio 4（V4） |

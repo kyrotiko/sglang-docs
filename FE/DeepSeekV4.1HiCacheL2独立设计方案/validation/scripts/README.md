@@ -5,7 +5,7 @@
 ## 0. 前置条件
 
 - A5（arch35）机器，`sgl-kernel-npu` 已按 `--arch-version 3510` 构建 `kv_exchange`。
-- 当前分支/commit 是 `dsv41-a5` @ `9898f7ce9a`（或包含 HiCache L2 的同一基线）。
+- 当前分支/commit 是 `dsv41-a5-hicache-l2` @ `b2e36bb605`（基于 `origin/main` @ `36d82211fe`），或包含 HiCache L2 修复的同一基线。
 - 已安装 `cann_ops_transformer`，V4.1 权重可加载。
 - 建议先确认 `python -c "import torch_npu; print(torch_npu.npu.is_available())"` 为 True。
 
@@ -62,7 +62,14 @@ python a5_hicache_e2e_probe.py \
   --out-dir probe_out/e2e
 ```
 
-上面是 **target-only**，不带 DSpark。V4.1 在 A5 上要求每个 rank 保留全部 64 个 query head，因此这条 A5 配方需要 `--enable-dp-attention --dp-size 8 --enable-dp-lm-head`。脚本默认 `ENABLE_DP=1`；不要用纯 TP8 跑这个模型，否则会命中 `needs all 64 query heads ... got 8`。当前首批不支持 DSpark + HiCache：draft SWA 是 V4 的 608 B/token，target 是 V4.1 的 544 B/token，必须拆成独立 draft SWA host pool（G6）。不要把这些 `--speculative-*` 参数加进 `--extra-args`。
+上面是 **target-only**（不带 DSpark），用于先隔离 L2 主链路。V4.1 在 A5 上要求每个 rank 保留全部 64 个 query head，因此这条 A5 配方需要 `--enable-dp-attention --dp-size 8 --enable-dp-lm-head`。脚本默认 `ENABLE_DP=1`；不要用纯 TP8 跑这个模型，否则会命中 `needs all 64 query heads ... got 8`。
+
+DSpark + HiCache 现已支持：draft SWA 是 V4 的 608 B/token，target 是 V4.1 的 544 B/token。计划阶段比较两侧 SWA 行宽，不一致时回退为 `SIDECAR`，由独立的 `DRAFT_SWA` host pool 承载 draft，target SWA host pool 不受影响。跑 DSpark 时：
+
+- 按现有 DSpark 启动脚本把 `--speculative-*` 参数整体放进 `--extra-args`，相关环境变量用 `--env KEY=VALUE` 传入（probe 启动的子进程不会继承你 shell 里的 export）；
+- 启动日志应出现 `HiCache draft SWA rows differ from the target's; using a DRAFT_SWA sidecar...`；
+- `DRAFT_SWA` 池的 `item_bytes` 应为 `608 * page_size`（page_size=128 时 77824），target `swa` 仍是 `544 * page_size`（69632）；
+- 仍需显式 `--hicache-ratio`：auto-size 对 V4 draft 池会拒绝并要求显式 ratio。
 
 其他 `export`（HCCL/DEEPEP/SGLANG_OPT_* 等）可以让 probe 继承：把启动脚本里 `python3 -m` 之前的 export 段复制成 `env.sh`，先 `source env.sh` 再跑 probe；或者用 `--env KEY=VALUE` 逐个补。`--env` 可重复。
 
@@ -94,7 +101,7 @@ python a5_hicache_e2e_probe.py \
 - 第一次 A 请求可能直接报 view/shape 错误 → 复现 G1b（NPU indexer 2-D vs 5-D）；
 - 如果 candidate 没崩但 `host_hit_delta == 0`，说明 L2 路径没有真正命中，也要返回报告。
 
-在**应用本设计的 commit 1–5** 后，`geometry_checks` 应全部 `ok`，第一次 A 请求应成功；若仍失败，报告里的 candidate log tail 就是定位依据。
+在当前分支 `b2e36bb605` 上，`geometry_checks` 应全部 `ok`，第一次 A 请求应成功；若仍失败，报告里的 candidate log tail 就是定位依据。
 
 ## 2.1 KV 页字节级 round-trip（模型输出不可重复时用这个）
 
@@ -127,6 +134,8 @@ python a5_hicache_page_roundtrip.py
 swa / c1_kv / c1_indexer / c1_scale / c2_kv / c2_indexer / c2_scale
 d2h=True h2d=True mismatch=0
 ```
+
+**已知假阴性**：当前脚本在 `c1_indexer` 上会报 `d2h=False`、`mismatch>0`，但生产 E2E 的页 CRC 对 `c1_indexer` 是匹配的（`3f3586f6`）。这是脚本构造 host 页视图时的读取方式问题，不是生产回载错误；修脚本前不要把该 case 当作准入门槛，其余 6 个 case 仍应全绿。
 
 这个测试和模型采样完全无关；它通过，再加上 E2E 里的 `cached_tokens_details.host > 0`，就能证明：
 

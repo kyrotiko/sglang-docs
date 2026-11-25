@@ -2,7 +2,7 @@
 
 ## 运行配置
 
-- 代码：`dsv41-a5-hicache-l2` @ 诊断时 `13d596d980`（临时 CRC trace）；trace 已在 `ab30299513` 清理
+- 代码：诊断时为 `dsv41-a5` 基线的 `dsv41-a5-hicache-l2` @ `13d596d980`（临时 CRC trace），trace 已在 `ab30299513` 清理。该分支后续已 rebase 到 `origin/main`，当前交付 HEAD 为 `b2e36bb605`；文中旧 commit 只属于历史基线。
 - 模型：DeepSeek-V4.1-Flash-1017，A5 单机 8 卡
 - 启动：DP8，`--max-total-tokens 32768`，`--hicache-ratio 1.2`，`write_through`
 - 探测：`TRACE_PAGES=16`，`FILLER_COUNT=95`，`REPEAT_A=2`
@@ -60,7 +60,38 @@ HICACHE_COMPRESSOR op=clear req=25 ratio=2 ring_crc=250218f5   (×321)
 
 结论：**host 命中请求在进入 prefill 前不会继承上一个请求的 ratio-2 pending state**。由于 A5 模型输出本身不可重复，压缩状态与冷启动的数值等价仍不能靠文本证明；这里验证的是清理/边界不变量。
 
+## DSpark + HiCache（2026-11-25）
+
+A5 上按 DSpark + HiCache 配方完成实机启动与推理功能验证，用户确认功能通过。本轮未归档启动日志与页 CRC；DSpark 路径的字节级证据仍以 2026-11-20 的 target-only CRC 为准。
+
+### 问题
+
+DSpark draft 是 V4 架构，SWA 行宽 608 B/token；V4.1 target 是 544 B/token。旧逻辑把 DSpark compressed-KV draft 判为 `PACKED`，draft 的 SWA buffer 被直接拼进 target 的 SWA host 池，启动时触发：
+
+```text
+ValueError: packed DSV4 draft SWA rows do not match the target's 69632 B pages: (413, 128, 1, 608)
+```
+
+仅跳过 `sidecar_draft_device_pools` 不够：在当前 main 上 DSpark 走的是 `mtp_draft_device_pools`（`PACKED`），sidecar 列表为空。
+
+### 修复
+
+`b2e36bb605` 在 `_build_hicache_draft_plan()` 的 pack 判定里增加行宽比较 `_packed_swa_rows_match_target()`：
+
+- 544 B draft → 仍 `PACKED`；
+- 608 B draft + 544 B target → 回退 `SIDECAR`，`mtp_draft_device_pools` 保持空；
+- `build_hicache_draft_sidecars()` → `build_swa_draft_pools()` 建独立的 `DRAFT_SWA` host pool，`item_bytes = 608 * page_size`（page_size 128 时为 77824）；
+- target `swa` host pool 保持 `544 * page_size`（69632）。
+
+启动日志应出现：
+
+```text
+HiCache draft SWA rows differ from the target's; using a DRAFT_SWA sidecar instead of the target SWA host pool.
+```
+
 ## 仍未闭环
 
 - `hicache_host_used_tokens` 在 host 命中时仍为 0，指标没有覆盖 sidecar/回载；属于可观测性缺口，不影响本次 L2 结论。
+- `a5_hicache_page_roundtrip.py` 的 `c1_indexer` 仍是假阴性（测试脚本构造 host 视图的问题）；生产 E2E 的 `c1_indexer` 页 CRC 是匹配的。
+- DSpark + HiCache 本轮只做了功能验证，没有归档启动日志、host 池几何与页 CRC；需要字节级证据时按 `validation/scripts/README.md` 重跑。
 - CRC / compressor trace 是临时诊断代码（`13d596d980`、`35961346b0`），已在 `ab30299513` 移除；上面的数字保留作历史证据。

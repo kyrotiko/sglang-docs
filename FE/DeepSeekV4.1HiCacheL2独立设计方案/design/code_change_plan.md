@@ -1,19 +1,19 @@
 # 代码改动清单
 
-主仓 `sglang`，分支 `dsv41-a5-hicache-l2`（工作区 `D:/workspace/SGLang/sglang-dsv41-a5-hicache-l2`）。**本文档只给方案，代码尚未实施。**
+主仓 `sglang`，分支 `dsv41-a5-hicache-l2`（工作区 `D:/workspace/SGLang/sglang-dsv41-a5-hicache-l2`）。**代码已实施并完成 A5 验证**；基线为 `origin/main` @ `36d82211fe`，分支 HEAD `b2e36bb605`。
 
-## 0. 提交拆分
+## 0. 提交拆分（实际）
 
 | 顺序 | 提交 | 内容 | 依赖 |
 | --- | --- | --- | --- |
-| 1 | `dsv41 hicache: normalize NPU low-ratio host pages to full-page rows` | 修正 NPU 4-D KV 的 `item_bytes`，把 NPU indexer 规范化为 full-page 4-D 视图；GPU 2-D 保持不变 | 无 |
-| 2 | `dsv41 hicache: cover low-ratio pools in host memory reservation` | 补齐 C1/C2 + indexer 的预留 | 1 |
-| 3 | `dsv41 hicache: add low-ratio host pool and transfer unit tests` | CPU 契约测试 | 1, 2 |
-| 4 | `dsv41 hicache: guard draft SWA row width in packed host pools` | DSpark 行宽断言 | 1 |
-| 5 | `dsv41 hicache: size V4 paged pools in auto-size` | G4/G10；覆盖 C1/C2/indexer；C4 state/draft 显式拒绝 | 2 |
-| 6 | `npu tests: add DSV4.1 HiCache L2 end-to-end` | 注册 NPU CI | 1–3 |
+| 1 | `a02a7e42e4` `fix(dsv41): correct NPU low-ratio HiCache host page geometry` | NPU 4-D `item_bytes`、indexer full-page 归一化、C1/C2 预留、draft 行宽断言、`_to_page_slots` 命名清理 | 无 |
+| 2 | `f8cd41cef6` `feat(hicache): size V4 paged pools for auto-sizing` | G4/G10；覆盖 SWA/C1/C2/indexer；C4 state 与 V4 draft 显式拒绝 | 1 |
+| 3 | `02de0828c1` `fix(hicache): support sidecar DSpark draft and harden V4.1 tests` | sidecar 池不并入 target SWA；compressor 页边界测试 | 1 |
+| 4 | `b2e36bb605` `fix(hicache): sidecar a draft SWA pool whose rows differ from the target` | 计划阶段比较 SWA 行宽；V4 draft + V4.1 target 回退 `SIDECAR`，建 `DRAFT_SWA` host pool | 3 |
 
-## 1. 提交 1：低压缩比 host 页几何
+CPU 结果：`test_dsv4_hicache_l2.py`、`test_dsv4_compressed_pools.py`、`test_hicache_auto_size.py`、`test_hicache_mtp_state.py` 共 64 passed。
+
+## 1. 低压缩比 host 页几何（已实现）
 
 **核心原则：host 页仍然是一个 full page，传输也以 full page 为单位。**
 
@@ -99,7 +99,7 @@ for name, device_pool, buffers, layer_mapping in \
 4. **传输调用**：mock `transfer_kv_all_layer_kv_split(_lf_pf)` 与 `transfer_kv_per_layer_kv_split(_pf_lf)`，断言 `page_size == S`，`device_k.shape == (1, full_pages, S, 1, dim)`，索引覆盖 `S` 个连续槽。
 5. 覆盖 ratio 1 与 ratio 2（C1 indexer `I=2, S=128`；C2 indexer `I=1, S=64`）。
 
-## 2. 提交 2：host 内存预留覆盖 C1/C2
+## 2. host 内存预留覆盖 C1/C2（已实现）
 
 `python/sglang/srt/mem_cache/pool_host/npu_host_memory.py:329-393`：
 
@@ -130,16 +130,20 @@ for ratio, kv_name, index_names in (
 
 补充单测：`test_dsv4_hicache_l2.py::test_dsv4_acl_capacity_declares_paged_pool_bytes` 扩展为 v4.1 侧池，断言总字节包含 C1/C2 与 indexer。
 
-## 3. 提交 3：单元测试补齐
+## 3. 单元测试（已实现）
 
 - `_dsv4_low_ratio_regions` / `_dsv4_low_ratio_entries` 的 NPU 4-D 装配测试。
 - indexer full-page 传输几何测试（见 §1.3）。
 - GPU 2-D 回归测试（现有测试保持通过）。
 - 预留测试（见 §2）。
 
-## 4. 提交 4：draft SWA 行宽断言
+## 4. draft SWA 行宽：断言 + sidecar 回退（已实现）
 
-`hybrid_pool_assembler.py:811-838`（`mtp_swa_device_buffers` 收集处）：
+分两层处理，缺一不可。
+
+### 4.1 装配层断言
+
+`hybrid_pool_assembler.py`（`mtp_swa_device_buffers` 收集处）保留行宽断言：
 
 ```python
 for buffer in draft_swa.buffer_info.buffers:
@@ -151,23 +155,60 @@ for buffer in draft_swa.buffer_info.buffers:
         )
 ```
 
-4-D PA_ND 上 `buffer.shape[1] * element_size()` 只会得到槽数 `S`，不能用它和 `S*544` 比较；`buffer[0].numel() * element_size()` 对 4-D 和 2-D 都是 full-page 字节数。
+4-D PA_ND 上 `buffer.shape[1] * element_size()` 只会得到槽数 `S`，不能用它和 `S*544` 比较；`buffer[0].numel() * element_size()` 对 4-D 和 2-D 都是 full-page 字节数。这个断言只负责“真到了 packed 路径就不许错读”，不能单独解决 DSpark：在当前 main 上，DSpark compressed-KV draft 会被 `_can_pack_hicache_mtp()` 判成 `PACKED`，根本不会进入 sidecar 列表，断言会直接把启动打断。
 
-只在启用投机时触发；首批即使不启用，也应加上显式拒绝，避免静默错读。
+### 4.2 计划层行宽比较与回退
 
-## 5. 提交 5：自动定容支持 V4 paged pools
+`python/sglang/srt/speculative/base_spec_worker.py`：
+
+```python
+def _packed_swa_rows_match_target(target_pool, draft_pools) -> bool:
+    ...
+    target_row_bytes = target_swa.paged_buffer_info().page_bytes
+    for draft in draft_pools:
+        if draft_swa.paged_buffer_info().page_bytes != target_row_bytes:
+            return False
+    return True
+```
+
+`_build_hicache_draft_plan()` 的 pack 条件改为：
+
+```python
+pack_eligible = _can_pack_hicache_mtp(spec_algorithm, draft_runners)
+if pack_eligible and not _packed_swa_rows_match_target(
+    target_model_runner.token_to_kv_pool, draft_pools
+):
+    logger.info(
+        "HiCache draft SWA rows differ from the target's; using a "
+        "DRAFT_SWA sidecar instead of the target SWA host pool."
+    )
+    pack_eligible = False
+```
+
+行为：
+
+- target 544 B / draft 544 B：保持 `PACKED`，draft 层拼进 target SWA host 页；
+- target 544 B / draft 608 B（V4 DSpark + V4.1 target）：`mtp_draft_device_pools` 保持空，计划降级为 `SIDECAR`；
+- `build_hicache_draft_sidecars()` 识别 `DeepSeekV4TokenToKVPool`，走 `build_swa_draft_pools()`，建独立的 `DRAFT_SWA` host pool，`item_bytes = 608 * page_size`；
+- target SWA host pool 仍是 544 B 行，不受 draft 影响。
+
+CPU 用例：`test_hicache_mtp_state.py::test_dspark_draft_swa_rows_decide_the_hicache_layout`，覆盖 544→`PACKED`、608→`SIDECAR` 两条路径。
+
+A5 验证（2026-11-25）：DSpark + HiCache 配方启动与推理功能通过。
+
+## 5. 自动定容支持 V4 paged pools（已实现）
 
 `hicache_auto_size._estimate_hicache_bytes` 增加 V4 分支：
 
 - `_dsv4_pool_bytes` 遍历 `get_device_pool_infos()`，统计 SWA、C1/C2 KV、indexer K/scale 的 `page_bytes * pages`。
-- `DSV4CheckpointBufferInfo`（C4 持久状态）和 V4 draft 池显式拒绝 auto-size，要求用户给 `--hicache-ratio`；首批不做这两类组合。
+- `DSV4CheckpointBufferInfo`（C4 持久状态）和 V4 draft 池显式拒绝 auto-size，要求用户给 `--hicache-ratio`；DSpark + HiCache 因此仍需显式 ratio。
 - CPU 用例：`test_hicache_auto_size.py::test_dsv4_paged_pools_are_sized_for_auto`。
 
 首批仍建议显式写 ratio 以固定容量；auto-size 是默认启用路径的兜底。
 
-## 6. 提交 6：A5 端到端用例
+## 6. A5 端到端用例（未注册 CI，改用验证脚本）
 
-位置建议：`test/registered/npu/basic_function/HiCache/test_npu_dsv41_hicache_l2.py`，`register_npu_ci` 选择与 DSV4.1 A5 匹配的 suite。
+当前没有新增 `register_npu_ci` 用例；A5 端到端由 [validation/scripts](../validation/scripts/README.md) 下的 `a5_kv_exchange_probe.py`、`a5_hicache_e2e_probe.py` 和 `run_a5_hicache_target_e2e.sh` 承担。若后续要进 CI，建议位置为 `test/registered/npu/basic_function/HiCache/test_npu_dsv41_hicache_l2.py`，`register_npu_ci` 选择与 DSV4.1 A5 匹配的 suite。
 
 用例至少覆盖：
 
@@ -185,4 +226,8 @@ for buffer in draft_swa.buffer_info.buffers:
 
 - `--hicache-size` 的字节预算拆分（G3）。
 - memfabric 后端的完整支持（G2 修完后开放）。
-- L3 存储、PD 分离、DSpark + HiCache 的正式支持（G6/G7）。
+- L3 存储、PD 分离（G7）。
+- `hicache_host_used_tokens` 对 sidecar/回载的指标覆盖（可观测性缺口）。
+- `a5_hicache_page_roundtrip.py` 的 `c1_indexer` 假阴性（测试脚本视角问题，生产 E2E CRC 已通过）。
+
+DSpark + HiCache 已不再是另立需求：`b2e36bb605` 起按独立 `DRAFT_SWA` sidecar 支持，并完成 A5 功能验证。

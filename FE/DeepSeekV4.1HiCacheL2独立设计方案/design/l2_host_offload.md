@@ -14,7 +14,7 @@
 - L3 存储后端、跨实例/跨节点共享。
 - `buffer_only` 暂存模式（它需要 L3）。
 - PD 分离、`--hicache-size` 按 GB 定容、HiSparse 组合。
-- 投机解码（DSpark）与 HiCache 的组合（单列验证，见 [G6](../analysis/gap_analysis.md#g6中dspark-draft-与-target-的-swa-行宽兼容性)）。
+- 投机解码（DSpark）的严格精度/接受率 A/B。功能已按独立 `DRAFT_SWA` sidecar 支持并完成 A5 功能验证，见 [G6](../analysis/gap_analysis.md#g6中dspark-draft-与-target-的-swa-行宽兼容性)。
 
 ## 2. 启用方式与参数解析
 
@@ -85,7 +85,8 @@ HybridCacheController
 | 池 | 是否持有字节 | 说明 |
 | --- | --- | --- |
 | `LogicalHostPool` (PoolName.KV) | 否 | host 槽位记账；所有 sidecar 复用它的 host 索引 |
-| `DeepSeekV4PagedHostPool` (SWA) | 是 | 窗口 KV；DSpark draft 层可打包进同一个池（首批关闭） |
+| `DeepSeekV4PagedHostPool` (SWA) | 是 | 窗口 KV；仅当 draft 与 target 的 SWA 行宽一致时才把 draft 层打包进同一个池 |
+| `DeepSeekV4PagedHostPool` (`DRAFT_SWA`) | 是 | DSpark draft 的独立 SWA 池；行宽与 target 不同时使用（如 V4 draft 608 B vs V4.1 target 544 B） |
 | `DeepSeekV4PagedHostPool` (C1/C2) | 是 | 压缩 KV；每个 full page 的 host 行持有 `page_size // ratio` 个槽 |
 | `DeepSeekV4PagedHostPool` (C1/C2 indexer K/scale) | 是 | 见 §3.2 的几何设计 |
 | `DeepSeekV4StateHostPool` | — | V4 的 ratio-4 持久状态；V4.1 不使用 |
@@ -136,7 +137,7 @@ host_bytes_pool = host_pages * item_bytes * layers_pool
 H ≈ ratio * Σ(device KV bytes of all mirrored pools)
 ```
 
-`LogicalHostPool` 不占数据字节；V4.1 不镜像持久状态；DSpark draft（首批关闭）不额外算。
+`LogicalHostPool` 不占数据字节；V4.1 不镜像持久状态；DSpark draft 使用独立 `DRAFT_SWA` pool 并需要显式 `--hicache-ratio`，不纳入 target 锚点池的 auto-size。
 
 ### 4.2 每 token 字节（以 nope 448 + rope 64、index_head_dim 128 为例）
 
@@ -212,7 +213,7 @@ H ≈ ratio * Σ(device KV bytes of all mirrored pools)
 | 模型 | DSV4.1-Flash，compress ratios 1/2，无 C128 | 混合 ratio 模型 |
 | 并行 | TP；DP attention 单独验证 | PP > 1、DCP > 1 |
 | 部署 | 聚合推理 | PD 分离 |
-| 投机 | 关闭 | DSpark（G6） |
+| 投机 | DSpark 已支持（`DRAFT_SWA` sidecar） | 严格精度/接受率 A/B |
 | 布局 | `page_first`（`layer_first` 保留为诊断选项） | — |
 | host 内存后端 | `acl` | `memfabric`（G2 修复后） |
 | 存储 | 无 L3 | L3（另立需求） |
@@ -241,5 +242,5 @@ H ≈ ratio * Σ(device KV bytes of all mirrored pools)
 | G1 NPU 4-D 几何 | 结果错误或传输崩溃 | full-page 规范化 + 单测 + A5 冒烟；GPU 2-D 路径保持回归 |
 | host 容量核算偏差 | OOM / 利用率低 | 以启动日志核对公式；多 rank 手工核算 |
 | AIV 传输吞吐 | TTFT 回载慢 | page_first + all-layer 备份；测 ratio/写策略 A/B |
-| DSpark 行宽 | 静默错误 | 首批关闭；开启前加断言与精度 A/B |
+| DSpark 行宽 | 静默错误 | 计划阶段比较行宽；不一致回退 `DRAFT_SWA` sidecar + 装配层断言；残留严格精度 A/B |
 | 压缩状态重建 | 长前缀数值漂移 | G8 专项验证 |

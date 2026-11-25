@@ -1,6 +1,6 @@
 # 缺口与风险分析
 
-基线：`sglang@dsv41-a5`（`9898f7ce9a`）。以下结论均为**代码级分析**，G1/G2/G6/G10 需要 A5 实机确认后才能定性为缺陷或已验证路径。
+基线：`sglang@dsv41-a5`（`9898f7ce9a`）。以下结论均为**代码级分析**，G1/G2/G6/G10 需要 A5 实机确认后才能定性为缺陷或已验证路径。修复状态已在 2026-11-25 更新；交付分支为 `dsv41-a5-hicache-l2` @ `b2e36bb605`（基于 `origin/main`）。
 
 ## G1（高）NPU PA_ND 低压缩比 host 池的页几何未闭环
 
@@ -127,7 +127,7 @@ if get_memory().hicache_size > 0:
 
 首批接受“按 ratio 定容”。如果产品要求按 GB 配置，需要实现各池（FULL/SWA/C1/C2/indexer）的字节预算拆分，属于独立需求。
 
-## G4（已修复，待 A5 验证）自动定容不覆盖侧池
+## G4（已修复，CPU 验证）自动定容不覆盖侧池
 
 `hicache_auto_size._estimate_hicache_bytes` 原先只统计 `_SIZEABLE_POOLS` 或 layer-router 子池的设备字节，不统计 C1/C2/indexer 侧池。
 
@@ -149,7 +149,13 @@ if get_memory().hicache_size > 0:
 - SWA 装配路径原先**没有逐层检查** draft 与 target 的 `page_bytes`；只有 `_extra_host_region_entries` 对 extra region 做了检查（`hybrid_pool_assembler.py:725-729`）。若行宽不同，`_host_page_view` 会按 target 宽度解释 draft buffer。
 - 已增加 `_check_dsv4_draft_swa_row_bytes`：用 `buffer[0].numel() * element_size()`（full-page bytes）比较 target 的 `page_bytes`，4-D PA_ND 上不会把槽数 `S` 与 `S*544` 误比。
 
-首批仍把投机解码排除在验收外；后续开启 DSpark + HiCache 时还需做 A/B 精度验证。
+但仅靠断言不够：当前 main 把 DSpark compressed-KV draft 判成 `PACKED`，draft 不会进入 `sidecar_draft_device_pools`，断言会在启动时直接失败。修复分两层：
+
+- `base_spec_worker._packed_swa_rows_match_target()` 在计划阶段比较 target 与 draft 的 SWA `page_bytes`；
+- 不一致时 pack 资格置空，`mtp_draft_device_pools` 保持空，计划降级为 `SIDECAR`；
+- `build_swa_draft_pools()` 建独立的 `DRAFT_SWA` host pool（608 B 行），target SWA 保持 544 B 行。
+
+2026-11-25 已在 A5 上完成 DSpark + HiCache 的启动与推理功能验证；greedy 输出/接受率/精度的严格 A/B 仍建议补测。
 
 ## G7（中）并行/部署组合未定义
 
@@ -162,7 +168,7 @@ HiCache 的既有约束（`hicache_hook.py:134-172`、`kv_cache_hook.py:640-675`
 | PP > 1 | host 池按 stage 本地层构建 | 延后，单独验收 |
 | PD 分离 | prefill/decode 各自的 host 池与备份策略不同 | 延后 |
 | DCP > 1 | 代码仅允许 MLA + 特定投机，且 V4.1 DCP 本身有独立约束 | 首批 DCP=1 |
-| 投机（DSpark） | 见 G6 | 延后 |
+| 投机（DSpark） | 已按独立 `DRAFT_SWA` sidecar 支持；A5 功能验证通过 | 补 A/B 精度对比 |
 
 ## G8（中）V4.1 压缩状态在命中回载后的重建语义
 
@@ -199,12 +205,12 @@ HiCache 的既有约束（`hicache_hook.py:134-172`、`kv_cache_hook.py:640-675`
 
 | ID | 优先级 | 内容 | 阻断首批？ |
 | --- | --- | --- | --- |
-| G1 | 高 | NPU 4-D 低压缩比 host 池几何：KV `item_bytes` + indexer full-page 视图 | 代码已修，待 A5 |
-| G2 | 中 | host 内存预留漏 C1/C2（memfabric） | 代码已补，待 memfabric 验证 |
-| G5 | 中 | 已有 NPU 4-D 单测；仍缺 A5 E2E | 是（验收必需） |
-| G8 | 中 | 压缩状态页边界重建正确性 | 是（正确性验收） |
-| G10 | 中 | 只开 HiCache 不开 ratio 的默认路径失败 | 代码已修，待 A5 |
-| G6 | 中 | DSpark draft 行宽 | 否（首批排除投机） |
+| G1 | 高 | NPU 4-D 低压缩比 host 池几何：KV `item_bytes` + indexer full-page 视图 | 已修复；A5 7 池页 CRC 通过 |
+| G2 | 中 | host 内存预留漏 C1/C2（memfabric） | 代码已补；ACL 已验证，memfabric 待验证 |
+| G5 | 中 | 已有 NPU 4-D 单测；A5 E2E 用脚本验证 | 否（未注册 CI） |
+| G8 | 中 | 压缩状态页边界重建正确性 | 清理/边界不变量已验证；数值等价待定 |
+| G10 | 中 | 只开 HiCache 不开 ratio 的默认路径失败 | 代码已修，auto-size 路径待 A5 |
+| G6 | 中 | DSpark draft 行宽 | 已修复；A5 功能验证通过 |
 | G7 | 中 | 并行组合矩阵 | 否（限定首批组合） |
 | G3 | 低 | `--hicache-size` 不支持 | 否（用 ratio） |
 | G4 | 低 | 自动定容不覆盖侧池 | 否（首批显式 ratio） |

@@ -1,6 +1,6 @@
 # 验收与验证计划
 
-所有测试基于 `dsv41-a5-hicache-l2` 工作区；未实施 [代码改动清单](../design/code_change_plan.md) 前，G1 相关用例预期失败，可作为复现基线。
+所有测试基于 `dsv41-a5-hicache-l2` @ `b2e36bb605`（`origin/main` @ `36d82211fe` 之上）。代码改动已实施；下文保留原始验收设计，当前完成状态见 [§0.4](#04-当前状态2026-11-25)。
 
 可直接上 A5 跑的探测脚本见 [scripts/README.md](scripts/README.md)：先跑 `a5_kv_exchange_probe.py` 验证 full-page 传输，再跑 `a5_hicache_e2e_probe.py` 复现 G1/G10。2026-11-18 的算子探测结果（`page_size=128`、`layers=2`、AIV D2H/H2D 均 PASS）见 [a5_operator_probe_2026-11-18.md](a5_operator_probe_2026-11-18.md)。
 
@@ -33,14 +33,29 @@ python -m sglang.launch_server \
   --port 30001
 ```
 
-`SGLANG_HICACHE_HOST_MEM_BACKEND` 不设置时 DSV4 自动取 `acl`。首批不要使用 `memfabric`（G2）。
+`SGLANG_HICACHE_HOST_MEM_BACKEND` 不设置时 DSV4 自动取 `acl`。首批不要使用 `memfabric`（G2 的预留修复已合入，但 memfabric 后端仍未纳入首批验证）。
 
 ### 0.3 启动自检
 
 1. 日志中每个 host 池都有 `Allocating ... GB host memory for V4 paged pool '<name>'`（`memory_pool_host.py:354-363`），确认存在：
    `swa`、`deepseek_v4_c1`、`deepseek_v4_c1_indexer`、`deepseek_v4_c1_indexer_scale`、`deepseek_v4_c2`、`deepseek_v4_c2_indexer`、`deepseek_v4_c2_indexer_scale`。
 2. 记录各池的 `pages`、`item_bytes`、layout、GB，作为容量核对的基线。
-3. `curl http://127.0.0.1:30001/metrics | grep hicache_host_total_tokens` 有值。
+3. 带 DSpark 时额外确认存在 `DRAFT_SWA` host pool，`item_bytes` 为 draft 的 608 B 行，且 target `swa` 仍为 544 B 行。
+4. `curl http://127.0.0.1:30001/metrics | grep hicache_host_total_tokens` 有值。
+
+### 0.4 当前状态（2026-11-25）
+
+| 项目 | 状态 |
+| --- | --- |
+| P0 CPU 契约测试 | 完成，4 个文件共 64 passed |
+| A5 算子 full-page 探测 | 完成，`page_size=128`、`layers=2` 的 AIV D2H/H2D 通过 |
+| T1/T2 target-only E2E | 完成，host 命中 768 token，`cached_tokens_details={"device":0,"host":768}`，`host_hit_delta=768` |
+| 页级字节校验 | 完成，7 个池的 D2H host CRC 与 H2D host/device CRC 一致 |
+| T5 输出逐 token 对比 | 不可用：A5 上 baseline 自身不可重复（MoE/DeepEP 数值不确定性），改用页级 CRC 作为正确性判据 |
+| G8 压缩状态数值等价 | 未直接证明；已验证 ratio-2 状态清理与页边界不变量 |
+| P4 DSpark + HiCache | 功能验证通过（2026-11-25）；DSpark draft 走独立 `DRAFT_SWA` sidecar，target SWA 不受影响 |
+| T6 并发/中止、P2 性能、P3 压力 | 未执行 |
+| A5 E2E 注册 NPU CI | 未完成，当前用 `validation/scripts/` 手工脚本 |
 
 ## 1. P0：CPU 契约测试（无 A5）
 
@@ -49,7 +64,9 @@ python -m sglang.launch_server \
 | `test_npu_pa_nd_rows_use_full_page_bytes` | C1/C2 KV 与 indexer K/scale 的 `item_bytes` 等于 full page 字节；NPU indexer 规范化为 `[full_pages, S, 1, dim]` | G1/G5 |
 | `test_dsv4_compressed_pools.py::test_ced_host_uses_captured_owner_pages_and_full_page_units` | GPU 2-D 页行与 `item_bytes` 与修改前完全一致（回归） | G1 |
 | `test_low_ratio_pools_reserve_indexer_native_pages` | `reserve_dsv4_paged_host_memory` 的预留字节包含 C1/C2 与 indexer 的 `I` 倍页数 | G2 |
-| `test_draft_swa_row_bytes_must_match_target` | draft SWA 行宽与 target 不一致时启动期报错 | G6 |
+| `test_draft_swa_row_bytes_must_match_target` | packed 路径的行宽断言 | G6 |
+| `test_dspark_draft_swa_rows_decide_the_hicache_layout` | 行宽一致→`PACKED`；608 B draft + 544 B target→`SIDECAR`，且 target 的 `mtp_draft_device_pools` 为空 | G6 |
+| `test_sidecar_draft_is_not_packed_into_target_swa` | sidecar draft 不并入 target SWA host 池 | G6 |
 | `test_dsv4_paged_pools_are_sized_for_auto` | auto-size 统计 SWA/C1/C2/indexer 的设备字节 | G4/G10 |
 
 运行：
@@ -59,7 +76,8 @@ cd D:/workspace/SGLang/sglang-dsv41-a5-hicache-l2
 python -m pytest \
   test/registered/unit/mem_cache/test_dsv4_hicache_l2.py \
   test/registered/unit/mem_cache/test_dsv4_compressed_pools.py \
-  test/registered/unit/mem_cache/test_hicache_auto_size.py -q
+  test/registered/unit/mem_cache/test_hicache_auto_size.py \
+  test/registered/unit/mem_cache/test_hicache_mtp_state.py -q
 ```
 
 ## 2. P1：A5 功能用例
@@ -140,14 +158,16 @@ python -m pytest \
 3. **多 rank**：TP=4/8、DP attention=4（若在首批范围）各跑一遍 T1/T2/T5；每个 rank 的 host 池独立，指标汇总后 host 总量不超过节点预算。
 4. **24h 稳定性（可选）**：固定 QPS 混合流量，观察 RSS/host 池、无 OOM、无错误日志。
 
-## 5. P4：DSpark（首批外，后续准入）
+## 5. P4：DSpark + HiCache（已支持）
 
-前置：提交 4 的行宽断言已合入。
+前置：`b2e36bb605` 的行宽回退已合入。
+
+2026-11-25 已在 A5 上完成 DSpark + HiCache 的启动与推理功能验证。下面 1–3 的严格对比仍建议补测：
 
 1. DSpark on + HiCache on vs DSpark on + HiCache off：greedy 输出一致；
 2. 投机接受率不下降（A5 既有标准 > 0.5，参考 `test_npu_deepseek_v4_flash_fp8_4p_gpqa_a5.py:149`）；
 3. 精度：GPQA / GSM8K 使用 `sgl-eval`，与基线同 harness 对比；
-4. 日志确认 draft SWA 层与 target 的 `page_bytes` 相等。
+4. 日志确认 draft 走独立 `DRAFT_SWA` host pool：draft 行宽 608 B、target SWA 544 B（page_size 128 时分别为 77824 / 69632）；行宽相等时才允许 `PACKED`。
 
 ## 6. 证据留存
 
@@ -166,9 +186,10 @@ python -m pytest \
 | --- | --- |
 | 功能 | T1、T2、T3、T4 全部通过；T2 的 host_hit 指标有增长 |
 | 正确性 | T5 逐 token 一致；T6 无泄漏 |
-| 测试 | P0 全绿；A5 E2E 已注册 NPU CI |
+| 测试 | P0 全绿；A5 E2E 已用 `validation/scripts/` 验证（尚未注册 NPU CI） |
+| DSpark | DSpark + HiCache 启动与推理功能通过；严格输出/接受率/精度对比待补 |
 | 性能 | 首批准出以功能和正确性为主；TTFT ≥ 20% 是目标值，待基线测量后由产品确认是否作为硬门槛；吞吐回归 ≤ 2% |
 | 稳定性 | 压力用例无崩溃/OOM；节点 host 内存不超预算 |
-| 文档 | 启动参数、容量公式、已知限制（G2/G3/G6）写入用户文档 |
+| 文档 | 启动参数、容量公式、已知限制（G3、memfabric、`hicache_host_used_tokens`、roundtrip 假阴性）写入用户文档 |
 
 任一必须项失败则不建议合入/发布；可将首批范围收缩为“单卡、TP、无投机、write_through、ratio 2”后重新验收。

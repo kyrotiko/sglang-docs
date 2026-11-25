@@ -1,9 +1,10 @@
 #!/bin/bash
 # Target-only DeepSeek-V4.1 HiCache L2 E2E on A5.
 #
-# DSpark is intentionally NOT enabled: the draft SWA uses the V4 608 B row,
-# while the V4.1 target uses 544 B, so both cannot share one SWA host pool.
-# Use this script first; add a draft SWA sidecar only after this passes.
+# This runner stays target-only to isolate the L2 data path. DSpark + HiCache
+# is supported through a separate DRAFT_SWA sidecar when the draft SWA row
+# width differs from the target's; use the existing DSpark launch recipe for
+# that case and expect the sidecar log line described in README.md.
 #
 # Required:
 #   MODEL_PATH      model directory (default below)
