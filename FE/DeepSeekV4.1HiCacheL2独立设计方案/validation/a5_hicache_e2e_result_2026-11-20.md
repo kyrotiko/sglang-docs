@@ -2,7 +2,7 @@
 
 ## 运行配置
 
-- 代码：诊断时为 `dsv41-a5` 基线的 `dsv41-a5-hicache-l2` @ `13d596d980`（临时 CRC trace），trace 已在 `ab30299513` 清理。该分支后续已 rebase 到 `origin/main`，当前交付 HEAD 为 `b2e36bb605`；文中旧 commit 只属于历史基线。
+- 代码：诊断时为 `dsv41-a5` 基线的 `dsv41-a5-hicache-l2` @ `13d596d980`（临时 CRC trace），trace 已在 `ab30299513` 清理。该分支后续已 rebase 到 `origin/main`，当前交付 HEAD 为 `46277ec334`；文中旧 commit 只属于历史基线。
 - 模型：DeepSeek-V4.1-Flash-1017，A5 单机 8 卡
 - 启动：DP8，`--max-total-tokens 32768`，`--hicache-ratio 1.2`，`write_through`
 - 探测：`TRACE_PAGES=16`，`FILLER_COUNT=95`，`REPEAT_A=2`
@@ -76,7 +76,7 @@ ValueError: packed DSV4 draft SWA rows do not match the target's 69632 B pages: 
 
 ### 修复
 
-`b2e36bb605` 在 `_build_hicache_draft_plan()` 的 pack 判定里增加行宽比较 `_packed_swa_rows_match_target()`：
+`46277ec334` 在 `_build_hicache_draft_plan()` 的 pack 判定里增加行宽比较 `_packed_swa_rows_match_target()`：
 
 - 544 B draft → 仍 `PACKED`；
 - 608 B draft + 544 B target → 回退 `SIDECAR`，`mtp_draft_device_pools` 保持空；

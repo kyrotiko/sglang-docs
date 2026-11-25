@@ -5,7 +5,7 @@
 ## 0. 前置条件
 
 - A5（arch35）机器，`sgl-kernel-npu` 已按 `--arch-version 3510` 构建 `kv_exchange`。
-- 当前分支/commit 是 `dsv41-a5-hicache-l2` @ `b2e36bb605`（基于 `origin/main` @ `36d82211fe`），或包含 HiCache L2 修复的同一基线。
+- 当前分支/commit 是 `dsv41-a5-hicache-l2` @ `46277ec334`（基于 `origin/main` @ `30a3796ca8`），或包含 HiCache L2 修复的同一基线。
 - 已安装 `cann_ops_transformer`，V4.1 权重可加载。
 - 建议先确认 `python -c "import torch_npu; print(torch_npu.npu.is_available())"` 为 True。
 
@@ -101,7 +101,7 @@ DSpark + HiCache 现已支持：draft SWA 是 V4 的 608 B/token，target 是 V4
 - 第一次 A 请求可能直接报 view/shape 错误 → 复现 G1b（NPU indexer 2-D vs 5-D）；
 - 如果 candidate 没崩但 `host_hit_delta == 0`，说明 L2 路径没有真正命中，也要返回报告。
 
-在当前分支 `b2e36bb605` 上，`geometry_checks` 应全部 `ok`，第一次 A 请求应成功；若仍失败，报告里的 candidate log tail 就是定位依据。
+在当前分支 `46277ec334` 上，`geometry_checks` 应全部 `ok`，第一次 A 请求应成功；若仍失败，报告里的 candidate log tail 就是定位依据。
 
 ## 2.1 KV 页字节级 round-trip（模型输出不可重复时用这个）
 
