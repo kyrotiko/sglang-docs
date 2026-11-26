@@ -33,7 +33,7 @@
 - CPU：`test_dsv4_hicache_l2.py`、`test_dsv4_compressed_pools.py`、`test_hicache_auto_size.py`、`test_hicache_mtp_state.py` 共 66 passed。
 - A5：
   - `a5_kv_exchange_probe.py` 的 `page_size=128`、`layers=2` AIV D2H/H2D 已通过；
-  - DP8 target-only E2E 已出现 host 命中 768 token，7 个池的 D2H/H2D 页 CRC 全部一致；
+  - DP8 target-only E2E 已出现 host 命中 768 token，7 个池的 D2H/H2D 页 CRC 全部一致；同一 814-token prompt 的 prefill 延迟从 cold 15.456 s 降到 host hit 0.355 s；
   - DSpark + HiCache 配方的实机启动与推理功能验证通过（2026-11-25）；
   - A5 冒烟在 `23de16b280` 上完成（2026-11-26）；PR head `b7a1bcf25d` 之后只把 `torch` import 移到模块级。`draft_swa` 池 77824 B 行、`swa` 池 69632 B 行，8 个 rank 一致，device 命中 128 token。
   - 详见 [E2E 结果](validation/a5_hicache_e2e_result_2026-11-20.md)。

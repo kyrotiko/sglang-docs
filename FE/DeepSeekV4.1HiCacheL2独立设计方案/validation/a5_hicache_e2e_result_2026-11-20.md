@@ -35,6 +35,17 @@
 
 结论：host 池页几何、C1/C2 的 ratio 1/2、indexer K/scale 的 D2H/H2D 字节都正确。不是“命中了但内容错”的情况。
 
+## Host 写入 / 回载延迟（同一诊断 run）
+
+814-token prompt，`max_total_tokens=32768`，`--hicache-ratio 1.2`，`write_through`：
+
+| case | cached tokens | prefill_latency | first_token_latency |
+| --- | --- | --- | --- |
+| cold | 0 | 15.456 s | 15.465 s |
+| host hit | 768（host） | 0.355 s | 0.364 s |
+
+同一 run 记录到 16 次 D2H 页写入、7 个 H2D 页回载，device/host CRC 全部一致。单请求数据，不是 benchmark；用于证明 L2 路径确实写入/回载了正确页，并省掉了 host 命中时的 prefill 重算。
+
 ## 文本输出为何不能作判据
 
 同一 server 连发两次完全相同的冷请求，baseline 两次输出不同：
