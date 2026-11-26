@@ -53,7 +53,7 @@ python -m sglang.launch_server \
 | 页级字节校验 | 完成，7 个池的 D2H host CRC 与 H2D host/device CRC 一致 |
 | T5 输出逐 token 对比 | 不可用：A5 上 baseline 自身不可重复（MoE/DeepEP 数值不确定性），改用页级 CRC 作为正确性判据 |
 | G8 压缩状态数值等价 | 未直接证明；已验证 ratio-2 状态清理与页边界不变量 |
-| P4 DSpark + HiCache | 功能验证通过（2026-11-25）；DSpark draft 走独立 `DRAFT_SWA` sidecar，target SWA 不受影响 |
+| P4 DSpark + HiCache | 功能验证通过（2026-11-25）；rebase 后 A5 冒烟通过（2026-11-26）：`draft_swa` 77824 B / `swa` 69632 B，device 命中 128 token |
 | T6 并发/中止、P2 性能、P3 压力 | 未执行 |
 | A5 E2E 注册 NPU CI | 未完成，当前用 `validation/scripts/` 手工脚本 |
 
