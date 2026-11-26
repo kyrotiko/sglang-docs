@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>low-ratio 路径 vs DSV4：V4.1 的 C1/C2 与 indexer</title>
+<style>
+:root{
+  --bg:#070b14; --panel:#0f1a2e; --panel2:#14233c; --text:#e8eefb;
+  --muted:#8ea3c2; --line:rgba(148,163,184,.2);
+  --cyan:#22d3ee; --violet:#a78bfa; --amber:#fbbf24; --green:#34d399;
+  --pink:#f472b6; --red:#f87171; --code:#0a1322;
+}
+*{box-sizing:border-box}
+body{margin:0;background:
+  radial-gradient(circle at 85% -5%,rgba(34,211,238,.09),transparent 42%),
+  radial-gradient(circle at 5% 35%,rgba(167,139,250,.07),transparent 38%),
+  var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;line-height:1.65;min-height:100vh}
+.wrap{max-width:1240px;margin:0 auto;padding:0 24px}
+header{padding:40px 0 18px}
+header .k{font-size:11px;letter-spacing:3px;color:var(--cyan);font-weight:800}
+header h1{font-size:clamp(25px,3.2vw,40px);line-height:1.18;margin:9px 0 8px;letter-spacing:-.4px}
+header h1 .g{background:linear-gradient(100deg,var(--cyan),var(--violet),var(--pink));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+header p{margin:0;color:var(--muted);font-size:14px;max-width:900px}
+
+.layout{display:grid;grid-template-columns:330px 1fr;gap:20px;align-items:start;margin:10px 0 30px}
+.side{position:sticky;top:16px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:19px}
+.side .tag{font-size:11px;letter-spacing:2px;color:var(--cyan);font-weight:800}
+.side h2{font-size:18.5px;margin:6px 0 8px;line-height:1.4}
+.side p{font-size:13px;color:var(--muted);margin:0 0 14px;min-height:104px}
+.ctrls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);
+  color:var(--text);border-radius:10px;padding:8px 13px;font-size:13px;transition:.2s}
+button:hover{border-color:var(--cyan);transform:translateY(-1px)}
+button.primary{background:linear-gradient(120deg,var(--cyan),var(--violet));color:#04101c;border:none;font-weight:800}
+button:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.progress{height:6px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .35s}
+.side .hint{font-size:11.5px;color:var(--muted);margin-top:13px;border-top:1px solid var(--line);padding-top:10px}
+.side .hint code{color:var(--cyan);background:var(--code);padding:1px 4px;border-radius:4px}
+
+.stage{background:linear-gradient(160deg,var(--panel),#0c1526);border:1px solid var(--line);
+  border-radius:20px;padding:22px;min-height:560px;overflow:hidden}
+.step{display:none}
+.step.active{display:block;animation:fadeUp .45s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.step h2{font-size:clamp(18px,2vw,25px);margin:0 0 4px}
+.step .sub{color:var(--muted);font-size:13px;margin:0 0 18px}
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;border:1px solid var(--line);
+  font-size:10px;font-weight:700;letter-spacing:1px;margin-bottom:8px}
+.badge.cyan{color:var(--cyan);border-color:rgba(34,211,238,.45);background:rgba(34,211,238,.08)}
+.badge.amber{color:var(--amber);border-color:rgba(251,191,36,.45);background:rgba(251,191,36,.08)}
+.badge.green{color:var(--green);border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.08)}
+.badge.red{color:var(--red);border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.08)}
+
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.panel{background:var(--panel2);border:1px solid var(--line);border-radius:15px;padding:15px}
+.panel h3{margin:0 0 4px;font-size:15px}
+.panel .note{color:var(--muted);font-size:12px;margin:0 0 12px}
+.stack{display:flex;flex-direction:column;gap:7px}
+.layer{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:9px;
+  padding:7px 9px;background:rgba(255,255,255,.02);font-family:Consolas,monospace;font-size:11px;
+  opacity:0;transform:translateX(-8px)}
+.step.active .layer{animation:slideIn .45s ease both;animation-delay:var(--d,0s)}
+@keyframes slideIn{to{opacity:1;transform:none}}
+.layer i{width:8px;height:8px;border-radius:2px;background:var(--c,var(--cyan));flex:none}
+.layer b{color:var(--text);font-weight:600}
+.layer span{margin-left:auto;color:var(--muted);font-size:10px}
+.bracket{margin-top:11px;border:1px dashed rgba(52,211,153,.5);border-radius:11px;padding:9px 11px;
+  color:var(--green);font-size:11.5px;background:rgba(52,211,153,.05)}
+.bracket.amber{border-color:rgba(251,191,36,.5);color:var(--amber);background:rgba(251,191,36,.05)}
+
+.page-row{display:flex;align-items:center;gap:10px;margin:9px 0}
+.page-row .lab{width:132px;font-family:Consolas,monospace;font-size:10.5px;color:var(--muted);flex:none}
+.page-row .lab b{color:var(--text);display:block;font-size:11.5px}
+.grid{display:grid;gap:1px;flex:1;min-width:0}
+.grid.c1{grid-template-columns:repeat(32,1fr)}
+.grid.c2{grid-template-columns:repeat(32,1fr);width:50%}
+.grid.c2 .cell:nth-child(n+33){display:none}
+.cell{height:10px;border-radius:1px;background:rgba(34,211,238,.16)}
+.cell.c1{background:rgba(52,211,153,.42)}
+.cell.c2{background:rgba(251,191,36,.42)}
+.cell.idx{background:rgba(167,139,250,.42)}
+.cell.scale{background:rgba(244,114,182,.42)}
+.step.active .cell{animation:pop .35s ease both;animation-delay:calc(var(--i,0) * 4ms)}
+@keyframes pop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+
+.formula{font-family:Consolas,monospace;font-size:12px;line-height:1.9;color:var(--text);
+  background:var(--code);border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin:12px 0 0;
+  white-space:pre-wrap}
+.formula .c{color:var(--cyan)} .formula .g{color:var(--green)} .formula .a{color:var(--amber)}
+.formula .m{color:var(--muted)}
+
+.fold{display:flex;align-items:center;gap:12px;margin:12px 0}
+.fold .stacked{display:flex;flex-direction:column;gap:4px;flex:1}
+.fold .native{display:flex;gap:3px;border:1px solid var(--line);border-radius:7px;padding:4px;
+  background:rgba(167,139,250,.06)}
+.fold .native span{flex:1;height:8px;border-radius:1px;background:rgba(167,139,250,.45)}
+.fold .arrow{font-family:Consolas,monospace;color:var(--cyan);font-size:11px;white-space:nowrap}
+.step.active .fold .arrow{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+.fold .full{border:1px solid rgba(34,211,238,.5);border-radius:7px;padding:4px;background:rgba(34,211,238,.06);flex:1}
+.fold .full span{display:block;height:8px;border-radius:1px;background:rgba(34,211,238,.45)}
+
+.layout-compare{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.buf{background:var(--code);border:1px solid var(--line);border-radius:12px;padding:12px;font-family:Consolas,monospace;
+  font-size:11px;color:var(--muted);min-height:220px}
+.buf b{color:var(--text)}
+.buf .big{font-size:12.5px;color:var(--cyan)}
+.buf .shape{display:inline-block;margin:4px 0;padding:2px 6px;border-radius:5px;background:var(--panel2);
+  border:1px solid var(--line);color:var(--text)}
+.blocks{display:flex;flex-direction:column;gap:4px;margin-top:10px}
+.block{border:1px solid var(--line);border-radius:5px;padding:5px 7px;background:var(--panel2);
+  opacity:0;transform:translateY(6px)}
+.step.active .block{animation:slideIn .4s ease both;animation-delay:var(--d,0s)}
+.block .inner{display:flex;gap:2px;margin-top:3px}
+.block .inner i{height:5px;flex:1;border-radius:1px;background:rgba(34,211,238,.4)}
+.block.d4 .inner i{background:rgba(52,211,153,.45)}
+.hi{color:var(--red);font-weight:700}
+
+.diff{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.code{background:var(--code);border:1px solid var(--line);border-radius:11px;padding:12px;
+  font-family:Consolas,monospace;font-size:11px;line-height:1.8;color:var(--muted);white-space:pre-wrap}
+.code b{color:var(--text)} .code .ok{color:var(--green)} .code .bad{color:var(--red)} .code .cy{color:var(--cyan)}
+.panel.ok{border-color:rgba(52,211,153,.4)}
+.panel.bad{border-color:rgba(248,113,113,.4)}
+
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:11px;letter-spacing:.5px}
+td code{color:var(--cyan);background:var(--code);padding:1px 4px;border-radius:4px;font-size:11px}
+
+.log{margin-top:12px;background:var(--code);border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  font-family:Consolas,monospace;font-size:10.5px;line-height:1.8;color:var(--muted);white-space:pre-wrap}
+.log .ok{color:var(--green)} .log .cy{color:var(--cyan)}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px}
+.card h4{margin:0 0 5px;font-size:13px}
+.card p{margin:0;color:var(--muted);font-size:11.5px}
+.card code{color:var(--cyan);background:var(--code);padding:1px 4px;border-radius:4px}
+footer{border-top:1px solid var(--line);padding:16px 0 30px;color:var(--muted);font-size:11.5px}
+footer code{color:var(--cyan);background:var(--code);padding:1px 4px;border-radius:4px}
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr}
+  .side{position:static}
+  .cols,.layout-compare,.diff,.cards{grid-template-columns:1fr}
+  .stage{min-height:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="k">DEEPSEEK V4.1 · HICACHE L2</div>
+  <h1>low-ratio 路径 vs <span class="g">DSV4</span></h1>
+  <p>V4.1 的 C1/C2 与 indexer 为什么要单独走一条 host offload 路径，V4 的 C4/C128 又为什么没有踩到同一个坑。共 6 步，点“下一步”或自动播放。</p>
+</header>
+
+<div class="layout">
+  <aside class="side">
+    <div class="tag">STEP <span id="stepNo">1</span> / 6</div>
+    <h2 id="sideTitle">两条路径总览</h2>
+    <p id="sideDesc">V4 走 SWA/C4/C128；V4.1 新增 C1/C2 和 indexer，代码里把这些池的装配单独放在 low-ratio 路径。</p>
+    <div class="ctrls">
+      <button id="prev">上一步</button>
+      <button id="next" class="primary">下一步</button>
+      <button id="play">自动播放</button>
+    </div>
+    <div class="progress"><i id="bar"></i></div>
+    <div class="hint">源码：<code>hybrid_pool_assembler.py</code> 的 <code>_dsv4_low_ratio_regions</code> / <code>_dsv4_low_ratio_entries</code>。</div>
+  </aside>
+
+  <section class="stage">
+
+    <!-- STEP 0 -->
+    <div class="step active" data-step="0">
+      <span class="badge cyan">总览</span>
+      <h2>两条路径：V4 的 C4/C128，V4.1 的 C1/C2</h2>
+      <p class="sub">同样是压缩 KV，但压缩比、池的数量、indexer 的参与方式都不同。</p>
+      <div class="cols">
+        <div class="panel">
+          <h3>DSV4（V4）</h3>
+          <p class="note">ratio 4 / 128，走 SWA / C4 / C128 各自的 host entry。</p>
+          <div class="stack">
+            <div class="layer" style="--c:var(--cyan);--d:.05s"><i></i><b>SWA</b><span>full page 单行</span></div>
+            <div class="layer" style="--c:var(--violet);--d:.12s"><i></i><b>C4</b><span>ratio 4</span></div>
+            <div class="layer" style="--c:var(--pink);--d:.19s"><i></i><b>C128</b><span>ratio 128</span></div>
+          </div>
+          <div class="bracket">host entry 直接用 <code>swa_info.page_bytes</code> / <code>c4_info.page_bytes</code> / <code>c128_info.page_bytes</code>，不经过 low-ratio 代码。</div>
+        </div>
+        <div class="panel">
+          <h3>DeepSeek-V4.1</h3>
+          <p class="note">ratio 1 / 2，额外有 indexer K 和 scale。</p>
+          <div class="stack">
+            <div class="layer" style="--c:var(--cyan);--d:.05s"><i></i><b>SWA</b><span>544 B/token</span></div>
+            <div class="layer" style="--c:var(--green);--d:.12s"><i></i><b>C1 KV</b><span>ratio 1 · S=128</span></div>
+            <div class="layer" style="--c:var(--amber);--d:.19s"><i></i><b>C2 KV</b><span>ratio 2 · S=64</span></div>
+            <div class="layer" style="--c:var(--violet);--d:.26s"><i></i><b>C1/C2 indexer K</b><span>K=64</span></div>
+            <div class="layer" style="--c:var(--pink);--d:.33s"><i></i><b>C1/C2 indexer scale</b><span>e8m0</span></div>
+          </div>
+          <div class="bracket amber">C1/C2 + indexer 的装配 = 代码里的 <b>low-ratio 路径</b>（<code>_dsv4_low_ratio_*</code>）。</div>
+        </div>
+      </div>
+      <div class="formula"><span class="m">// 两条路径的分界，不是模型层数，而是“池的类别”</span>
+<span class="c">V4</span>   : SWA / C4 / C128  → 各自的 entry，item_bytes 取 page_bytes
+<span class="g">V4.1</span> : SWA            → 普通 entry
+       : C1 / C2        → <span class="a">low-ratio entries</span>（KV + indexer K/scale）</div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="step" data-step="1">
+      <span class="badge green">low-ratio 是什么</span>
+      <h2>一个 full page，在 C1/C2 里有多少个槽？</h2>
+      <p class="sub">full page 固定 128 token；压缩比决定它在某个池里的槽数 S。</p>
+      <div class="page-row">
+        <div class="lab"><b>Full page</b>128 tokens · 0..127</div>
+        <div class="grid c1">
+          <span class="cell c1" style="--i:0"></span><span class="cell c1" style="--i:1"></span><span class="cell c1" style="--i:2"></span><span class="cell c1" style="--i:3"></span><span class="cell c1" style="--i:4"></span><span class="cell c1" style="--i:5"></span><span class="cell c1" style="--i:6"></span><span class="cell c1" style="--i:7"></span><span class="cell c1" style="--i:8"></span><span class="cell c1" style="--i:9"></span><span class="cell c1" style="--i:10"></span><span class="cell c1" style="--i:11"></span><span class="cell c1" style="--i:12"></span><span class="cell c1" style="--i:13"></span><span class="cell c1" style="--i:14"></span><span class="cell c1" style="--i:15"></span><span class="cell c1" style="--i:16"></span><span class="cell c1" style="--i:17"></span><span class="cell c1" style="--i:18"></span><span class="cell c1" style="--i:19"></span><span class="cell c1" style="--i:20"></span><span class="cell c1" style="--i:21"></span><span class="cell c1" style="--i:22"></span><span class="cell c1" style="--i:23"></span><span class="cell c1" style="--i:24"></span><span class="cell c1" style="--i:25"></span><span class="cell c1" style="--i:26"></span><span class="cell c1" style="--i:27"></span><span class="cell c1" style="--i:28"></span><span class="cell c1" style="--i:29"></span><span class="cell c1" style="--i:30"></span><span class="cell c1" style="--i:31"></span>
+        </div>
+      </div>
+      <div class="page-row">
+        <div class="lab"><b>C1 · ratio 1</b>S = 128</div>
+        <div class="grid c1">
+          <span class="cell c1" style="--i:0"></span><span class="cell c1" style="--i:1"></span><span class="cell c1" style="--i:2"></span><span class="cell c1" style="--i:3"></span><span class="cell c1" style="--i:4"></span><span class="cell c1" style="--i:5"></span><span class="cell c1" style="--i:6"></span><span class="cell c1" style="--i:7"></span><span class="cell c1" style="--i:8"></span><span class="cell c1" style="--i:9"></span><span class="cell c1" style="--i:10"></span><span class="cell c1" style="--i:11"></span><span class="cell c1" style="--i:12"></span><span class="cell c1" style="--i:13"></span><span class="cell c1" style="--i:14"></span><span class="cell c1" style="--i:15"></span><span class="cell c1" style="--i:16"></span><span class="cell c1" style="--i:17"></span><span class="cell c1" style="--i:18"></span><span class="cell c1" style="--i:19"></span><span class="cell c1" style="--i:20"></span><span class="cell c1" style="--i:21"></span><span class="cell c1" style="--i:22"></span><span class="cell c1" style="--i:23"></span><span class="cell c1" style="--i:24"></span><span class="cell c1" style="--i:25"></span><span class="cell c1" style="--i:26"></span><span class="cell c1" style="--i:27"></span><span class="cell c1" style="--i:28"></span><span class="cell c1" style="--i:29"></span><span class="cell c1" style="--i:30"></span><span class="cell c1" style="--i:31"></span>
+        </div>
+      </div>
+      <div class="page-row">
+        <div class="lab"><b>C2 · ratio 2</b>S = 64</div>
+        <div class="grid c2">
+          <span class="cell c2" style="--i:0"></span><span class="cell c2" style="--i:1"></span><span class="cell c2" style="--i:2"></span><span class="cell c2" style="--i:3"></span><span class="cell c2" style="--i:4"></span><span class="cell c2" style="--i:5"></span><span class="cell c2" style="--i:6"></span><span class="cell c2" style="--i:7"></span><span class="cell c2" style="--i:8"></span><span class="cell c2" style="--i:9"></span><span class="cell c2" style="--i:10"></span><span class="cell c2" style="--i:11"></span><span class="cell c2" style="--i:12"></span><span class="cell c2" style="--i:13"></span><span class="cell c2" style="--i:14"></span><span class="cell c2" style="--i:15"></span><span class="cell c2" style="--i:16"></span><span class="cell c2" style="--i:17"></span><span class="cell c2" style="--i:18"></span><span class="cell c2" style="--i:19"></span><span class="cell c2" style="--i:20"></span><span class="cell c2" style="--i:21"></span><span class="cell c2" style="--i:22"></span><span class="cell c2" style="--i:23"></span><span class="cell c2" style="--i:24"></span><span class="cell c2" style="--i:25"></span><span class="cell c2" style="--i:26"></span><span class="cell c2" style="--i:27"></span><span class="cell c2" style="--i:28"></span><span class="cell c2" style="--i:29"></span><span class="cell c2" style="--i:30"></span><span class="cell c2" style="--i:31"></span>
+        </div>
+      </div>
+      <div class="formula"><span class="m">// low-ratio 路径的输入</span>
+S = page_size / ratio   →  C1: 128 / 1 = <span class="g">128</span>   C2: 128 / 2 = <span class="a">64</span>
+row_bytes               →  C1/C2 KV: 320 B；indexer K: 64 B；scale: 4 B
+item_bytes = S * row_bytes</div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step" data-step="2">
+      <span class="badge cyan">indexer</span>
+      <h2>indexer 的 native page 不是 full page</h2>
+      <p class="sub">KV 的 S 和 indexer 的 K 不是一回事；一个 full page 要覆盖 I = S / K 个 native index page。</p>
+      <div class="cols">
+        <div class="panel">
+          <h3>C1 indexer · I = 2</h3>
+          <p class="note">S=128, K=64 → 两个 native page 折成一个 full page。</p>
+          <div class="fold">
+            <div class="stacked">
+              <div class="native"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+              <div class="native"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+            <div class="arrow">fold I=2 →</div>
+            <div class="full"><span></span></div>
+          </div>
+          <div class="formula">C1 indexer K:  128 × 64 = <span class="g">8192 B</span>
+C1 indexer scale: 128 × 4  = <span class="g">512 B</span></div>
+        </div>
+        <div class="panel">
+          <h3>C2 indexer · I = 1</h3>
+          <p class="note">S=64, K=64 → 一个 native page 就是一个 full page。</p>
+          <div class="fold">
+            <div class="stacked">
+              <div class="native"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+            <div class="arrow">I=1 →</div>
+            <div class="full"><span></span></div>
+          </div>
+          <div class="formula">C2 indexer K:  64 × 64 = <span class="a">4096 B</span>
+C2 indexer scale: 64 × 4  = <span class="a">256 B</span></div>
+        </div>
+      </div>
+      <div class="formula"><span class="m">// 为什么需要 reshape：indexer 的设备页是 K 槽，不是一个 full page</span>
+I = S / K      →  C1: 128/64 = <span class="g">2</span>   C2: 64/64 = <span class="a">1</span>
+item_bytes     =  I × native_page_bytes
+device buffer  :  [full_pages*I, K, 1, dim]  →  [full_pages, S, 1, dim]</div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step" data-step="3">
+      <span class="badge amber">布局</span>
+      <h2>GPU 是 2-D 行，NPU 是 4-D PA_ND</h2>
+      <p class="sub">同一份 KV，GPU 按字节行存；NPU 的 sparse attention 算子按 (pages, kernel_page_size, 1, dim) 读。</p>
+      <div class="layout-compare">
+        <div class="buf">
+          <b>GPU</b> · <span class="big">2-D</span>
+          <div><span class="shape">[pages, native_page_bytes]</span></div>
+          <div class="blocks">
+            <div class="block" style="--d:.05s">page 0<div class="inner"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+            <div class="block" style="--d:.12s">page 1<div class="inner"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+            <div class="block" style="--d:.19s">page 2<div class="inner"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+          </div>
+          <div class="formula">view(uint8).reshape(full_pages, -1)</div>
+        </div>
+        <div class="buf">
+          <b>NPU</b> · <span class="big">4-D PA_ND</span>
+          <div><span class="shape">[pages, K, 1, dim]</span></div>
+          <div class="blocks">
+            <div class="block d4" style="--d:.05s">page 0 · K slots<div class="inner"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+            <div class="block d4" style="--d:.12s">page 1 · K slots<div class="inner"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+            <div class="block d4" style="--d:.19s">page 2 · K slots<div class="inner"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+          </div>
+          <div class="formula">page.reshape(full_pages, S, *page.shape[2:])</div>
+        </div>
+      </div>
+      <div class="formula"><span class="m">// 旧代码的坑：4-D 上 shape[1] 是槽数，不是字节数</span>
+buffers[0].shape      = [pages, <span class="hi">S</span>, 1, dim]
+shape[1] * itemsize   = <span class="hi">S * itemsize</span>      ≠  S * row_bytes = full page 字节
+正确：buffers[0][0].numel() * element_size()</div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step" data-step="4">
+      <span class="badge green">为什么 V4 没事</span>
+      <h2>V4 也走 4-D，但它从来没有用 shape[1] 算 item_bytes</h2>
+      <p class="sub">问题不在“4-D”，而在 V4.1 low-ratio 路径手写了一个只对 2-D 成立的公式。</p>
+      <div class="diff">
+        <div class="panel ok">
+          <h3>DSV4（V4）</h3>
+          <p class="note">SWA / C4 / C128 entry 统一用 buffer info：</p>
+          <div class="code"><b>item_bytes</b>=swa_info.page_bytes
+<b>item_bytes</b>=c4_info.page_bytes
+<b>item_bytes</b>=c128_info.page_bytes
+
+<span class="ok">DSV4PagedBufferInfo.from_buffers():</span>
+  page_bytes = buffers[0][0].numel()
+               * element_size()</div>
+          <div class="formula">4-D 和 2-D 都正确 → V4 不会踩坑</div>
+        </div>
+        <div class="panel bad">
+          <h3>V4.1 low-ratio（旧代码）</h3>
+          <p class="note">C1/C2 + indexer 是单独一段手写逻辑：</p>
+          <div class="code"><b>item_bytes</b>=buffers[0].shape[1]
+                 * buffers[0].element_size()
+
+<span class="bad">4-D: shape[1] = S</span>
+<span class="bad">S * itemsize ≠ S * row_bytes</span></div>
+          <div class="formula"><span class="bad">C1 KV: 128 × 1 B = 128</span>（应为 128 × 320 = 40960）</div>
+        </div>
+      </div>
+      <div class="formula"><span class="m">// 另外两个 V4 没有的触发条件</span>
+1. V4 <span class="g">没有 C1/C2 low-ratio 池</span>，走的是 SWA/C4/C128 各自的 entry
+2. V4 SWA 是 <span class="g">单行页</span>；V4.1 C1 indexer 有 <span class="a">I=2</span>，需要把两个 native page 折成一个 full page</div>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="step" data-step="5">
+      <span class="badge cyan">修复与结果</span>
+      <h2>把“一个 full page”作为唯一单位</h2>
+      <p class="sub">4-D indexer 折成 S 槽；item_bytes 取 full-page 字节；V4 路径不动，GPU 2-D 路径不动。</p>
+      <div class="diff">
+        <div class="panel ok">
+          <h3>几何</h3>
+          <div class="code">page = buffer[: full_pages * I]
+if page.ndim == 4:
+    return page.reshape(
+        full_pages, S, *page.shape[2:])
+return page.view(torch.uint8).reshape(
+    full_pages, -1)</div>
+        </div>
+        <div class="panel ok">
+          <h3>字节</h3>
+          <div class="code">def _dsv4_full_page_bytes(buffers):
+    return (buffers[0][0].numel()
+            * buffers[0].element_size())</div>
+        </div>
+      </div>
+      <table>
+        <tr><th>池</th><th>full page 槽数</th><th>item_bytes</th><th>旧值（4-D）</th></tr>
+        <tr><td>C1 KV</td><td>128</td><td><code>40960</code></td><td class="hi">128</td></tr>
+        <tr><td>C1 indexer K</td><td>128</td><td><code>8192</code></td><td class="hi">128</td></tr>
+        <tr><td>C1 indexer scale</td><td>128</td><td><code>512</code></td><td class="hi">128</td></tr>
+        <tr><td>C2 KV</td><td>64</td><td><code>20480</code></td><td class="hi">64</td></tr>
+        <tr><td>C2 indexer K</td><td>64</td><td><code>4096</code></td><td class="hi">64</td></tr>
+        <tr><td>C2 indexer scale</td><td>64</td><td><code>256</code></td><td class="hi">64</td></tr>
+        <tr><td>SWA（V4.1）</td><td>128</td><td><code>69632</code></td><td>本来就对</td></tr>
+      </table>
+      <div class="log"><span class="cy">A5 · DSpark + HiCache</span>
+Allocating ... 'swa'      layers=40 pages=532 item_bytes=<span class="ok">69632</span>
+Allocating ... 'draft_swa' layers=3 pages=532 item_bytes=<span class="ok">77824</span>
+HiCache draft SWA rows differ ... using a DRAFT_SWA sidecar</div>
+      <div class="cards">
+        <div class="card"><h4>V4 / GPU</h4><p>路径不动：V4 继续用 <code>page_bytes</code>，GPU 2-D 继续走原来的 <code>view(uint8)</code>。</p></div>
+        <div class="card"><h4>V4.1 low-ratio</h4><p>C1/C2 和 indexer 统一按 full page 算；indexer 先折 <code>I</code> 个 native page。</p></div>
+        <div class="card"><h4>DSpark</h4><p>draft 608 B vs target 544 B，不能 packed；计划阶段比较行宽，回退 <code>DRAFT_SWA</code> sidecar。</p></div>
+      </div>
+    </div>
+
+  </section>
+</div>
+
+<footer>
+  源码参考：<code>hybrid_pool_assembler.py</code> 的 <code>_dsv4_low_ratio_regions</code> / <code>_dsv4_low_ratio_entries</code>，<code>hardware_backend/npu/dsv4/dsv4_memory_pool.py</code> 的 PA_ND <code>create_buffer</code>，以及 <code>base_spec_worker.py</code> 的 <code>_packed_swa_rows_match_target</code>。
+</footer>
+</div>
+
+<script>
+const meta=[
+  ["两条路径总览","V4 走 SWA/C4/C128；V4.1 新增 C1/C2 和 indexer，代码里把这些池的装配单独放在 low-ratio 路径。"],
+  ["low-ratio 是什么","full page 固定 128 token；C1 的 S=128，C2 的 S=64。item_bytes = S × row_bytes。"],
+  ["indexer 的 native page","indexer 的 K=64；C1 需要把 I=2 个 native page 折成一个 full page，C2 的 I=1。"],
+  ["GPU 2-D vs NPU 4-D","NPU 的 sparse attention 按 PA_ND 读 KV；shape[1] 是槽数，不是字节数。"],
+  ["为什么 V4 没事","V4 的 host entry 用 page_bytes（buffers[0][0].numel()），不是 shape[1]；也没有 C1/C2 low-ratio 路径。"],
+  ["修复与结果","4-D 折 S 槽、item_bytes 取 full-page 字节；V4/GPU 路径不动；DSpark 走 DRAFT_SWA sidecar。"]
+];
+const steps=[...document.querySelectorAll('.step')];
+const sideTitle=document.getElementById('sideTitle');
+const sideDesc=document.getElementById('sideDesc');
+const stepNo=document.getElementById('stepNo');
+const bar=document.getElementById('bar');
+const prev=document.getElementById('prev');
+const next=document.getElementById('next');
+const play=document.getElementById('play');
+let cur=0, timer=null;
+const hashStep=Number((location.hash.match(/step=(\d+)/)||[])[1]);
+if(Number.isInteger(hashStep)) cur=Math.max(0,Math.min(steps.length-1,hashStep-1));
+
+function render(){
+  steps.forEach((s,i)=>s.classList.toggle('active',i===cur));
+  sideTitle.textContent=meta[cur][0];
+  sideDesc.textContent=meta[cur][1];
+  stepNo.textContent=cur+1;
+  bar.style.width=((cur+1)/steps.length*100)+'%';
+  prev.disabled=cur===0;
+  next.disabled=cur===steps.length-1;
+  if(cur===steps.length-1) stop();
+}
+function go(n){cur=Math.max(0,Math.min(steps.length-1,n));render()}
+function stop(){if(timer){clearInterval(timer);timer=null;play.textContent='自动播放'}}
+prev.onclick=()=>{stop();go(cur-1)};
+next.onclick=()=>{stop();go(cur+1)};
+play.onclick=()=>{
+  if(timer){stop();return}
+  if(cur===steps.length-1) go(0);
+  play.textContent='暂停';
+  timer=setInterval(()=>{ if(cur>=steps.length-1){stop();return} go(cur+1); },6500);
+};
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'){stop();go(cur+1)}
+  if(e.key==='ArrowLeft'){stop();go(cur-1)}
+});
+render();
+</script>
+</body>
+</html>
