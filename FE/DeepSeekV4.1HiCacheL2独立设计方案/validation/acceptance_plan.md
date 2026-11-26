@@ -1,6 +1,6 @@
 # 验收与验证计划
 
-所有测试基于 `dsv41-a5-hicache-l2` @ `23de16b280`（`origin/main` @ `a662e1efbb` 之上）。代码改动已实施；下文保留原始验收设计，当前完成状态见 [§0.4](#04-当前状态2026-11-25)。
+所有测试基于 `dsv41-a5-hicache-l2` @ `b7a1bcf25d`（`origin/main` @ `a662e1efbb` 之上）。代码改动已实施；下文保留原始验收设计，当前完成状态见 [§0.4](#04-当前状态2026-11-25)。
 
 可直接上 A5 跑的探测脚本见 [scripts/README.md](scripts/README.md)：先跑 `a5_kv_exchange_probe.py` 验证 full-page 传输，再跑 `a5_hicache_e2e_probe.py` 复现 G1/G10。2026-11-18 的算子探测结果（`page_size=128`、`layers=2`、AIV D2H/H2D 均 PASS）见 [a5_operator_probe_2026-11-18.md](a5_operator_probe_2026-11-18.md)。
 
@@ -53,7 +53,7 @@ python -m sglang.launch_server \
 | 页级字节校验 | 完成，7 个池的 D2H host CRC 与 H2D host/device CRC 一致 |
 | T5 输出逐 token 对比 | 不可用：A5 上 baseline 自身不可重复（MoE/DeepEP 数值不确定性），改用页级 CRC 作为正确性判据 |
 | G8 压缩状态数值等价 | 未直接证明；已验证 ratio-2 状态清理与页边界不变量 |
-| P4 DSpark + HiCache | 功能验证通过（2026-11-25）；最终 commit `23de16b280` A5 冒烟通过（2026-11-26）：`draft_swa` 77824 B / `swa` 69632 B，device 命中 128 token |
+| P4 DSpark + HiCache | 功能验证通过（2026-11-25）；`23de16b280` A5 冒烟通过（2026-11-26；PR head `b7a1bcf25d` 仅移动 `torch` import）：`draft_swa` 77824 B / `swa` 69632 B，device 命中 128 token |
 | T6 并发/中止、P2 性能、P3 压力 | 未执行 |
 | A5 E2E 注册 NPU CI | 未完成，当前用 `validation/scripts/` 手工脚本 |
 
@@ -160,7 +160,7 @@ python -m pytest \
 
 ## 5. P4：DSpark + HiCache（已支持）
 
-前置：`23de16b280` 的行宽回退已合入。
+前置：`23de16b280` 的行宽回退已合入（PR head `b7a1bcf25d`）。
 
 2026-11-25 已在 A5 上完成 DSpark + HiCache 的启动与推理功能验证。下面 1–3 的严格对比仍建议补测：
 

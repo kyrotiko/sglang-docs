@@ -2,7 +2,7 @@
 
 ## 运行配置
 
-- 代码：诊断时为 `dsv41-a5` 基线的 `dsv41-a5-hicache-l2` @ `13d596d980`（临时 CRC trace），trace 已在 `ab30299513` 清理。该分支后续已 rebase 到 `origin/main`，当前交付 HEAD 为 `23de16b280`；文中旧 commit 只属于历史基线。
+- 代码：诊断时为 `dsv41-a5` 基线的 `dsv41-a5-hicache-l2` @ `13d596d980`（临时 CRC trace），trace 已在 `ab30299513` 清理。该分支后续已 rebase 到 `origin/main`，当前交付 HEAD 为 `b7a1bcf25d`；文中旧 commit 只属于历史基线。
 - 模型：DeepSeek-V4.1-Flash-1017，A5 单机 8 卡
 - 启动：DP8，`--max-total-tokens 32768`，`--hicache-ratio 1.2`，`write_through`
 - 探测：`TRACE_PAGES=16`，`FILLER_COUNT=95`，`REPEAT_A=2`
@@ -91,7 +91,7 @@ HiCache draft SWA rows differ from the target's; using a DRAFT_SWA sidecar inste
 
 ## Rebase 后 A5 冒烟（2026-11-26）
 
-冒烟在最终 PR commit `23de16b280`（基于 `origin/main` @ `a662e1efbb`）上完成；此前在内容等价的 `46277ec334` 上也跑过一次，结论一致。A5 容器 `yy_test`，使用现有 DSpark 启动脚本追加：
+冒烟在 `23de16b280`（基于 `origin/main` @ `a662e1efbb`）上完成；PR head `b7a1bcf25d` 之后只把 `torch` import 移到模块级。此前在内容等价的 `46277ec334` 上也跑过一次，结论一致。A5 容器 `yy_test`，使用现有 DSpark 启动脚本追加：
 
 ```bash
 --enable-hierarchical-cache --hicache-ratio 2.0 --hicache-write-policy write_through
@@ -128,11 +128,11 @@ DP0 的 host 池几何（其余 rank 一致）：
 - 200-token prompt 连续两次（`routed_dp_rank=0`）：第二次 `cached_tokens=128`，`cached_tokens_details={"device":128,"host":0}`，页对齐与 device 命中正常；
 - 日志无 `ERROR` / `Traceback`。
 
-本轮 `max_total_num_tokens=537088`，没有强制 device 淘汰，因此未复现 host 命中；L2 host 命中的字节级证据沿用 2026-11-20 的 target-only 结果。rebase 未改动 L2 传输路径，CPU 测试 66 passed。最终 commit 的启动日志保存在 A5 `/workspace/serve_dspark_hicache_23de16b280.log`。
+本轮 `max_total_num_tokens=537088`，没有强制 device 淘汰，因此未复现 host 命中；L2 host 命中的字节级证据沿用 2026-11-20 的 target-only 结果。rebase 未改动 L2 传输路径，CPU 测试 66 passed。冒烟 commit 的启动日志保存在 A5 `/workspace/serve_dspark_hicache_23de16b280.log`。
 
 ## 仍未闭环
 
 - `hicache_host_used_tokens` 在 host 命中时仍为 0，指标没有覆盖 sidecar/回载；属于可观测性缺口，不影响本次 L2 结论。
 - `a5_hicache_page_roundtrip.py` 的 `c1_indexer` 仍是假阴性（测试脚本构造 host 视图的问题）；生产 E2E 的 `c1_indexer` 页 CRC 是匹配的。
-- DSpark + HiCache 只做了功能验证，没有归档页 CRC；最终 commit 的启动日志与 host 池几何已保存在 A5 `/workspace/serve_dspark_hicache_23de16b280.log`。
+- DSpark + HiCache 只做了功能验证，没有归档页 CRC；冒烟 commit 的启动日志与 host 池几何已保存在 A5 `/workspace/serve_dspark_hicache_23de16b280.log`。
 - CRC / compressor trace 是临时诊断代码（`13d596d980`、`35961346b0`），已在 `ab30299513` 移除；上面的数字保留作历史证据。

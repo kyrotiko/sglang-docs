@@ -1,6 +1,6 @@
 # 代码改动清单
 
-主仓 `sglang`，分支 `dsv41-a5-hicache-l2`（工作区 `D:/workspace/SGLang/sglang-dsv41-a5-hicache-l2`）。**代码已实施并完成 A5 验证**；基线为 `origin/main` @ `a662e1efbb`，分支 HEAD `23de16b280`。
+主仓 `sglang`，分支 `dsv41-a5-hicache-l2`（工作区 `D:/workspace/SGLang/sglang-dsv41-a5-hicache-l2`）。**代码已实施并完成 A5 验证**；基线为 `origin/main` @ `a662e1efbb`，分支 HEAD `b7a1bcf25d`。
 
 ## 0. 提交拆分（实际）
 
@@ -10,6 +10,7 @@
 | 2 | `23056a7e24` `feat(hicache): size V4 paged pools for auto-sizing` | G4/G10；覆盖 SWA/C1/C2/indexer；C4 state 与 V4 draft 显式拒绝 | 1 |
 | 3 | `7040d0b4f9` `fix(hicache): support sidecar DSpark draft and harden V4.1 tests` | sidecar 池不并入 target SWA；compressor 页边界测试 | 1 |
 | 4 | `23de16b280` `fix(hicache): sidecar a draft SWA pool whose rows differ from the target` | 计划阶段比较 SWA 行宽；V4 draft + V4.1 target 回退 `SIDECAR`，建 `DRAFT_SWA` host pool | 3 |
+| 5 | `b7a1bcf25d` `style(hicache): import torch at module scope` | 修复新加注解触发的 ruff F821；无行为变化 | 4 |
 
 CPU 结果：`test_dsv4_hicache_l2.py`、`test_dsv4_compressed_pools.py`、`test_hicache_auto_size.py`、`test_hicache_mtp_state.py` 共 66 passed。
 
@@ -194,7 +195,7 @@ if pack_eligible and not _packed_swa_rows_match_target(
 
 CPU 用例：`test_hicache_mtp_state.py::test_dspark_draft_swa_rows_decide_the_hicache_layout`，覆盖 544→`PACKED`、608→`SIDECAR` 两条路径。
 
-A5 验证：DSpark + HiCache 配方启动与推理功能通过（2026-11-25）；最终 PR commit `23de16b280` 冒烟通过（2026-11-26）。
+A5 验证：DSpark + HiCache 配方启动与推理功能通过（2026-11-25）；`23de16b280` 冒烟通过（2026-11-26），PR head `b7a1bcf25d` 之后只移动了 `torch` import。
 
 ## 5. 自动定容支持 V4 paged pools（已实现）
 
@@ -230,4 +231,4 @@ A5 验证：DSpark + HiCache 配方启动与推理功能通过（2026-11-25）�
 - `hicache_host_used_tokens` 对 sidecar/回载的指标覆盖（可观测性缺口）。
 - `a5_hicache_page_roundtrip.py` 的 `c1_indexer` 假阴性（测试脚本视角问题，生产 E2E CRC 已通过）。
 
-DSpark + HiCache 已不再是另立需求：`23de16b280` 起按独立 `DRAFT_SWA` sidecar 支持，并完成 A5 功能验证。
+DSpark + HiCache 已不再是另立需求：`23de16b280` 起按独立 `DRAFT_SWA` sidecar 支持，并完成 A5 功能验证（PR head `b7a1bcf25d`）。

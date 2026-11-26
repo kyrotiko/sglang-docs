@@ -15,26 +15,27 @@
 | 主仓 | `sglang`（fork） |
 | 分析基线 | `dsv41-a5` @ `9898f7ce9a`（合并 `randgun/dsv41-a5@c790194814` 后） |
 | 交付基线 | `origin/main` @ `a662e1efbb`（main 已合入 dsv41-a5 代码，本方案 rebase 到该基线） |
-| 本方案工作分支 | `dsv41-a5-hicache-l2` @ `23de16b280`，worktree `D:/workspace/SGLang/sglang-dsv41-a5-hicache-l2` |
+| 本方案工作分支 | `dsv41-a5-hicache-l2` @ `b7a1bcf25d`，worktree `D:/workspace/SGLang/sglang-dsv41-a5-hicache-l2` |
 | PR | [sgl-project/sglang#53204](https://github.com/sgl-project/sglang/pull/53204) |
 | 文档仓 | `sglang-docs`，`main` 分支 |
 | 分析日期 | 2026-11-18（2026-11-25 按 main 基线更新） |
 
 本文档只做**独立代码分析**：结论全部来自分析基线的代码、提交历史和 `sgl-kernel-npu` 参考仓文档，不引用其他分析文档的结论。**设计分析阶段没有 A5 实机运行**，所有涉及设备行为的判断都标记为待验证，并给出验证方法；后续 A5 算子探测与 E2E 结果见下节。
 
-## 实现状态（2026-11-25）
+## 实现状态（2026-11-26）
 
-- 代码分支：`dsv41-a5-hicache-l2`，基于 `origin/main` @ `a662e1efbb`，4 个提交：
+- 代码分支：`dsv41-a5-hicache-l2`，基于 `origin/main` @ `a662e1efbb`，5 个提交：
   - `5c32e0ee0a`：NPU 4-D 低压缩比页几何、C1/C2 预留、draft SWA 行宽断言；
   - `23056a7e24`：V4 paged pools auto-size；
   - `7040d0b4f9`：sidecar draft 与测试补齐；
-  - `23de16b280`：draft SWA 行宽不一致时回退到 `DRAFT_SWA` sidecar（DSpark + V4.1 target）。
+  - `23de16b280`：draft SWA 行宽不一致时回退到 `DRAFT_SWA` sidecar（DSpark + V4.1 target）；
+  - `b7a1bcf25d`：把 `torch` import 移到模块级，修复 ruff F821。
 - CPU：`test_dsv4_hicache_l2.py`、`test_dsv4_compressed_pools.py`、`test_hicache_auto_size.py`、`test_hicache_mtp_state.py` 共 66 passed。
 - A5：
   - `a5_kv_exchange_probe.py` 的 `page_size=128`、`layers=2` AIV D2H/H2D 已通过；
   - DP8 target-only E2E 已出现 host 命中 768 token，7 个池的 D2H/H2D 页 CRC 全部一致；
   - DSpark + HiCache 配方的实机启动与推理功能验证通过（2026-11-25）；
-  - 最终 PR commit `23de16b280` 完成 A5 冒烟（2026-11-26）：`draft_swa` 池 77824 B 行、`swa` 池 69632 B 行，8 个 rank 一致，device 命中 128 token。
+  - A5 冒烟在 `23de16b280` 上完成（2026-11-26）；PR head `b7a1bcf25d` 之后只把 `torch` import 移到模块级。`draft_swa` 池 77824 B 行、`swa` 池 69632 B 行，8 个 rank 一致，device 命中 128 token。
   - 详见 [E2E 结果](validation/a5_hicache_e2e_result_2026-11-20.md)。
 
 ## 结论摘要
