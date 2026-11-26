@@ -75,7 +75,7 @@
 | [缺口与风险分析](analysis/gap_analysis.md) | G1–G10，按优先级给出证据、影响和验证/修复状态 |
 | [L2 Host Offload 设计](design/l2_host_offload.md) | 启用方式、池布局、容量公式、数据面时序、正确性不变量、兼容矩阵 |
 | [代码改动清单](design/code_change_plan.md) | 逐文件/函数的改动建议与提交顺序 |
-| [PR #53204 代码说明](design/pr53204_code_walkthrough.md) | 逐文件、逐 hunk 解释全部改动与原因 |
+| [PR #53204 代码说明](design/pr53204_code_walkthrough.md) | 速讲版（按代码段给 committer）+ 逐文件、逐 hunk 的详细说明 |
 | [验收与验证计划](validation/acceptance_plan.md) | CPU 契约测试、A5 单卡功能/正确性/性能/压力测试与通过标准 |
 | [A5 验证脚本](validation/scripts/README.md) | 可直接上 A5 跑的算子 full-page 探测、HiCache E2E、G10 默认 ratio 复现 |
 | [A5 算子探测结果（2026-11-18）](validation/a5_operator_probe_2026-11-18.md) | `page_size=128` + `layers=2` 的 AIV D2H/H2D 已通过，full-page 传输假设成立 |

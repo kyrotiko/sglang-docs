@@ -1,11 +1,122 @@
 # PR #53204 代码说明
 
-本文按文件、按 hunk 说明 `dsv41-a5-hicache-l2` 相对 `origin/main` 的全部代码改动，以及每一处为什么这么改。对应 PR：
+本文先给一版按代码段的速讲，再按文件、按 hunk 说明 `dsv41-a5-hicache-l2` 相对 `origin/main` 的全部代码改动，以及每一处为什么这么改。对应 PR：
 
 - <https://github.com/sgl-project/sglang/pull/53204>
 - 分支：`dsv41-a5-hicache-l2` @ `b7a1bcf25d`
 - 基线：`origin/main` @ `a662e1efbb`
 - 规模：9 个文件，+569 / -50
+
+## 速讲版：按代码段讲给 committer
+
+如果只过一遍，按下面 8 段讲；时间紧就讲第 1、2、5 段。
+
+### 第 1 段：NPU 4-D indexer 归一化成一个 full page
+
+```python
+page = buffer[: full_pages * index_pages_per_full_page]
+if page.ndim == 4:
+    return page.reshape(full_pages, slots_per_full_page, *page.shape[2:])
+return page.view(torch.uint8).reshape(full_pages, -1)
+```
+
+- indexer 在 GPU 上是 2-D 行 `[pages, bytes]`，在 NPU 上是 4-D PA_ND `[pages, K, 1, dim]`。
+- 一个 full page 包含 `I` 个 native index page，所以 NPU 这边要先把 `I` 个 `K` 槽折成 `S` 槽，得到 `[full_pages, S, 1, dim]`。
+- 2-D 分支保持原样，GPU 路径不动。
+- 不能统一拍平：拍平会丢掉 PA_ND 的 5-D 视图，Ascend 传输算子按这个视图推导 `page_slots`，拍平后对不上。
+
+### 第 2 段：`item_bytes` 按 full page 算
+
+```python
+def _dsv4_full_page_bytes(buffers):
+    return buffers[0][0].numel() * buffers[0].element_size()
+```
+
+- 原来写的是 `buffers[0].shape[1] * element_size()`。
+- 在 NPU 4-D 上 `shape[1]` 是槽数 `S`，不是字节数，所以 host 页只分配了“S 个元素”的大小。
+- 现在取第一页的 `numel * element_size`，2-D 和 4-D 都能得到真正的 full-page 字节数。
+
+### 第 3 段：host 内存预留补上 C1/C2 和 indexer
+
+```python
+add_paged(kv_name, num_host_pages)
+...
+add_paged(name, num_host_pages * (slots_per_full_page // native_slots))
+```
+
+- `reserve_dsv4_paged_host_memory` 原来只预留 SWA，C1/C2 KV 和 indexer K/scale 没算。
+- ACL 后端下 `ensure_capacity` 是空操作，所以以前没暴露；memfabric 会漏预留。
+- KV 的 `page_bytes` 已经是 full page，直接乘 host 页数；indexer 的 `page_bytes` 是 native page，所以要乘 `I = S / K`。
+- 除不尽直接报错，不猜布局。
+
+### 第 4 段：auto-size 认识 V4 的 paged pools
+
+```python
+for info in pool.get_device_pool_infos():
+    region = info.buffer_info
+    if isinstance(region, DSV4PagedBufferInfo):
+        total += region.page_bytes * sum(b.shape[0] for b in region.buffers)
+    ...
+```
+
+- V4 pool 不在原来的 `_SIZEABLE_POOLS` 里，也没有通用 `layer_router`，所以只开 `--enable-hierarchical-cache` 不给 ratio 时启动直接失败。
+- 现在按 `get_device_pool_infos()` 的 region 类型统计：普通 Paged、Compressed 的 kv+rope、Indexer 的 key+scale 都算。
+- C4 持久状态（`DSV4CheckpointBufferInfo`）和 V4 draft 仍然直接拒绝，要求显式 `--hicache-ratio`，因为它们的 host 镜像比例不能简单按设备字节推。
+
+### 第 5 段：DSpark 的行宽决策
+
+```python
+target_row_bytes = target_swa.paged_buffer_info().page_bytes
+...
+if draft_swa.paged_buffer_info().page_bytes != target_row_bytes:
+    return False
+```
+
+```python
+pack_eligible = _can_pack_hicache_mtp(...)
+if pack_eligible and not _packed_swa_rows_match_target(...):
+    logger.info("HiCache draft SWA rows differ ...")
+    pack_eligible = False
+```
+
+- DSpark 的 draft 是 V4 架构，SWA 行宽 608 B；V4.1 target 是 544 B。
+- 原来的 `_can_pack_hicache_mtp` 只看算法类型，会把 DSpark 判成 `PACKED`，然后 draft 的 SWA buffer 被塞进 target 的 SWA host 池，启动时行宽断言直接失败。
+- 现在在计划阶段多比一步：两边 SWA 的 `page_bytes` 不一致，就把 `pack_eligible` 置空，落到已有的 sidecar 分支。
+- sidecar 会走 `build_swa_draft_pools()`，用 draft 自己的行宽建一个独立的 `DRAFT_SWA` host pool；target 的 `swa` 池不受影响。
+- 不报错：DSpark + V4.1 是我们要支持的组合，sidecar 是正确路径，不是异常。
+
+### 第 6 段：装配层的最后一道守卫
+
+```python
+_check_dsv4_draft_swa_row_bytes(
+    draft_swa.buffer_info.buffers, swa_info.page_bytes
+)
+```
+
+- 这段只在真的走 packed 时执行。
+- 如果行宽不一致，说明上面的计划层逻辑失效了，直接 fail loud，避免静默错读。
+- 另外 sidecar 池会从 `mtp_draft_device_pools` 里跳过，避免同一份 draft 被备份两次。
+
+### 第 7 段：重命名，不改行为
+
+```python
+native_page_size -> page_slots
+_to_native_page_indices -> _to_page_slots
+```
+
+- full-page 规范化之后，`device_buffers[0].shape[1]` 已经是 `S`，不是 native 的 `K`。
+- 继续叫 native 会误导，所以统一改成 `page_slots`。
+- `page_size` 仍然传 `S`，AIV 每次搬一个 full page，行为不变。
+
+### 第 8 段：测试分别锁什么
+
+- 4-D fake buffer：锁 `item_bytes` 和 `[pages, S, 1, dim]` 形状；
+- 预留测试：锁 indexer 要乘 `I`；
+- auto-size 测试：锁 7 个池都统计到；
+- `544→PACKED / 608→SIDECAR`：锁计划层决策；
+- `768/769` compressor 测试：锁 host 命中恢复时不会继承半对状态；
+- sidecar 测试：锁 sidecar 不并进 target SWA；
+- 545 行宽测试：锁装配层守卫。
 
 ## 0. 先理解数据模型
 
