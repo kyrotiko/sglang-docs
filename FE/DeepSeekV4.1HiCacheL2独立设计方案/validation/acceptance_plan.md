@@ -1,6 +1,6 @@
 # 验收与验证计划
 
-所有测试基于 `dsv41-a5-hicache-l2` @ `46277ec334`（`origin/main` @ `30a3796ca8` 之上）。代码改动已实施；下文保留原始验收设计，当前完成状态见 [§0.4](#04-当前状态2026-11-25)。
+所有测试基于 `dsv41-a5-hicache-l2` @ `23de16b280`（`origin/main` @ `a662e1efbb` 之上）。代码改动已实施；下文保留原始验收设计，当前完成状态见 [§0.4](#04-当前状态2026-11-25)。
 
 可直接上 A5 跑的探测脚本见 [scripts/README.md](scripts/README.md)：先跑 `a5_kv_exchange_probe.py` 验证 full-page 传输，再跑 `a5_hicache_e2e_probe.py` 复现 G1/G10。2026-11-18 的算子探测结果（`page_size=128`、`layers=2`、AIV D2H/H2D 均 PASS）见 [a5_operator_probe_2026-11-18.md](a5_operator_probe_2026-11-18.md)。
 
@@ -160,7 +160,7 @@ python -m pytest \
 
 ## 5. P4：DSpark + HiCache（已支持）
 
-前置：`46277ec334` 的行宽回退已合入。
+前置：`23de16b280` 的行宽回退已合入。
 
 2026-11-25 已在 A5 上完成 DSpark + HiCache 的启动与推理功能验证。下面 1–3 的严格对比仍建议补测：
 

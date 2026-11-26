@@ -14,8 +14,9 @@
 | --- | --- |
 | 主仓 | `sglang`（fork） |
 | 分析基线 | `dsv41-a5` @ `9898f7ce9a`（合并 `randgun/dsv41-a5@c790194814` 后） |
-| 交付基线 | `origin/main` @ `30a3796ca8`（main 已合入 dsv41-a5 代码，本方案 rebase 到该基线） |
-| 本方案工作分支 | `dsv41-a5-hicache-l2` @ `46277ec334`，worktree `D:/workspace/SGLang/sglang-dsv41-a5-hicache-l2` |
+| 交付基线 | `origin/main` @ `a662e1efbb`（main 已合入 dsv41-a5 代码，本方案 rebase 到该基线） |
+| 本方案工作分支 | `dsv41-a5-hicache-l2` @ `23de16b280`，worktree `D:/workspace/SGLang/sglang-dsv41-a5-hicache-l2` |
+| PR | [sgl-project/sglang#53204](https://github.com/sgl-project/sglang/pull/53204) |
 | 文档仓 | `sglang-docs`，`main` 分支 |
 | 分析日期 | 2026-11-18（2026-11-25 按 main 基线更新） |
 
@@ -23,17 +24,17 @@
 
 ## 实现状态（2026-11-25）
 
-- 代码分支：`dsv41-a5-hicache-l2`，基于 `origin/main` @ `30a3796ca8`，4 个提交：
-  - `cfa7dfca97`：NPU 4-D 低压缩比页几何、C1/C2 预留、draft SWA 行宽断言；
-  - `c3d1332606`：V4 paged pools auto-size；
-  - `a4ee5c3489`：sidecar draft 与测试补齐；
-  - `46277ec334`：draft SWA 行宽不一致时回退到 `DRAFT_SWA` sidecar（DSpark + V4.1 target）。
+- 代码分支：`dsv41-a5-hicache-l2`，基于 `origin/main` @ `a662e1efbb`，4 个提交：
+  - `5c32e0ee0a`：NPU 4-D 低压缩比页几何、C1/C2 预留、draft SWA 行宽断言；
+  - `23056a7e24`：V4 paged pools auto-size；
+  - `7040d0b4f9`：sidecar draft 与测试补齐；
+  - `23de16b280`：draft SWA 行宽不一致时回退到 `DRAFT_SWA` sidecar（DSpark + V4.1 target）。
 - CPU：`test_dsv4_hicache_l2.py`、`test_dsv4_compressed_pools.py`、`test_hicache_auto_size.py`、`test_hicache_mtp_state.py` 共 66 passed。
 - A5：
   - `a5_kv_exchange_probe.py` 的 `page_size=128`、`layers=2` AIV D2H/H2D 已通过；
   - DP8 target-only E2E 已出现 host 命中 768 token，7 个池的 D2H/H2D 页 CRC 全部一致；
   - DSpark + HiCache 配方的实机启动与推理功能验证通过（2026-11-25）；
-  - rebase 到最新 main 后再次完成 A5 冒烟（2026-11-26）：`draft_swa` 池 77824 B 行、`swa` 池 69632 B 行，8 个 rank 一致，device 命中 128 token。
+  - rebase 到最新 main 后再次完成 A5 冒烟（2026-11-26，冒烟 commit `46277ec334`；PR 前 rebase 后为 `23de16b280`，内容未变）：`draft_swa` 池 77824 B 行、`swa` 池 69632 B 行，8 个 rank 一致，device 命中 128 token。
   - 详见 [E2E 结果](validation/a5_hicache_e2e_result_2026-11-20.md)。
 
 ## 结论摘要
