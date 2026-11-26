@@ -34,7 +34,7 @@
   - `a5_kv_exchange_probe.py` 的 `page_size=128`、`layers=2` AIV D2H/H2D 已通过；
   - DP8 target-only E2E 已出现 host 命中 768 token，7 个池的 D2H/H2D 页 CRC 全部一致；
   - DSpark + HiCache 配方的实机启动与推理功能验证通过（2026-11-25）；
-  - rebase 到最新 main 后再次完成 A5 冒烟（2026-11-26，冒烟 commit `46277ec334`；PR 前 rebase 后为 `23de16b280`，内容未变）：`draft_swa` 池 77824 B 行、`swa` 池 69632 B 行，8 个 rank 一致，device 命中 128 token。
+  - 最终 PR commit `23de16b280` 完成 A5 冒烟（2026-11-26）：`draft_swa` 池 77824 B 行、`swa` 池 69632 B 行，8 个 rank 一致，device 命中 128 token。
   - 详见 [E2E 结果](validation/a5_hicache_e2e_result_2026-11-20.md)。
 
 ## 结论摘要

@@ -91,7 +91,7 @@ HiCache draft SWA rows differ from the target's; using a DRAFT_SWA sidecar inste
 
 ## Rebase 后 A5 冒烟（2026-11-26）
 
-冒烟时分支为 `dsv41-a5-hicache-l2` @ `46277ec334`（基于 `origin/main` @ `30a3796ca8`）；PR 前再次 rebase 到 `a662e1efbb`，交付 commit 为 `23de16b280`，本次冒烟涉及的 9 个文件内容未变。A5 容器 `yy_test`，使用现有 DSpark 启动脚本追加：
+冒烟在最终 PR commit `23de16b280`（基于 `origin/main` @ `a662e1efbb`）上完成；此前在内容等价的 `46277ec334` 上也跑过一次，结论一致。A5 容器 `yy_test`，使用现有 DSpark 启动脚本追加：
 
 ```bash
 --enable-hierarchical-cache --hicache-ratio 2.0 --hicache-write-policy write_through
@@ -109,14 +109,16 @@ DP0 的 host 池几何（其余 rank 一致）：
 
 | 池 | layers | pages | item_bytes | layout |
 | --- | --- | --- | --- | --- |
-| `swa` | 40 | 516 | 69632 | page_first |
-| `draft_swa` | 3 | 516 | 77824 | page_first |
-| `deepseek_v4_c1` | 1 | 8392 | 40960 | page_first |
-| `deepseek_v4_c1_indexer` | 1 | 8392 | 8192 | page_first |
-| `deepseek_v4_c1_indexer_scale` | 1 | 8392 | 512 | page_first |
-| `deepseek_v4_c2` | 3 | 8392 | 20480 | page_first |
-| `deepseek_v4_c2_indexer` | 3 | 8392 | 4096 | page_first |
-| `deepseek_v4_c2_indexer_scale` | 3 | 8392 | 256 | page_first |
+| `swa` | 40 | 532 | 69632 | page_first |
+| `draft_swa` | 3 | 532 | 77824 | page_first |
+| `deepseek_v4_c1` | 1 | 8168 | 40960 | page_first |
+| `deepseek_v4_c1_indexer` | 1 | 8168 | 8192 | page_first |
+| `deepseek_v4_c1_indexer_scale` | 1 | 8168 | 512 | page_first |
+| `deepseek_v4_c2` | 3 | 8168 | 20480 | page_first |
+| `deepseek_v4_c2_indexer` | 3 | 8168 | 4096 | page_first |
+| `deepseek_v4_c2_indexer_scale` | 3 | 8168 | 256 | page_first |
+
+第一次 run（`46277ec334`）的 pages 为 516/8392，最终 run 为 532/8168；pages 随空闲显存变化，`item_bytes` 不变。
 
 `swa` = 544 × 128，`draft_swa` = 608 × 128，确认 V4 draft 与 V4.1 target 已拆成两个 host 池。服务随后打印 `The server is fired up and ready to roll!`。
 
@@ -126,11 +128,11 @@ DP0 的 host 池几何（其余 rank 一致）：
 - 200-token prompt 连续两次（`routed_dp_rank=0`）：第二次 `cached_tokens=128`，`cached_tokens_details={"device":128,"host":0}`，页对齐与 device 命中正常；
 - 日志无 `ERROR` / `Traceback`。
 
-本轮 `max_total_num_tokens=537088`，没有强制 device 淘汰，因此未复现 host 命中；L2 host 命中的字节级证据沿用 2026-11-20 的 target-only 结果。rebase 未改动 L2 传输路径，CPU 测试 66 passed。
+本轮 `max_total_num_tokens=537088`，没有强制 device 淘汰，因此未复现 host 命中；L2 host 命中的字节级证据沿用 2026-11-20 的 target-only 结果。rebase 未改动 L2 传输路径，CPU 测试 66 passed。最终 commit 的启动日志保存在 A5 `/workspace/serve_dspark_hicache_23de16b280.log`。
 
 ## 仍未闭环
 
 - `hicache_host_used_tokens` 在 host 命中时仍为 0，指标没有覆盖 sidecar/回载；属于可观测性缺口，不影响本次 L2 结论。
 - `a5_hicache_page_roundtrip.py` 的 `c1_indexer` 仍是假阴性（测试脚本构造 host 视图的问题）；生产 E2E 的 `c1_indexer` 页 CRC 是匹配的。
-- DSpark + HiCache 本轮只做了功能验证，没有归档启动日志、host 池几何与页 CRC；需要字节级证据时按 `validation/scripts/README.md` 重跑。
+- DSpark + HiCache 只做了功能验证，没有归档页 CRC；最终 commit 的启动日志与 host 池几何已保存在 A5 `/workspace/serve_dspark_hicache_23de16b280.log`。
 - CRC / compressor trace 是临时诊断代码（`13d596d980`、`35961346b0`），已在 `ab30299513` 移除；上面的数字保留作历史证据。

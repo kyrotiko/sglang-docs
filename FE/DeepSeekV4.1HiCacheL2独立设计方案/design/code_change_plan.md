@@ -194,7 +194,7 @@ if pack_eligible and not _packed_swa_rows_match_target(
 
 CPU 用例：`test_hicache_mtp_state.py::test_dspark_draft_swa_rows_decide_the_hicache_layout`，覆盖 544→`PACKED`、608→`SIDECAR` 两条路径。
 
-A5 验证：DSpark + HiCache 配方启动与推理功能通过（2026-11-25）；rebase 后冒烟通过（2026-11-26，冒烟 commit `46277ec334`，PR 前 rebase 后为 `23de16b280`）。
+A5 验证：DSpark + HiCache 配方启动与推理功能通过（2026-11-25）；最终 PR commit `23de16b280` 冒烟通过（2026-11-26）。
 
 ## 5. 自动定容支持 V4 paged pools（已实现）
 
